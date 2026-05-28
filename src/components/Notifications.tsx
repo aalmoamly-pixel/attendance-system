@@ -11,7 +11,7 @@ import {
   Paperclip,
   Smile
 } from 'lucide-react';
-import { db } from '../lib/supabase';
+import { db, supabase } from '../lib/supabase';
 import { getAuthState } from '../lib/auth';
 import type { Notification, Student } from '../types/database';
 
@@ -35,20 +35,40 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
   const currentUserId = authState.user?.student_id;
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
-  }, [studentId, isAdmin, selectedChatStudent]);
+    loadInitialData();
+    
+    // Set up realtime listener for new messages
+    let subscription: any = null;
+    if (supabase) {
+      subscription = supabase
+        .channel('notifications_channel')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'notifications'
+        }, (payload) => {
+          console.log('[Realtime] New message received:', payload);
+          handleRealtimeUpdate(payload);
+        })
+        .subscribe();
+    }
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, [studentId, isAdmin]);
+
+  useEffect(() => {
+    filterMessages(allMessages);
+  }, [selectedChatStudent, allMessages, isAdmin, studentId]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const loadData = async () => {
+  const loadInitialData = async () => {
     try {
       setLoading(true);
       const [notifs, students] = await Promise.all([
@@ -57,16 +77,15 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
       ]);
       
       setAllMessages(notifs);
-      setAllStudents(students.filter(s => s.role === 'student'));
-      
-      if (isAdmin && !selectedChatStudent && students.length > 0) {
-        const firstStudent = students.find(s => s.role === 'student');
-        if (firstStudent) {
+      if (isAdmin) {
+        const filteredStudents = students.filter(s => s.role === 'student');
+        setAllStudents(filteredStudents);
+        
+        if (!selectedChatStudent && filteredStudents.length > 0) {
+          const firstStudent = filteredStudents[0];
           setSelectedChatStudent(firstStudent);
         }
       }
-      
-      filterMessages(notifs);
     } catch (err) {
       console.error('[Notifications] Error loading data:', err);
     } finally {
@@ -74,32 +93,53 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
     }
   };
 
-  const filterMessages = (notifs: Notification[]) => {
-    if (isAdmin && selectedChatStudent) {
-      const chatMessages = notifs.filter(n => 
-        n.student_id === selectedChatStudent.student_id
+  const handleRealtimeUpdate = (payload: any) => {
+    if (payload.eventType === 'INSERT' && payload.new) {
+      setAllMessages(prev => [payload.new, ...prev]);
+    } else if (payload.eventType === 'UPDATE' && payload.new) {
+      setAllMessages(prev => 
+        prev.map(msg => 
+          msg.notification_id === payload.new.notification_id ? payload.new : msg
+        )
       );
-      setMessages(chatMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const filterMessages = (notifs: Notification[]) => {
+    let filtered: Notification[] = [];
+    
+    if (isAdmin && selectedChatStudent) {
+      filtered = notifs.filter(n => n.student_id === selectedChatStudent.student_id);
       
-      chatMessages.filter(n => 
-        n.sender_role === 'student' && 
-        !n.is_read
-      ).forEach(n => {
+      // Mark unread messages as read
+      const unreadFromStudent = filtered.filter(
+        n => n.sender_role === 'student' && !n.is_read
+      );
+      
+      unreadFromStudent.forEach(n => {
         db.markNotificationRead(n.notification_id);
       });
-    } else if (!isAdmin && studentId) {
-      const chatMessages = notifs.filter(n => 
-        n.student_id === studentId
-      );
-      setMessages(chatMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
       
-      chatMessages.filter(n => 
-        n.sender_role === 'admin' && 
-        !n.is_read
-      ).forEach(n => {
+    } else if (!isAdmin && studentId) {
+      filtered = notifs.filter(n => n.student_id === studentId);
+      
+      // Mark unread messages from admin as read
+      const unreadFromAdmin = filtered.filter(
+        n => n.sender_role === 'admin' && !n.is_read
+      );
+      
+      unreadFromAdmin.forEach(n => {
         db.markNotificationRead(n.notification_id);
       });
     }
+
+    setMessages(filtered.sort((a, b) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    ));
   };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -112,7 +152,7 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
       setSending(true);
       const targetStudentId = isAdmin ? selectedChatStudent!.student_id : studentId;
       
-      await db.sendNotification({
+      const newNotification = await db.sendNotification({
         student_id: targetStudentId!,
         sender_id: currentUserId || 0,
         sender_role: authState.role || 'student',
@@ -120,8 +160,9 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
         is_read: false
       });
 
+      // Optimistic update
+      setAllMessages(prev => [newNotification, ...prev]);
       setMessageInput('');
-      await loadData();
     } catch (err) {
       console.error('[Notifications] Error sending:', err);
     } finally {
@@ -144,6 +185,18 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
     ).length;
   };
 
+  const getLastMessage = (student: Student) => {
+    const studentMessages = allMessages.filter(n => 
+      n.student_id === student.student_id
+    );
+    if (studentMessages.length === 0) return null;
+    
+    const sorted = studentMessages.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    return sorted[0];
+  };
+
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleTimeString('ar-SA', {
@@ -162,7 +215,19 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
     });
   };
 
-  const filteredStudents = allStudents.filter(s => 
+  // Sort students by last message time
+  const sortedStudents = [...allStudents].sort((a, b) => {
+    const lastMsgA = getLastMessage(a);
+    const lastMsgB = getLastMessage(b);
+    
+    if (!lastMsgA && !lastMsgB) return 0;
+    if (!lastMsgA) return 1;
+    if (!lastMsgB) return -1;
+    
+    return new Date(lastMsgB.created_at).getTime() - new Date(lastMsgA.created_at).getTime();
+  });
+
+  const filteredStudents = sortedStudents.filter(s => 
     s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.academic_id.includes(searchQuery)
   );
@@ -223,6 +288,7 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
             <div className="flex-1 overflow-y-auto">
               {filteredStudents.map((student) => {
                 const unread = getUnreadCount(student);
+                const lastMsg = getLastMessage(student);
                 const isSelected = selectedChatStudent?.student_id === student.student_id;
                 
                 return (
@@ -248,8 +314,15 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
                     <div className="flex-1 text-right min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-white truncate text-lg">{student.full_name}</span>
+                        {lastMsg && (
+                          <span className="text-xs text-dark-muted">{formatTime(lastMsg.created_at)}</span>
+                        )}
                       </div>
-                      <p className="text-sm text-dark-muted truncate mt-1">{student.academic_id}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-sm text-dark-muted truncate">
+                          {lastMsg ? lastMsg.message : student.academic_id}
+                        </p>
+                      </div>
                     </div>
                   </button>
                 );
