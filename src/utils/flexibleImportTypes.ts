@@ -11,7 +11,10 @@ export type ImportWarningType =
   | 'ACADEMIC_ID_MISSING'
   | 'PASSWORD_MISSING'
   | 'DEPARTMENT_MISSING'
-  | 'DEPARTMENT_UNKNOWN';
+  | 'DEPARTMENT_UNKNOWN'
+  | 'SUBJECT_MISSING'
+  | 'WEEKDAY_UNKNOWN'
+  | 'SLOT_UNKNOWN';
 
 export interface ImportWarning {
   id: string;
@@ -24,7 +27,19 @@ export interface ImportWarning {
 }
 
 // ----------------------------------------------------
-// 2. صف بيانات بعد التحليل
+// 2. بيانات مادة دراسية للطالب
+// ----------------------------------------------------
+export interface StudentSubjectData {
+  subjectName: string;
+  weekdayName?: string;
+  timeRange?: string;
+  slotName?: string;
+  lecturer?: string;
+  room?: string;
+}
+
+// ----------------------------------------------------
+// 3. صف بيانات بعد التحليل
 // ----------------------------------------------------
 export interface ProcessedRow {
   original: Record<string, any>;
@@ -35,13 +50,14 @@ export interface ProcessedRow {
     nationalId: string;
     password: string;
     department: string;
+    subjects: StudentSubjectData[];
   };
   warnings: ImportWarning[];
   isSuccess: boolean;
 }
 
 // ----------------------------------------------------
-// 3. تقرير الاستيراد
+// 4. تقرير الاستيراد
 // ----------------------------------------------------
 export interface ImportReport {
   totalRows: number;
@@ -55,7 +71,7 @@ export interface ImportReport {
 }
 
 // ----------------------------------------------------
-// 4. نتيجة الاستيراد النهائية
+// 5. نتيجة الاستيراد النهائية
 // ----------------------------------------------------
 export interface FlexibleImportResult {
   success: boolean;
