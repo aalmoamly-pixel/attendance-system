@@ -184,7 +184,7 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
 
       {/* 3. MOBILE SIDEBAR DRAWER */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 md:hidden flex justify-start">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 md:hidden flex justify-end">
           <div className="w-72 bg-dark-card h-full border-l border-dark-border/40 p-6 flex flex-col animate-slide-up">
             <div className="flex items-center justify-between pb-6 border-b border-dark-border/40 mb-6">
               <div className="flex items-center gap-2">

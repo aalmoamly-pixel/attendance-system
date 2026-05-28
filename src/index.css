@@ -131,12 +131,21 @@
   vertical-align: middle;
 }
 
-body {
+html, body {
   background-color: var(--color-dark-bg);
   color: var(--color-dark-text);
   font-family: 'Cairo', 'Outfit', 'Inter', sans-serif;
   overflow-x: hidden;
+  max-width: 100%;
   direction: rtl;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body {
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 /* Custom dark scrollbar */
