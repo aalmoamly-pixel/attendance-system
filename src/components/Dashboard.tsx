@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
   Users, 
+  BookOpen,
   Calendar, 
+  Building2,
   Clock,
   CheckCircle2,
   XCircle,
@@ -22,6 +24,7 @@ import { db, migrateLocalToSupabase } from '../lib/supabase';
 import type { 
   Student, 
   Subject, 
+  Department,
   StudentSchedule, 
   TimeSlot,
   AttendanceLog
@@ -55,6 +58,7 @@ const AnimatedCounter = ({ value, suffix = '' }: { value: number, suffix?: strin
 export default function Dashboard({ setActivePage }: { setActivePage: (p: string) => void }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [schedules, setSchedules] = useState<StudentSchedule[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
@@ -133,9 +137,10 @@ export default function Dashboard({ setActivePage }: { setActivePage: (p: string
       setError(null);
       formatTodayDate();
 
-      const [studentsData, subjectsData, schedulesData, slotsData, attendanceData] = await Promise.all([
+      const [studentsData, subjectsData, deptsData, schedulesData, slotsData, attendanceData] = await Promise.all([
         db.getStudents(),
         db.getSubjects(),
+        db.getDepartments(),
         db.getSchedules(),
         db.getTimeSlots(),
         db.getAttendance()
@@ -143,6 +148,7 @@ export default function Dashboard({ setActivePage }: { setActivePage: (p: string
 
       setStudents(studentsData);
       setSubjects(subjectsData);
+      setDepartments(deptsData);
       setSchedules(schedulesData);
       setTimeSlots(slotsData);
       setAttendanceLogs(attendanceData);
@@ -363,27 +369,73 @@ export default function Dashboard({ setActivePage }: { setActivePage: (p: string
         </div>
       </div>
 
-      {/* 1. SMART ATTENDANCE STATS */}
-      <div>
+      {/* 1. ORIGINAL STATS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* TOTAL STUDENTS */}
+        <div className="glass-card p-6 hover:-translate-y-1 transition-all relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full blur-3xl group-hover:bg-brand-primary/10 transition-colors" />
+          <div className="flex justify-between items-start mb-4">
+            <div className="w-12 h-12 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center">
+              <Users className="w-6 h-6" />
+            </div>
+          </div>
+          <div>
+            <p className="text-3xl font-black text-white mb-1">{students.length}</p>
+            <p className="text-sm text-dark-muted font-semibold">طالب إجمالي</p>
+          </div>
+        </div>
+
+        {/* TOTAL SUBJECTS */}
+        <div className="glass-card p-6 hover:-translate-y-1 transition-all relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-secondary/5 rounded-full blur-3xl group-hover:bg-brand-secondary/10 transition-colors" />
+          <div className="flex justify-between items-start mb-4">
+            <div className="w-12 h-12 rounded-xl bg-brand-secondary/10 text-brand-secondary flex items-center justify-center">
+              <BookOpen className="w-6 h-6" />
+            </div>
+          </div>
+          <div>
+            <p className="text-3xl font-black text-white mb-1">{subjects.length}</p>
+            <p className="text-sm text-dark-muted font-semibold">مادة مسجلة</p>
+          </div>
+        </div>
+
+        {/* TOTAL SCHEDULES */}
+        <div className="glass-card p-6 hover:-translate-y-1 transition-all relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-info/5 rounded-full blur-3xl group-hover:bg-brand-info/10 transition-colors" />
+          <div className="flex justify-between items-start mb-4">
+            <div className="w-12 h-12 rounded-xl bg-brand-info/10 text-brand-info flex items-center justify-center">
+              <Calendar className="w-6 h-6" />
+            </div>
+          </div>
+          <div>
+            <p className="text-3xl font-black text-white mb-1">{schedules.length}</p>
+            <p className="text-sm text-dark-muted font-semibold">جلسة مجدولة</p>
+          </div>
+        </div>
+
+        {/* TOTAL DEPARTMENTS */}
+        <div className="glass-card p-6 hover:-translate-y-1 transition-all relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-success/5 rounded-full blur-3xl group-hover:bg-brand-success/10 transition-colors" />
+          <div className="flex justify-between items-start mb-4">
+            <div className="w-12 h-12 rounded-xl bg-brand-success/10 text-brand-success flex items-center justify-center">
+              <Building2 className="w-6 h-6" />
+            </div>
+          </div>
+          <div>
+            <p className="text-3xl font-black text-white mb-1">{departments.length}</p>
+            <p className="text-sm text-dark-muted font-semibold">تخصصات مختلفة</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. SMART ATTENDANCE STATS */}
+      <div className="mt-6">
         <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
           <BarChart3 className="w-6 h-6 text-brand-primary" />
           📊 إحصائيات الحضور الذكية
         </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          <div className="glass-card p-6 hover:-translate-y-1 transition-all relative overflow-hidden group col-span-1">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full blur-3xl group-hover:bg-brand-primary/10 transition-colors" />
-            <div className="flex justify-between items-start mb-4">
-              <div className="w-12 h-12 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center">
-                <Users className="w-6 h-6" />
-              </div>
-            </div>
-            <div>
-              <AnimatedCounter value={attendanceStats.totalStudents} />
-              <p className="text-sm text-dark-muted font-semibold">طالب إجمالي</p>
-            </div>
-          </div>
-          
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="glass-card p-6 hover:-translate-y-1 transition-all relative overflow-hidden group col-span-1">
             <div className="absolute top-0 right-0 w-32 h-32 bg-brand-success/5 rounded-full blur-3xl group-hover:bg-brand-success/10 transition-colors" />
             <div className="flex justify-between items-start mb-4">
