@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { supabase, db } from '../lib/supabase';
 import { getAuthState, logout } from '../lib/auth';
-import type { Notification } from '../types/database';
 
 interface LayoutProps {
   children: React.ReactNode;

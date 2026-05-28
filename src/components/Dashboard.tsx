@@ -16,17 +16,15 @@ import type {
   Subject, 
   Department, 
   StudentSchedule, 
-  TimeSlot, 
-  Weekday 
+  TimeSlot
 } from '../types/database';
 
-export default function Dashboard({ setActivePage }: { setActivePage: (p: string) => void }) {
+export default function Dashboard({ setActivePage: _setActivePage }: { setActivePage: (p: string) => void }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [schedules, setSchedules] = useState<StudentSchedule[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [weekdays, setWeekdays] = useState<Weekday[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [todayDate, setTodayDate] = useState('');
@@ -52,13 +50,12 @@ export default function Dashboard({ setActivePage }: { setActivePage: (p: string
       setError(null);
       formatTodayDate();
 
-      const [studentsData, subjectsData, deptsData, schedulesData, slotsData, weekdaysData] = await Promise.all([
+      const [studentsData, subjectsData, deptsData, schedulesData, slotsData] = await Promise.all([
         db.getStudents(),
         db.getSubjects(),
         db.getDepartments(),
         db.getSchedules(),
-        db.getTimeSlots(),
-        db.getWeekdays()
+        db.getTimeSlots()
       ]);
 
       setStudents(studentsData);
@@ -66,7 +63,6 @@ export default function Dashboard({ setActivePage }: { setActivePage: (p: string
       setDepartments(deptsData);
       setSchedules(schedulesData);
       setTimeSlots(slotsData);
-      setWeekdays(weekdaysData);
     } catch (err: any) {
       console.error(err);
       setError('حدث خطأ أثناء تحميل البيانات.');

@@ -13,7 +13,7 @@ import {
 import { db } from '../lib/supabase';
 import type { Student, Subject } from '../types/database';
 
-export default function AttendanceReport({ setActivePage }: { setActivePage: (p: string) => void }) {
+export default function AttendanceReport({ setActivePage: _setActivePage }: { setActivePage: (p: string) => void }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -77,13 +77,6 @@ export default function AttendanceReport({ setActivePage }: { setActivePage: (p:
   };
 
   const selectedStudent = students.find(s => String(s.student_id) === selectedStudentId);
-
-  const getStudentSubjects = () => {
-    if (!selectedStudent) return [];
-    const studentSchedules = schedules.filter(s => s.student_id === selectedStudent.student_id);
-    const subjectIds = studentSchedules.map(s => s.subject_id);
-    return subjects.filter(sub => subjectIds.includes(sub.subject_id));
-  };
 
   const getScheduleInfo = (subject: Subject) => {
     if (!selectedStudent) return null;

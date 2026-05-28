@@ -10,7 +10,7 @@ import SmartImport from './components/SmartImport';
 import ScheduleImport from './components/ScheduleImport';
 import StudentDashboard from './components/StudentDashboard';
 import Notifications from './components/Notifications';
-import { getAuthState, setAuthState, logout, initializeDefaultAdmin } from './lib/auth';
+import { getAuthState, logout, initializeDefaultAdmin } from './lib/auth';
 import type { AuthState } from './types/database';
 
 export default function App() {

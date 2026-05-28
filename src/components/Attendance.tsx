@@ -176,7 +176,6 @@ export default function AttendancePage() {
   };
 
   const studentSubjects = getStudentSubjects();
-  const currentStatus = getCurrentStatus();
   const overallStats = selectedStudent ? getOverallAttendanceStats(selectedStudent) : null;
 
   const weeks = Array.from({ length: 15 }, (_, i) => i + 1);
@@ -284,7 +283,7 @@ export default function AttendancePage() {
               <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold ${
                 overallStats?.isWarning 
                   ? 'bg-brand-danger/10 text-brand-danger' 
-                  : overallStats?.rate >= 85 
+                  : (overallStats?.rate ?? 0) >= 85 
                     ? 'bg-brand-success/10 text-brand-success' 
                     : 'bg-yellow-500/10 text-yellow-500'
               }`}>

@@ -1,5 +1,5 @@
 import { db } from './supabase';
-import type { Student, UserRole, AuthState, LoginCredentials } from '../types/database';
+import type { AuthState, LoginCredentials } from '../types/database';
 
 const AUTH_KEY = 'attendance_auth';
 

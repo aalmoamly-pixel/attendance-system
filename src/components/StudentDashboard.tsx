@@ -4,19 +4,17 @@ import {
   BookOpen, 
   Calendar, 
   AlertTriangle, 
-  CheckCircle2, 
   LogOut,
   Award,
   Clock,
   X,
   Check,
-  MessageSquare,
   Bell,
   Sparkles
 } from 'lucide-react';
 import { db } from '../lib/supabase';
-import { getAuthState, logout } from '../lib/auth';
-import type { Student, Subject, Notification, PersonalNote } from '../types/database';
+import { getAuthState } from '../lib/auth';
+import type { Student, Notification, PersonalNote } from '../types/database';
 import Notifications from './Notifications';
 
 interface StudentDashboardProps {
@@ -25,14 +23,12 @@ interface StudentDashboardProps {
 
 export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const [student, setStudent] = useState<Student | null>(null);
-  const [subjects, setSubjects] = useState<any[]>([]);
   const [schedule, setSchedule] = useState<any[]>([]);
   const [attendanceRates, setAttendanceRates] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [personalNote, setPersonalNote] = useState<PersonalNote | null>(null);
   const [showNote, setShowNote] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'notifications'>('dashboard');
 
   useEffect(() => {
@@ -46,17 +42,15 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const loadData = async (studentId: number) => {
     try {
       setLoading(true);
-      const [studentSchedule, rates, allSubjects, note, notifs] = await Promise.all([
+      const [studentSchedule, rates, note, notifs] = await Promise.all([
         db.getStudentSchedule(studentId),
         db.calculateAttendanceRates(studentId),
-        db.getSubjects(),
         db.getPersonalNote(studentId),
         db.getNotifications(studentId)
       ]);
       
       setSchedule(studentSchedule);
       setAttendanceRates(rates);
-      setSubjects(allSubjects);
       setPersonalNote(note);
       setNotifications(notifs);
       setShowNote(note?.is_active ?? false);

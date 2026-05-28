@@ -700,7 +700,7 @@ export const db = {
     }
   },
 
-  async getAttendanceReport(student_id: number, from: string, to: string): Promise<AttendanceLog[]> {
+  async getAttendanceReport(_student_id: number, from: string, to: string): Promise<AttendanceLog[]> {
     if (supabase) {
       const { data, error } = await supabase
         .from('attendance_log')
@@ -785,11 +785,10 @@ export const db = {
   },
 
   async getDashboardStats(): Promise<DashboardStats> {
-    const [students, subjects, schedules, departments] = await Promise.all([
+    const [students, subjects, schedules] = await Promise.all([
       this.getStudents(),
       this.getSubjects(),
-      this.getSchedules(),
-      this.getDepartments()
+      this.getSchedules()
     ]);
 
     return {

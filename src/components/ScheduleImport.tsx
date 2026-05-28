@@ -6,13 +6,10 @@ import {
   Users, 
   BookOpen, 
   Calendar, 
-  Clock, 
-  Building2,
   RefreshCw,
   Check,
   XCircle,
   X,
-  AlertTriangle,
   Sparkles
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -36,9 +33,10 @@ interface RawScheduleRow {
 interface ParsedData {
   students: Array<{
     full_name: string;
-    phone: string;
+    phone: string | null;
     academic_id: string;
-    password_hash: string;
+    national_id: string;
+    password: string;
     department_name: string;
   }>;
   subjects: Array<{ subject_name: string; department_name: string }>;
@@ -61,19 +59,6 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
   const handleSelectClick = () => {
     fileInputRef.current?.click();
-  };
-
-  const parseArabicDayToWeekdayId = (dayName: string): number => {
-    const dayMap: Record<string, number> = {
-      'الأحد': 1,
-      'الإثنين': 2,
-      'الثلاثاء': 3,
-      'الأربعاء': 4,
-      'الخميس': 5,
-      'الجمعة': 6,
-      'السبت': 7
-    };
-    return dayMap[dayName] || 1;
   };
 
   const parseTextToRows = (text: string): RawScheduleRow[] => {
@@ -207,9 +192,10 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           seenStudents.add(academicId);
           students.push({
             full_name: studentName || `طالب ${academicId}`,
-            phone: phone || `05${Math.floor(Math.random() * 900000000 + 100000000)}`,
+            phone: phone || null,
             academic_id: academicId,
-            password_hash: 'Aa123456',
+            national_id: phone || `9${Math.floor(Math.random() * 900000000 + 100000000)}`,
+            password: 'Aa123456',
             department_name: departmentName
           });
         }
@@ -265,8 +251,9 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           full_name: student.full_name,
           phone: student.phone,
           academic_id: student.academic_id,
-          password_hash: student.password_hash,
-          department_id: deptMap.get(student.department_name) || null
+          national_id: student.national_id,
+          password: student.password,
+          department_id: deptMap.get(student.department_name) || 1
         }))
       );
 

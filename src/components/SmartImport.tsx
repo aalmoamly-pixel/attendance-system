@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { 
   UploadCloud, 
   Sparkles, 
@@ -14,7 +14,6 @@ import {
   XCircle,
   X,
   Eye,
-  ChevronRight,
   AlertTriangle,
   Info
 } from 'lucide-react';

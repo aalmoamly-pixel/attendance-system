@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   MessageSquare, 
   Send, 
-  X, 
   Check, 
   User,
   Shield,
@@ -293,7 +292,7 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
                   <>
                     {(() => {
                       let lastDate = '';
-                      return messages.map((msg, index) => {
+                      return messages.map((msg, _index) => {
                         const msgDate = formatDate(msg.created_at);
                         const showDate = msgDate !== lastDate;
                         lastDate = msgDate;

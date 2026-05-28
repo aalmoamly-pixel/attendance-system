@@ -6,7 +6,6 @@ import {
   Trash2, 
   X, 
   Check, 
-  Phone, 
   GraduationCap, 
   RefreshCw,
   AlertCircle,
@@ -39,7 +38,7 @@ export default function Students() {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [selectedStudentForNote, setSelectedStudentForNote] = useState<Student | null>(null);
-  const [personalNote, setPersonalNote] = useState<PersonalNote | null>(null);
+  const [_personalNote, setPersonalNote] = useState<PersonalNote | null>(null);
   const [noteText, setNoteText] = useState('');
   const [noteActive, setNoteActive] = useState(true);
   const [formData, setFormData] = useState({
@@ -98,7 +97,7 @@ export default function Students() {
       academic_id: '',
       national_id: '',
       password: 'Aa123456',
-      department_id: departments[0]?.department_id || 1
+      department_name: departments[0]?.department_name || 'هندسة البرمجيات'
     });
     setStudentSubjects([
       { subject_name: '', weekday_id: 1, slot_id: timeSlots[0]?.slot_id || 1 }
@@ -292,10 +291,12 @@ export default function Students() {
           national_id: formData.national_id,
           password: formData.password,
           role: 'student',
-          department_id: departmentId
-        };
+          department_id: departmentId,
+          password_hash: ''
+        } as any;
         console.log('[Students handleSubmit] newStudentData:', newStudentData);
-        const studentId = await db.createStudent(newStudentData);
+        const newStudent = await db.createStudent(newStudentData);
+        const studentId = newStudent.student_id;
         
         for (const subj of studentSubjects) {
           if (subj.subject_name) {

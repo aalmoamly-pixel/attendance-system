@@ -170,7 +170,6 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
     const subjectsMap = new Map<string, { id: number; name: string; departmentId: number | null }>();
     
     let deptIdCounter = 1;
-    let subjIdCounter = 1;
     
     defaultDepartments.forEach(name => {
       departmentsMap.set(name, { id: deptIdCounter++, name, degreeType: 'بكالوريوس' });
@@ -354,7 +353,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
     // ----------------------------------------------------
     // النتيجة النهائية
     // ----------------------------------------------------
-    const students = processedRows.map((row, i) => {
+    const students = processedRows.map((row, _i) => {
       const dept = departmentsMap.get(row.processed.department) || departmentsMap.get('عام')!;
       return {
         full_name: row.processed.fullName,
@@ -447,7 +446,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
 // ----------------------------------------------------
 export async function flexibleParseImage(
   file: File,
-  onProgress?: (progress: number) => void
+  _onProgress?: (progress: number) => void
 ): Promise<FlexibleImportResult> {
   return flexibleParseExcelOrCsv(file);
 }
