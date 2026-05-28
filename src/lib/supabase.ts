@@ -867,6 +867,40 @@ export const db = {
     return [];
   },
 
+  // Helper: Get date of last occurrence of a specific weekday (1=Sunday, 7=Saturday) on or before a given date
+  getLastWeekdayDate(weekdayId: number, upToDate: Date = new Date()): Date | null {
+    const targetDay = (weekdayId === 7 ? 6 : weekdayId - 1); // 0=Sunday, 6=Saturday for getDay()
+    let date = new Date(upToDate);
+    const currentDay = date.getDay();
+    
+    let diff = targetDay - currentDay;
+    if (diff > 0) diff -= 7;
+    date.setDate(date.getDate() + diff);
+    
+    return date;
+  },
+
+  // Helper: Check if a lecture (given weekday, time slot) has ended as of now
+  isLectureEnded(weekdayId: number, _startTime: string, endTime: string): boolean {
+    const now = new Date();
+    const lastWeekdayDate = this.getLastWeekdayDate(weekdayId, now);
+    if (!lastWeekdayDate) return false;
+
+    const [endHour, endMinute] = endTime.split(':').map(Number);
+
+    const lectureEndDate = new Date(lastWeekdayDate);
+    lectureEndDate.setHours(endHour, endMinute, 0, 0);
+
+    return now >= lectureEndDate;
+  },
+
+  // Helper: Get attendance date string for a lecture (if it has ended)
+  getLectureAttendanceDate(weekdayId: number): string | null {
+    const lastWeekdayDate = this.getLastWeekdayDate(weekdayId);
+    if (!lastWeekdayDate) return null;
+    return lastWeekdayDate.toISOString().split('T')[0];
+  },
+
   async calculateAttendanceRates(student_id: number): Promise<{
     overallRate: number;
     bySubject: Array<{
@@ -877,62 +911,117 @@ export const db = {
       rate: number;
     }>;
   }> {
-    const [allLogs, allSchedules, allSubjects] = await Promise.all([
+    const [allLogs, allSchedules, allSubjects, allTimeSlots] = await Promise.all([
       this.getAttendance(),
       this.getSchedules(),
-      this.getSubjects()
+      this.getSubjects(),
+      this.getTimeSlots()
     ]);
 
-    const studentLogs = allLogs.filter(log => {
-      const schedule = allSchedules.find(s => s.schedule_id === log.schedule_id);
-      return schedule && schedule.student_id === student_id;
-    });
-
     const studentSchedules = allSchedules.filter(s => s.student_id === student_id);
-
-    const subjectMap = new Map<number, { total: number; attended: number; name: string }>();
+    const subjectMap = new Map<number, { totalCompleted: number; attended: number; name: string }>();
     
+    // Initialize subjects
     studentSchedules.forEach(schedule => {
       const subject = allSubjects.find(sub => sub.subject_id === schedule.subject_id);
       if (subject) {
         if (!subjectMap.has(subject.subject_id)) {
-          subjectMap.set(subject.subject_id, { total: 0, attended: 0, name: subject.subject_name });
+          subjectMap.set(subject.subject_id, { totalCompleted: 0, attended: 0, name: subject.subject_name });
         }
-        const data = subjectMap.get(subject.subject_id)!;
-        data.total++;
       }
     });
 
-    studentLogs.forEach(log => {
-      const schedule = studentSchedules.find(s => s.schedule_id === log.schedule_id);
-      if (schedule && subjectMap.has(schedule.subject_id)) {
-        const data = subjectMap.get(schedule.subject_id)!;
-        if (log.status === 'حاضر' || log.status === 'متأخر') {
+    // Process each schedule to count completed sessions and check attendance
+    for (const schedule of studentSchedules) {
+      const subject = allSubjects.find(sub => sub.subject_id === schedule.subject_id);
+      if (!subject) continue;
+      
+      const timeSlot = allTimeSlots.find(t => t.slot_id === schedule.slot_id);
+      if (!timeSlot) continue;
+
+      // Check if this lecture has ended
+      const hasEnded = this.isLectureEnded(schedule.weekday_id, timeSlot.start_time, timeSlot.end_time);
+      if (!hasEnded) continue;
+
+      const data = subjectMap.get(subject.subject_id)!;
+      data.totalCompleted++;
+
+      // Check if there's an existing log for this lecture
+      const attendanceDate = this.getLectureAttendanceDate(schedule.weekday_id);
+      const existingLog = allLogs.find(log => 
+        log.schedule_id === schedule.schedule_id && 
+        log.attendance_date === attendanceDate
+      );
+
+      if (existingLog) {
+        if (existingLog.status === 'حاضر' || existingLog.status === 'متأخر') {
           data.attended++;
         }
       }
-    });
+      // If no log exists, it's an automatic absence, so we don't increment attended
+    }
 
     const bySubject = Array.from(subjectMap.entries()).map(([subject_id, data]) => {
-      const totalSessions = 15;
-      const rate = totalSessions > 0 ? Math.round((data.attended / totalSessions) * 100) : 0;
+      let rate = 100;
+      if (data.totalCompleted > 0) {
+        rate = Math.round((data.attended / data.totalCompleted) * 100);
+      }
       return {
         subject_id,
         subject_name: data.name,
-        totalSessions,
+        totalSessions: data.totalCompleted,
         attended: data.attended,
         rate: Math.min(rate, 100)
       };
     });
 
-    const totalAttended = bySubject.reduce((sum, s) => sum + s.attended, 0);
-    const totalSessionsAll = bySubject.reduce((sum, s) => sum + s.totalSessions, 0);
-    const overallRate = totalSessionsAll > 0 ? Math.round((totalAttended / (bySubject.length * 15)) * 100) : 0;
+    // Calculate overall rate
+    const totalAttendedAll = bySubject.reduce((sum, s) => sum + s.attended, 0);
+    const totalCompletedAll = bySubject.reduce((sum, s) => sum + s.totalSessions, 0);
+    let overallRate = 100;
+    if (totalCompletedAll > 0) {
+      overallRate = Math.round((totalAttendedAll / totalCompletedAll) * 100);
+    }
 
     return {
       overallRate,
       bySubject
     };
+  },
+
+  // Auto-check function to mark automatic absences for expired lectures
+  async autoMarkAbsences(): Promise<void> {
+    const [allStudents, allSchedules, allTimeSlots, allAttendanceLogs] = await Promise.all([
+      this.getStudents(),
+      this.getSchedules(),
+      this.getTimeSlots(),
+      this.getAttendance()
+    ]);
+
+    for (const student of allStudents) {
+      const studentSchedules = allSchedules.filter(s => s.student_id === student.student_id);
+      
+      for (const schedule of studentSchedules) {
+        const timeSlot = allTimeSlots.find(t => t.slot_id === schedule.slot_id);
+        if (!timeSlot) continue;
+
+        const hasEnded = this.isLectureEnded(schedule.weekday_id, timeSlot.start_time, timeSlot.end_time);
+        if (!hasEnded) continue;
+
+        const attendanceDate = this.getLectureAttendanceDate(schedule.weekday_id);
+        if (!attendanceDate) continue;
+
+        // Check if log already exists
+        const existingLog = allAttendanceLogs.find(log => 
+          log.schedule_id === schedule.schedule_id && log.attendance_date === attendanceDate
+        );
+
+        if (!existingLog) {
+          // Mark automatic absence
+          await this.markAttendance(schedule.schedule_id, attendanceDate, 'غائب', undefined, 'غياب تلقائي');
+        }
+      }
+    }
   },
 
   async getDashboardStats(): Promise<DashboardStats> {

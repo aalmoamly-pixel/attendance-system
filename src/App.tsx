@@ -11,6 +11,7 @@ import ScheduleImport from './components/ScheduleImport';
 import StudentDashboard from './components/StudentDashboard';
 import Notifications from './components/Notifications';
 import { getAuthState, logout, initializeDefaultAdmin } from './lib/auth';
+import { db } from './lib/supabase';
 import type { AuthState } from './types/database';
 
 export default function App() {
@@ -20,6 +21,16 @@ export default function App() {
 
   useEffect(() => {
     initializeDefaultAdmin();
+    
+    // Run auto mark absences on app load
+    db.autoMarkAbsences();
+    
+    // Auto-run every 5 minutes
+    const interval = setInterval(() => {
+      db.autoMarkAbsences();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleLoginSuccess = () => {
