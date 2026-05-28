@@ -1,0 +1,182 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-dark-bg: #0B0F19;
+  --color-dark-card: #151D30;
+  --color-dark-hover: #1E2942;
+  --color-dark-border: #24324F;
+  --color-dark-text: #F1F5F9;
+  --color-dark-muted: #94A3B8;
+
+  --color-brand-primary: #4F46E5;
+  --color-brand-secondary: #06B6D4;
+  --color-brand-success: #10B981;
+  --color-brand-warning: #F59E0B;
+  --color-brand-danger: #EF4444;
+  --color-brand-info: #3B82F6;
+
+  --font-sans: 'Cairo', 'Outfit', 'Inter', 'sans-serif';
+}
+
+@utility glass-card {
+  background-color: var(--color-dark-card);
+  border: 1px solid rgba(36, 50, 79, 0.4);
+  backdrop-filter: blur(12px);
+  border-radius: 1rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  &:hover {
+    border-color: rgba(36, 50, 79, 0.8);
+  }
+}
+
+@utility glass-input {
+  background-color: rgba(11, 15, 25, 0.6);
+  border: 1px solid var(--color-dark-border);
+  color: var(--color-dark-text);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  outline: none;
+  transition: all 0.3s;
+  width: 100%;
+  text-align: right;
+  &:focus {
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.4);
+  }
+}
+
+@utility btn-primary {
+  background-color: var(--color-brand-primary);
+  color: white;
+  font-weight: 500;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.2);
+  cursor: pointer;
+  &:hover {
+    background-color: rgba(79, 70, 229, 0.9);
+    transform: translateY(-2px);
+  }
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+@utility btn-secondary {
+  background-color: var(--color-dark-card);
+  border: 1px solid var(--color-dark-border);
+  color: var(--color-dark-text);
+  font-weight: 500;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  &:hover {
+    background-color: var(--color-dark-hover);
+    transform: translateY(-2px);
+  }
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+@utility btn-danger {
+  background-color: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--color-brand-danger);
+  font-weight: 500;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  &:hover {
+    background-color: rgba(239, 68, 68, 0.3);
+    transform: translateY(-2px);
+  }
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+@utility table-header {
+  background-color: rgba(21, 29, 48, 0.8);
+  border-bottom: 1px solid rgba(36, 50, 79, 0.5);
+  color: var(--color-dark-muted);
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 1rem 1.5rem;
+  text-align: right;
+  user-select: none;
+}
+
+@utility table-cell {
+  border-bottom: 1px solid rgba(36, 50, 79, 0.2);
+  padding: 1rem 1.5rem;
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+body {
+  background-color: var(--color-dark-bg);
+  color: var(--color-dark-text);
+  font-family: 'Cairo', 'Outfit', 'Inter', sans-serif;
+  overflow-x: hidden;
+  direction: rtl;
+}
+
+/* Custom dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-dark-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-dark-border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Animations and transitions */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideUp {
+  0% { transform: translateY(12px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.rtl-grid {
+  direction: rtl;
+}
