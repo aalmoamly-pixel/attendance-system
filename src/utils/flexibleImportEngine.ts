@@ -9,21 +9,21 @@ import type {
 } from './flexibleImportTypes';
 
 // ----------------------------------------------------
-// 1. أنماط مطابقة الأعمدة
+// 1. أنماط مطابقة الأعمدة (أكثر شمولاً)
 // ----------------------------------------------------
 const COLUMN_PATTERNS: Record<string, string[]> = {
-  fullName: ['الاسم', 'الاسم الكامل', 'اسم الطالب', 'student name', 'name', 'الإسم', 'الطالب'],
-  phone: ['الهاتف', 'الجوال', 'رقم الجوال', 'phone', 'mobile', 'tel', 'رقم الهاتف'],
-  academicId: ['الرقم الأكاديمي', 'الرقم الجامعي', 'university id', 'academic id', 'student id', 'الرقم', 'id', 'student number'],
-  nationalId: ['رقم الهوية', 'الهوية', 'national id', 'national-id', 'national_id', 'رقم الهوية الوطنية'],
-  password: ['كلمة المرور', 'الرمز', 'password', 'pass', 'باسورد'],
-  department: ['التخصص', 'القسم', 'department', 'section', 'الكلية'],
-  subject: ['المادة', 'الدرس', 'subject', 'course', 'المقرر', 'المادة الدراسية'],
-  weekday: ['اليوم', 'weekday', 'day', 'اليوم الدراسي'],
-  time: ['الوقت', 'time', 'الموعد', 'الساعة'],
-  slot: ['الفترة', 'slot', 'الفترة الدراسية'],
-  lecturer: ['الدكتور', 'المحاضر', 'lecturer', 'instructor', 'الاستاذ'],
-  room: ['القاعة', 'الغرفة', 'room', 'classroom', 'القاعة الدراسية']
+  fullName: ['الاسم', 'الاسم الكامل', 'اسم الطالب', 'student name', 'name', 'الإسم', 'الطالب', 'اسم', 'الطلاب'],
+  phone: ['الهاتف', 'الجوال', 'رقم الجوال', 'phone', 'mobile', 'tel', 'رقم الهاتف', 'جوال'],
+  academicId: ['الرقم الأكاديمي', 'الرقم الجامعي', 'university id', 'academic id', 'student id', 'الرقم', 'id', 'student number', 'الرقم'],
+  nationalId: ['رقم الهوية', 'الهوية', 'national id', 'national-id', 'national_id', 'رقم الهوية الوطنية', 'الهوية الوطنية'],
+  password: ['كلمة المرور', 'الرمز', 'password', 'pass', 'باسورد', 'الرمز'],
+  department: ['التخصص', 'القسم', 'department', 'section', 'الكلية', 'القسم'],
+  subject: ['المادة', 'الدرس', 'subject', 'course', 'المقرر', 'المادة الدراسية', 'المقرر', 'الدرس'],
+  weekday: ['اليوم', 'weekday', 'day', 'اليوم الدراسي', 'الايام'],
+  time: ['الوقت', 'time', 'الموعد', 'الساعة', 'الوقت'],
+  slot: ['الفترة', 'slot', 'الفترة الدراسية', 'الحصة', 'الحصص'],
+  lecturer: ['الدكتور', 'المحاضر', 'lecturer', 'instructor', 'الاستاذ', 'الاستاذة'],
+  room: ['القاعة', 'الغرفة', 'room', 'classroom', 'القاعة الدراسية', 'القاعات']
 };
 
 // ----------------------------------------------------
@@ -40,7 +40,37 @@ const generateAcademicId = () => (academicCounter++).toString();
 const generateNationalId = () => (nationalIdCounter++).toString();
 
 // ----------------------------------------------------
-// 3. محرك مطابقة الأعمدة
+// 3. مساعدة: تحويل أسماء الأيام إلى أرقام
+// ----------------------------------------------------
+const WEEKDAY_MAP: Record<string, number> = {
+  'الأحد': 1, 'احد': 1, 'sunday': 1, 'sun': 1,
+  'الإثنين': 2, 'اثنين': 2, 'الاثنين': 2, 'monday': 2, 'mon': 2,
+  'الثلاثاء': 3, 'ثلاثاء': 3, 'tuesday': 3, 'tue': 3,
+  'الأربعاء': 4, 'اربعاء': 4, 'الاربعاء': 4, 'wednesday': 4, 'wed': 4,
+  'الخميس': 5, 'خميس': 5, 'thursday': 5, 'thu': 5,
+  'الجمعة': 6, 'جمعة': 6, 'friday': 6, 'fri': 6,
+  'السبت': 7, 'سبت': 7, 'saturday': 7, 'sat': 7
+};
+
+// ----------------------------------------------------
+// 4. مساعدة: تحويل أسماء الفترات إلى أرقام
+// ----------------------------------------------------
+const SLOT_MAP: Record<string, number> = {
+  'أولى': 1, 'الاولى': 1, 'الاول': 1, 'first': 1,
+  'ثانية': 2, 'الثانية': 2, 'second': 2,
+  'ثالثة': 3, 'ثالثه': 3, 'الثالثة': 3, 'third': 3,
+  'رابعة': 4, 'رابع': 4, 'fourth': 4,
+  'فترة صباحية': 1, 'فترة صباحية الأولى': 1,
+  'الفترة الصباحية': 1,
+  'فترة مسائية': 2, 'الفترة المسائية': 2,
+  '4-7': 1, '4-7 م':1, '16:00':1, '16-19':1,
+  '7-10': 2, '7-10 م':2, '19:00':2, '19-22':2,
+  '8-11': 3, '8-11 ص':3, '08:00':3, '08-11':3,
+  '11-2': 4, '11-2 م':4, '11:00':4, '11-14':4
+};
+
+// ----------------------------------------------------
+// 5. محرك مطابقة الأعمدة
 // ----------------------------------------------------
 function matchColumn(header: string): string | null {
   const normalized = header.trim().toLowerCase();
@@ -48,6 +78,7 @@ function matchColumn(header: string): string | null {
   for (const [key, patterns] of Object.entries(COLUMN_PATTERNS)) {
     for (const pattern of patterns) {
       if (normalized.includes(pattern.toLowerCase())) {
+        console.log(`[SmartImport] Column matched: "${header}" → ${key}`);
         return key;
       }
     }
@@ -56,7 +87,51 @@ function matchColumn(header: string): string | null {
 }
 
 // ----------------------------------------------------
-// 4. إنشاء تحذير
+// 6. مساعدة: تحليل محتوى العمود لتحديد نوعه
+// ----------------------------------------------------
+function analyzeColumnContent(columnData: (string | number | null)[]): { type: string | null; confidence: number } {
+  // إزالة القيم الفارغة
+  const cleanData = columnData.filter(val => val !== null && val !== undefined && String(val).trim() !== '');
+  if (cleanData.length === 0) {
+    return { type: null, confidence: 0 };
+  }
+
+  // تحقق من أن معظم القيم أسماء أيام
+  let weekdayMatches = 0;
+  let subjectMatches = 0;
+  
+  for (const val of cleanData) {
+    const strVal = String(val).toLowerCase();
+    for (const [key, _id] of Object.entries(WEEKDAY_MAP)) {
+      if (strVal.includes(key.toLowerCase())) {
+        weekdayMatches++;
+        break;
+      }
+    }
+    // تحقق من أن القيمة تشبه اسم مادة (أطول من 3 حروف، لا تحوي أرقام فقط)
+    if (strVal.length > 3 && !/^\d+$/.test(strVal)) {
+      subjectMatches++;
+    }
+  }
+  
+  const weekdayConfidence = cleanData.length > 0 ? weekdayMatches / cleanData.length : 0;
+  const subjectConfidence = cleanData.length > 0 ? subjectMatches / cleanData.length : 0;
+  
+  if (weekdayConfidence > 0.6) {
+    console.log(`[SmartImport] Content analysis: column looks like weekday (confidence: ${(weekdayConfidence*100).toFixed(0)}%)`);
+    return { type: 'weekday', confidence: weekdayConfidence };
+  }
+  
+  if (subjectConfidence > 0.5) {
+    console.log(`[SmartImport] Content analysis: column looks like subject (confidence: ${(subjectConfidence*100).toFixed(0)}%)`);
+    return { type: 'subject', confidence: subjectConfidence };
+  }
+  
+  return { type: null, confidence: 0 };
+}
+
+// ----------------------------------------------------
+// 7. إنشاء تحذير
 // ----------------------------------------------------
 function createWarning(
   type: ImportWarningType, 
@@ -78,37 +153,7 @@ function createWarning(
 }
 
 // ----------------------------------------------------
-// 5. مساعدة: تحويل أسماء الأيام إلى أرقام
-// ----------------------------------------------------
-const WEEKDAY_MAP: Record<string, number> = {
-  'الأحد': 1, 'احد': 1, 'sunday': 1, 'sun': 1,
-  'الإثنين': 2, 'اثنين': 2, 'الاثنين': 2, 'monday': 2, 'mon': 2,
-  'الثلاثاء': 3, 'ثلاثاء': 3, 'tuesday': 3, 'tue': 3,
-  'الأربعاء': 4, 'اربعاء': 4, 'الاربعاء': 4, 'wednesday': 4, 'wed': 4,
-  'الخميس': 5, 'خميس': 5, 'thursday': 5, 'thu': 5,
-  'الجمعة': 6, 'جمعة': 6, 'friday': 6, 'fri': 6,
-  'السبت': 7, 'سبت': 7, 'saturday': 7, 'sat': 7
-};
-
-// ----------------------------------------------------
-// 6. مساعدة: تحويل أسماء الفترات إلى أرقام
-// ----------------------------------------------------
-const SLOT_MAP: Record<string, number> = {
-  'أولى': 1, 'الاولى': 1, 'الاول': 1, 'first': 1,
-  'ثانية': 2, 'الثانية': 2, 'second': 2,
-  'ثالثة': 3, 'ثالثه': 3, 'الثالثة': 3, 'third': 3,
-  'رابعة': 4, 'رابع': 4, 'fourth': 4,
-  'فترة صباحية': 1, 'فترة صباحية الأولى': 1,
-  'الفترة الصباحية': 1,
-  'فترة مسائية': 2, 'الفترة المسائية': 2,
-  '4-7': 1, '4-7 م':1, '16:00':1, '16-19':1,
-  '7-10': 2, '7-10 م':2, '19:00':2, '19-22':2,
-  '8-11': 3, '8-11 ص':3, '08:00':3, '08-11':3,
-  '11-2': 4, '11-2 م':4, '11:00':4, '11-14':4
-};
-
-// ----------------------------------------------------
-// 7. محرك الاستيراد المرن الرئيسي
+// 8. محرك الاستيراد المرن الرئيسي
 // ----------------------------------------------------
 export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImportResult> {
   const warnings: ImportWarning[] = [];
@@ -127,14 +172,17 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
     const workbook = XLSX.read(data);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
+    console.log(`[SmartImport] Loaded worksheet: ${sheetName}`);
 
     // تحويل إلى مصفوفة مع دعم الخلايا المدمجة
     const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: null });
+    console.log(`[SmartImport] Raw rows count: ${rawRows.length}`);
 
     // ----------------------------------------------------
-    // الخطوة 1: فحص الخلايا المدمجة وتعبئتها
+    // الخطوة 1: فحص الخلايا المدمجة وتعبئتها بشكل كامل
     // ----------------------------------------------------
     if (worksheet['!merges'] && worksheet['!merges'].length > 0) {
+      console.log(`[SmartImport] Found ${worksheet['!merges'].length} merged cells`);
       for (const merge of worksheet['!merges']) {
         const { s, e } = merge;
         const masterValue = rawRows[s.r]?.[s.c];
@@ -153,52 +201,83 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
     }
 
     // ----------------------------------------------------
-    // الخطوة 2: تحديد صف العناوين
+    // الخطوة 2: دعم multi-row headers (دمج أول 3 صفوف لتجميع أسماء الأعمدة)
     // ----------------------------------------------------
     let headerRowIndex = 0;
     let columnMap: Record<number, { key: string; originalName: string }> = {};
     
-    for (let i = 0; i < Math.min(10, rawRows.length); i++) {
-      const row = rawRows[i];
-      const matches: Record<number, { key: string; originalName: string }> = {};
-      
-      for (let j = 0; j < row.length; j++) {
-        const cellValue = row[j]?.toString().trim();
-        
-        if (cellValue && cellValue !== '') {
-          const key = matchColumn(cellValue);
-          if (key) {
-            matches[j] = { key, originalName: cellValue };
-          } else {
-            ignoredColumns.push(cellValue);
-          }
-        } else if (cellValue === '' || cellValue === null) {
-          const autoName = `Column_${j + 1}`;
-          warnings.push(createWarning(
-            'COLUMN_EMPTY_NAME',
-            `العمود ${j + 1} بدون اسم، تم تسميته تلقائيًا: ${autoName}`,
-            true,
-            undefined,
-            j,
-            autoName
-          ));
+    // جمع أسماء الأعمدة من أول 3 صفوف
+    const possibleHeaders: string[] = [];
+    const maxColCount = Math.max(...rawRows.slice(0, 5).map(r => r.length));
+    for (let c = 0; c < maxColCount; c++) {
+      let combinedHeader = '';
+      for (let r = 0; r < 3; r++) {
+        if (rawRows[r] && rawRows[r][c] !== null && rawRows[r][c] !== '') {
+          combinedHeader += String(rawRows[r][c]).trim() + ' ';
         }
       }
-      
-      if (Object.keys(matches).length >= 2) {
-        headerRowIndex = i;
-        columnMap = matches;
-        break;
+      combinedHeader = combinedHeader.trim();
+      possibleHeaders.push(combinedHeader);
+    }
+    
+    console.log(`[SmartImport] Possible combined headers:`, possibleHeaders);
+
+    // محاولة مطابقة الأعمدة المدمجة
+    for (let c = 0; c < possibleHeaders.length; c++) {
+      if (possibleHeaders[c]) {
+        const key = matchColumn(possibleHeaders[c]);
+        if (key) {
+          columnMap[c] = { key, originalName: possibleHeaders[c] };
+        } else {
+          // تحليل محتوى العمود لتحديد نوعه
+          const columnData = rawRows.slice(3).map(r => r[c]);
+          const contentAnalysis = analyzeColumnContent(columnData);
+          if (contentAnalysis.type && contentAnalysis.confidence > 0.5) {
+            columnMap[c] = { key: contentAnalysis.type, originalName: possibleHeaders[c] || `Column ${c + 1}` };
+            console.log(`[SmartImport] Column ${c + 1} identified via content analysis as ${contentAnalysis.type}`);
+          } else if (possibleHeaders[c]) {
+            ignoredColumns.push(possibleHeaders[c]);
+          }
+        }
       }
     }
 
+    // إذا لم نعثر على أعمدة كافية، نتصفح الصفوف حتى نعثر
+    if (Object.keys(columnMap).length < 2) {
+      for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+        const row = rawRows[i];
+        const matches: Record<number, { key: string; originalName: string }> = {};
+        
+        for (let j = 0; j < row.length; j++) {
+          const cellValue = row[j]?.toString().trim();
+          
+          if (cellValue && cellValue !== '') {
+            const key = matchColumn(cellValue);
+            if (key) {
+              matches[j] = { key, originalName: cellValue };
+            }
+          }
+        }
+        
+        if (Object.keys(matches).length >= 2) {
+          headerRowIndex = i;
+          columnMap = matches;
+          break;
+        }
+      }
+    }
+
+    console.log(`[SmartImport] Final column mapping (${Object.keys(columnMap).length} columns):`, columnMap);
+    console.log(`[SmartImport] Ignored columns (${ignoredColumns.length}):`, ignoredColumns);
+
     // ----------------------------------------------------
-    // الخطوة 3: معالجة الصفوف
+    // الخطوة 3: معالجة الصفوف (البيانات تبدأ بعد أول 3 صفوف أو صف العناوين)
     // ----------------------------------------------------
-    const dataStartRow = headerRowIndex + 1;
+    const dataStartRow = Math.max(headerRowIndex + 1, 3); // بدأ من الصف الرابع على الأقل
     const dataRows = rawRows.slice(dataStartRow).filter(row => 
       row.some(cell => cell !== null && cell !== '')
     );
+    console.log(`[SmartImport] Data rows count: ${dataRows.length}`);
 
     // التخصصات الافتراضية
     const defaultDepartments = ['هندسة البرمجيات', 'علوم الحاسب', 'نظم المعلومات', 'عام'];
@@ -224,12 +303,20 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
       let password = '';
       let department = 'عام';
       
-      // جمع المواد (قد يكون أكثر من مادة في الصف)
-      const subjectGroups: { subjectName?: string, weekdayName?: string, timeRange?: string, slotName?: string, lecturer?: string, room?: string }[] = [];
+      // جمع المواد (من جميع الأعمدة المتاحة)
+      const subjectGroups: Array<{
+        subjectName?: string;
+        weekdayName?: string;
+        timeRange?: string;
+        slotName?: string;
+        lecturer?: string;
+        room?: string;
+      }> = [];
       
       // قراءة الأعمدة المحددة
-      for (const [colIndex, { key, originalName }] of Object.entries(columnMap)) {
-        const cellValue = row[parseInt(colIndex)]?.toString().trim();
+      for (const [colIndexStr, { key, originalName }] of Object.entries(columnMap)) {
+        const colIndex = parseInt(colIndexStr);
+        const cellValue = row[colIndex]?.toString().trim();
         
         switch (key) {
           case 'fullName':
@@ -240,7 +327,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
                 'اسم الطالب ناقص، تم إنشاء اسم تلقائي',
                 true,
                 rowIndex,
-                parseInt(colIndex),
+                colIndex,
                 originalName
               ));
             } else {
@@ -256,7 +343,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
                 'رقم الجوال ناقص، تم إنشاء رقم تلقائي',
                 true,
                 rowIndex,
-                parseInt(colIndex),
+                colIndex,
                 originalName
               ));
             } else {
@@ -272,7 +359,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
                 'الرقم الأكاديمي ناقص، تم إنشاء رقم تلقائي',
                 true,
                 rowIndex,
-                parseInt(colIndex),
+                colIndex,
                 originalName
               ));
             } else {
@@ -288,7 +375,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
                 'كلمة المرور ناقصة، تم تعيين كلمة مرور افتراضية',
                 true,
                 rowIndex,
-                parseInt(colIndex),
+                colIndex,
                 originalName
               ));
             } else {
@@ -304,7 +391,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
                 'رقم الهوية ناقص، تم إنشاء رقم تلقائي',
                 true,
                 rowIndex,
-                parseInt(colIndex),
+                colIndex,
                 originalName
               ));
             } else {
@@ -319,7 +406,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
                 'التخصص ناقص، تم تعيينه إلى "عام"',
                 true,
                 rowIndex,
-                parseInt(colIndex),
+                colIndex,
                 originalName
               ));
             } else {
@@ -334,7 +421,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
             }
             break;
             
-          // التعامل مع أعمدة الجدول الدراسي
+          // التعامل مع أعمدة الجدول الدراسية
           case 'subject':
           case 'weekday':
           case 'time':
@@ -342,8 +429,8 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
           case 'lecturer':
           case 'room':
             if (cellValue && cellValue !== '') {
-              // تقسيم القيم المفصولة بفواصل أو خطوط جديدة
-              const values = cellValue.split(/[,،;\n\r]+/).map((s: string) => s.trim()).filter(Boolean);
+              // تقسيم القيم المفصولة بفواصل أو خطوط جديدة أو علامات أخرى
+              const values = cellValue.split(/[,،;\n\r\t]+/).map((s: string) => s.trim()).filter(Boolean);
               
               for (let i = 0; i < values.length; i++) {
                 if (!subjectGroups[i]) subjectGroups[i] = {};
@@ -414,6 +501,9 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
       warnings.push(...rowWarnings);
     }
 
+    console.log(`[SmartImport] Students found: ${processedRows.length}`);
+    console.log(`[SmartImport] Subjects found: ${subjectsMap.size}`);
+
     // ----------------------------------------------------
     // الخطوة 4: إنشاء التقرير والنتيجة النهائية
     // ----------------------------------------------------
@@ -455,7 +545,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
         let weekdayId = 1; // القيمة الافتراضية
         if (subjData.weekdayName) {
           for (const [key, val] of Object.entries(WEEKDAY_MAP)) {
-            if (subjData.weekdayName.includes(key)) {
+            if (subjData.weekdayName.toLowerCase().includes(key.toLowerCase())) {
               weekdayId = val;
               break;
             }
@@ -465,14 +555,14 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
         let slotId = 1; // القيمة الافتراضية
         if (subjData.slotName) {
           for (const [key, val] of Object.entries(SLOT_MAP)) {
-            if (subjData.slotName.includes(key)) {
+            if (subjData.slotName.toLowerCase().includes(key.toLowerCase())) {
               slotId = val;
               break;
             }
           }
         } else if (subjData.timeRange) {
           for (const [key, val] of Object.entries(SLOT_MAP)) {
-            if (subjData.timeRange.includes(key)) {
+            if (subjData.timeRange.toLowerCase().includes(key.toLowerCase())) {
               slotId = val;
               break;
             }
@@ -487,6 +577,8 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
         });
       }
     }
+
+    console.log(`[SmartImport] Schedules generated: ${schedules.length}`);
 
     return {
       success: true,
@@ -516,7 +608,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
     };
 
   } catch (err: any) {
-    console.error(err);
+    console.error('[SmartImport] Error:', err);
     
     // في حال فشل كل شيء: إرجاع بيانات نموذجية
     const report: ImportReport = {
@@ -565,7 +657,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
 }
 
 // ----------------------------------------------------
-// 8. دالة OCR
+// 9. دالة OCR
 // ----------------------------------------------------
 export async function flexibleParseImage(
   file: File,
