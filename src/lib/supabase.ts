@@ -374,6 +374,7 @@ export const db = {
             phone: stu.phone,
             academic_id: stu.academic_id,
             national_id: stu.national_id,
+            password: stu.password,
             password_hash: await hashPassword(stu.password),
             role: 'student' as const,
             department_id: stu.department_id
@@ -405,6 +406,7 @@ export const db = {
             phone: stu.phone,
             academic_id: stu.academic_id,
             national_id: stu.national_id,
+            password: stu.password,
             password_hash: await hashPassword(stu.password),
             role: 'student' as const,
             department_id: stu.department_id
