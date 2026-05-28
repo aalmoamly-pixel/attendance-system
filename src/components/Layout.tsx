@@ -71,7 +71,7 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
   ];
 
   const SidebarContent = () => (
-    <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 h-screen sticky top-0 z-40 shrink-0">
+    <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 min-h-screen sticky top-0 z-40 shrink-0">
       {/* Brand Logo Header */}
       <div className="p-6 border-b border-dark-border/40 flex items-center gap-3">
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center shadow-xl shadow-brand-primary/30 transform hover:scale-105 transition-all">
@@ -191,7 +191,7 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
       </div>
 
       {/* 2. MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto bg-dark-bg p-4 md:p-8 relative min-w-0">
+      <main className="flex-1 flex flex-col min-h-screen overflow-y-auto bg-dark-bg p-4 md:p-8 relative min-w-0">
         {/* Top Navbar Context Info (e.g. alerts or notifications) */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-dark-border/20">
           <div className="flex items-center gap-3">
