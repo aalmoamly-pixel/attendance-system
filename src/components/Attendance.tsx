@@ -26,6 +26,7 @@ export default function AttendancePage() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | ''>('');
   const [selectedWeek, setSelectedWeek] = useState<string>('1');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [attendanceRates, setAttendanceRates] = useState<any>(null);
 
   useEffect(() => {
     fetchData();
@@ -84,7 +85,7 @@ export default function AttendancePage() {
   };
 
   const getAttendanceStats = (student: Student, subject: Subject) => {
-    const totalSessions = 15;
+    const subjectRates = attendanceRates?.bySubject?.find((s: any) => s.subject_id === subject.subject_id);
     const studentSchedules = schedules.filter(
       s => s.student_id === student.student_id && s.subject_id === subject.subject_id
     );
@@ -92,43 +93,40 @@ export default function AttendancePage() {
       studentSchedules.some(s => s.schedule_id === log.schedule_id)
     );
     
-    const attended = logs.filter(log => 
-      log.status === 'حاضر' || log.status === 'متأخر'
-    ).length;
-    
     const absents = logs.filter(log => log.status === 'غائب').length;
     const late = logs.filter(log => log.status === 'متأخر').length;
-    const rate = Math.round((attended / totalSessions) * 100);
-    
+
+    if (subjectRates) {
+      return {
+        totalSessions: subjectRates.totalSessions,
+        attended: subjectRates.attended,
+        absents,
+        late,
+        rate: subjectRates.rate,
+        isWarning: subjectRates.rate <75
+      };
+    }
+
     return {
-      totalSessions,
-      attended,
+      totalSessions: 0,
+      attended: 0,
       absents,
       late,
-      rate: Math.min(rate, 100),
-      isWarning: rate < 75
+      rate: 0,
+      isWarning: false
     };
   };
 
-  const getOverallAttendanceStats = (student: Student) => {
-    const studentSubjects = getStudentSubjects();
-    if (studentSubjects.length === 0) return { rate: 0, isWarning: false };
-    
-    let totalRate = 0;
-    let warningCount = 0;
-    
-    for (const subject of studentSubjects) {
-      const stats = getAttendanceStats(student, subject);
-      totalRate += stats.rate;
-      if (stats.isWarning) warningCount++;
+  const getOverallAttendanceStats = (_student: Student) => {
+    if (attendanceRates) {
+      return {
+        rate: attendanceRates.overallRate,
+        isWarning: attendanceRates.overallRate <75,
+        warningCount: attendanceRates.bySubject?.filter((s: any) => s.rate <75).length
+      };
     }
-    
-    const avgRate = Math.round(totalRate / studentSubjects.length);
-    return {
-      rate: avgRate,
-      isWarning: avgRate < 75,
-      warningCount
-    };
+
+    return { rate: 0, isWarning: false, warningCount: 0 };
   };
 
   const getCurrentStatus = () => {
@@ -160,7 +158,11 @@ export default function AttendancePage() {
       new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
     );
     
-    fetchData();
+    await fetchData();
+    if (selectedStudent) {
+      const rates = await db.calculateAttendanceRates(selectedStudent.student_id);
+      setAttendanceRates(rates);
+    }
   };
 
   const getRateColor = (rate: number) => {
@@ -214,9 +216,14 @@ export default function AttendancePage() {
             <label className="text-sm font-bold text-dark-muted">الطالب</label>
             <select
               value={selectedStudentId}
-              onChange={(e) => {
+              onChange={async (e) => {
                 setSelectedStudentId(e.target.value);
                 setSelectedSubjectId('');
+                setAttendanceRates(null);
+                if (e.target.value) {
+                  const rates = await db.calculateAttendanceRates(parseInt(e.target.value));
+                  setAttendanceRates(rates);
+                }
               }}
               className="w-full bg-dark-card border border-dark-border rounded-xl p-4 text-white focus:outline-none focus:border-brand-primary"
             >
