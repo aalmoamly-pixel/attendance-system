@@ -84,52 +84,52 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center">
-              <User className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-dark-bg overflow-x-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 sm:mb-8 gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center flex-shrink-0">
+              <User className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">أهلاً {student?.full_name}</h1>
-              <p className="text-dark-muted">رقم الطالب: {student?.academic_id}</p>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-white truncate">أهلاً {student?.full_name}</h1>
+              <p className="text-sm text-dark-muted">رقم الطالب: {student?.academic_id}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full md:w-auto">
             <button
               onClick={() => setActiveTab('notifications')}
-              className={`relative px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
+              className={`relative flex-1 md:flex-none px-3 sm:px-4 py-2 rounded-xl flex items-center justify-center gap-2 transition-all text-sm ${
                 activeTab === 'notifications'
                   ? 'bg-brand-primary text-white'
                   : 'bg-dark-card text-dark-muted hover:bg-dark-hover'
               }`}
             >
-              <Bell className="w-5 h-5" />
-              الرسائل
+              <Bell className="w-4 sm:w-5 h-4 sm:h-5" />
+              <span className="hidden sm:inline">الرسائل</span>
               {unreadCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-brand-danger text-white text-xs w-6 h-6 rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-brand-danger text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center">
                   {unreadCount}
                 </span>
               )}
             </button>
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
+              className={`flex-1 md:flex-none px-3 sm:px-4 py-2 rounded-xl flex items-center justify-center gap-2 transition-all text-sm ${
                 activeTab === 'dashboard'
                   ? 'bg-brand-primary text-white'
                   : 'bg-dark-card text-dark-muted hover:bg-dark-hover'
               }`}
             >
-              <Award className="w-5 h-5" />
-              لوحة التحكم
+              <Award className="w-4 sm:w-5 h-4 sm:h-5" />
+              <span className="hidden sm:inline">لوحة التحكم</span>
             </button>
             <button
               onClick={onLogout}
-              className="btn-secondary px-4 py-2 flex items-center gap-2"
+              className="btn-secondary flex-1 md:flex-none px-3 sm:px-4 py-2 flex items-center justify-center gap-2 text-sm"
             >
               <LogOut className="w-4 h-4" />
-              تسجيل الخروج
+              <span className="hidden sm:inline">تسجيل الخروج</span>
             </button>
           </div>
         </div>
@@ -196,41 +196,41 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
 
         {activeTab === 'dashboard' ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="glass-card p-6 hover:scale-[1.02] transition-transform">
-                <div className="flex items-center gap-4">
-                  <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${attendanceRates ? getRateBg(attendanceRates.overallRate) : 'bg-dark-card'}`}>
-                    <Award className={`w-8 h-8 ${attendanceRates ? getRateColor(attendanceRates.overallRate) : 'text-brand-primary'}`} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+              <div className="glass-card p-4 sm:p-6 hover:scale-[1.02] transition-transform overflow-hidden">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center flex-shrink-0 ${attendanceRates ? getRateBg(attendanceRates.overallRate) : 'bg-dark-card'}`}>
+                    <Award className={`w-6 h-6 sm:w-8 sm:h-8 ${attendanceRates ? getRateColor(attendanceRates.overallRate) : 'text-brand-primary'}`} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-dark-muted text-sm">النسبة الإجمالية</p>
-                    <p className={`text-3xl font-bold ${attendanceRates ? getRateColor(attendanceRates.overallRate) : 'text-white'}`}>
+                    <p className={`text-2xl sm:text-3xl font-bold truncate ${attendanceRates ? getRateColor(attendanceRates.overallRate) : 'text-white'}`}>
                       {attendanceRates ? attendanceRates.overallRate : 0}%
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="glass-card p-6 hover:scale-[1.02] transition-transform">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-brand-primary/10 flex items-center justify-center">
-                    <BookOpen className="w-8 h-8 text-brand-primary" />
+              <div className="glass-card p-4 sm:p-6 hover:scale-[1.02] transition-transform overflow-hidden">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-brand-primary/10 flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="w-6 h-6 sm:w-8 sm:h-8 text-brand-primary" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-dark-muted text-sm">المواد المسجلة</p>
-                    <p className="text-3xl font-bold text-white">{schedule.length}</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-white truncate">{schedule.length}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="glass-card p-6 hover:scale-[1.02] transition-transform">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-brand-secondary/10 flex items-center justify-center">
-                    <Calendar className="w-8 h-8 text-brand-secondary" />
+              <div className="glass-card p-4 sm:p-6 hover:scale-[1.02] transition-transform overflow-hidden sm:col-span-2 lg:col-span-1">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-brand-secondary/10 flex items-center justify-center flex-shrink-0">
+                    <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-brand-secondary" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-dark-muted text-sm">الحاضر</p>
-                    <p className="text-3xl font-bold text-brand-success">
+                    <p className="text-2xl sm:text-3xl font-bold text-brand-success truncate">
                       {attendanceRates ? attendanceRates.bySubject.reduce((sum: number, s: any) => sum + s.attended, 0) : 0}
                     </p>
                   </div>
@@ -238,26 +238,26 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="glass-card p-6">
-                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                  <BookOpen className="w-6 h-6 text-brand-primary" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+              <div className="glass-card p-4 sm:p-6">
+                <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
+                  <BookOpen className="w-5 sm:w-6 h-5 sm:h-6 text-brand-primary" />
                   المواد و نسب الحضور
                 </h2>
                 
                 {attendanceRates && attendanceRates.bySubject.length > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     {attendanceRates.bySubject.map((subject: any) => (
-                      <div key={subject.subject_id} className="p-4 rounded-xl bg-dark-bg border border-dark-border hover:border-brand-primary/50 transition-all">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-bold text-white">{subject.subject_name}</h4>
+                      <div key={subject.subject_id} className="p-3 sm:p-4 rounded-xl bg-dark-bg border border-dark-border hover:border-brand-primary/50 transition-all overflow-hidden">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-bold text-white truncate">{subject.subject_name}</h4>
                             <p className="text-sm text-dark-muted mt-1">
                               {subject.attended} من {subject.totalSessions} جلسة
                             </p>
                           </div>
-                          <div className={`px-4 py-2 rounded-lg ${getRateBg(subject.rate)}`}>
-                            <span className={`font-bold ${getRateColor(subject.rate)}`}>
+                          <div className={`px-3 sm:px-4 py-2 rounded-lg ${getRateBg(subject.rate)} flex-shrink-0`}>
+                            <span className={`font-bold text-sm sm:text-base ${getRateColor(subject.rate)}`}>
                               {subject.rate}%
                             </span>
                           </div>
@@ -270,7 +270,7 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
                                 subject.rate >= 85 ? 'bg-brand-success' :
                                 subject.rate >= 70 ? 'bg-yellow-500' : 'bg-brand-danger'
                               }`}
-                              style={{ width: `${subject.rate}%` }}
+                              style={{ width: `${Math.min(subject.rate, 100)}%` }}
                             />
                           </div>
                         </div>
@@ -285,30 +285,30 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
                 )}
               </div>
 
-              <div className="glass-card p-6">
-                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                  <Calendar className="w-6 h-6 text-brand-secondary" />
+              <div className="glass-card p-4 sm:p-6">
+                <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
+                  <Calendar className="w-5 sm:w-6 h-5 sm:h-6 text-brand-secondary" />
                   جدول المحاضرات
                 </h2>
                 
                 {schedule.length > 0 ? (
                   <div className="space-y-3">
                     {schedule.map((item: any, index: number) => (
-                      <div key={item.schedule_id || index} className="p-4 rounded-xl bg-dark-bg border border-dark-border hover:border-brand-secondary/50 transition-all">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center">
-                              <Clock className="w-5 h-5 text-brand-primary" />
+                      <div key={item.schedule_id || index} className="p-3 sm:p-4 rounded-xl bg-dark-bg border border-dark-border hover:border-brand-secondary/50 transition-all overflow-hidden">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Clock className="w-4 sm:w-5 h-4 sm:h-5 text-brand-primary" />
                             </div>
-                            <div>
-                              <h4 className="font-bold text-white">{item.subjects?.subject_name}</h4>
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-white truncate">{item.subjects?.subject_name}</h4>
                               <p className="text-sm text-dark-muted">
                                 {item.weekdays?.weekday_name_ar}
                               </p>
                             </div>
                           </div>
-                          <div className="text-left">
-                            <p className="font-medium text-white">
+                          <div className="text-left flex-shrink-0">
+                            <p className="font-medium text-white text-sm sm:text-base">
                               {item.time_slots?.start_time}
                             </p>
                             <p className="text-xs text-dark-muted">
