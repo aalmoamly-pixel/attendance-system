@@ -82,7 +82,7 @@ export default function Dashboard({ setActivePage }: { setActivePage: (p: string
   };
   
   // Simulated login logs (since we don't have real data)
-  const [loginLogs] = useState<SimulatedLoginLog[]>([]);
+  const [loginLogs, setLoginLogs] = useState<SimulatedLoginLog[]>([]);
   
   // Update login logs when students change
   useEffect(() => {
@@ -108,13 +108,8 @@ export default function Dashboard({ setActivePage }: { setActivePage: (p: string
     // Sort by login time
     newLogs.sort((a, b) => new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime());
     
-    // Only update if logs have changed
-    const currentLogIds = loginLogs.map(log => log.id);
-    const newLogIds = newLogs.map(log => log.id);
-    if (JSON.stringify(currentLogIds) !== JSON.stringify(newLogIds)) {
-      // Since we can't easily update the initial state, we can leave it as is for demo purposes
-      // In a real app you'd use a separate state setter
-    }
+    // Update the state
+    setLoginLogs(newLogs);
   }, [students]);
   
   // Search state for login logs
