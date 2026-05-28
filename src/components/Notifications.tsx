@@ -363,7 +363,7 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
                     {isAdmin ? selectedChatStudent?.full_name : 'الإدارة'}
                   </h3>
                   <p className="text-sm text-dark-muted mt-1 truncate">
-                    {isAdmin ? selectedChatStudent?.academic_id : 'مدرسة حضورك الذكي'}
+                    {isAdmin ? selectedChatStudent?.academic_id : 'إدارة تحضير الطلاب'}
                   </p>
                 </div>
               </div>

@@ -146,7 +146,7 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-white">ملاحظة مهمة</h2>
-                      <p className="text-sm text-dark-muted mt-1">من إدارة المدرسة</p>
+                      <p className="text-sm text-dark-muted mt-1">من إدارة تحضير الطلاب</p>
                     </div>
                   </div>
                   <button
