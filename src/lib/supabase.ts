@@ -911,65 +911,52 @@ export const db = {
       rate: number;
     }>;
   }> {
-    const [allLogs, allSchedules, allSubjects, allTimeSlots] = await Promise.all([
+    const [allLogs, allSchedules, allSubjects] = await Promise.all([
       this.getAttendance(),
       this.getSchedules(),
-      this.getSubjects(),
-      this.getTimeSlots()
+      this.getSubjects()
     ]);
 
     const studentSchedules = allSchedules.filter(s => s.student_id === student_id);
-    const subjectMap = new Map<number, { totalCompleted: number; attended: number; name: string }>();
+    const studentScheduleIds = studentSchedules.map(s => s.schedule_id);
+    const studentLogs = allLogs.filter(log => studentScheduleIds.includes(log.schedule_id));
+
+    const subjectMap = new Map<number, { totalSessions: number; attended: number; name: string }>();
     
     // Initialize subjects
     studentSchedules.forEach(schedule => {
       const subject = allSubjects.find(sub => sub.subject_id === schedule.subject_id);
       if (subject) {
         if (!subjectMap.has(subject.subject_id)) {
-          subjectMap.set(subject.subject_id, { totalCompleted: 0, attended: 0, name: subject.subject_name });
+          subjectMap.set(subject.subject_id, { totalSessions: 0, attended: 0, name: subject.subject_name });
         }
       }
     });
 
-    // Process each schedule to count completed sessions and check attendance
-    for (const schedule of studentSchedules) {
+    // Count all logs per subject
+    for (const log of studentLogs) {
+      const schedule = studentSchedules.find(s => s.schedule_id === log.schedule_id);
+      if (!schedule) continue;
       const subject = allSubjects.find(sub => sub.subject_id === schedule.subject_id);
       if (!subject) continue;
       
-      const timeSlot = allTimeSlots.find(t => t.slot_id === schedule.slot_id);
-      if (!timeSlot) continue;
-
-      // Check if this lecture has ended
-      const hasEnded = this.isLectureEnded(schedule.weekday_id, timeSlot.start_time, timeSlot.end_time);
-      if (!hasEnded) continue;
-
       const data = subjectMap.get(subject.subject_id)!;
-      data.totalCompleted++;
-
-      // Check if there's an existing log for this lecture
-      const attendanceDate = this.getLectureAttendanceDate(schedule.weekday_id);
-      const existingLog = allLogs.find(log => 
-        log.schedule_id === schedule.schedule_id && 
-        log.attendance_date === attendanceDate
-      );
-
-      if (existingLog) {
-        if (existingLog.status === 'حاضر' || existingLog.status === 'متأخر') {
-          data.attended++;
-        }
+      data.totalSessions++;
+      
+      if (log.status === 'حاضر' || log.status === 'متأخر') {
+        data.attended++;
       }
-      // If no log exists, it's an automatic absence, so we don't increment attended
     }
 
     const bySubject = Array.from(subjectMap.entries()).map(([subject_id, data]) => {
       let rate = 100;
-      if (data.totalCompleted > 0) {
-        rate = Math.round((data.attended / data.totalCompleted) * 100);
+      if (data.totalSessions > 0) {
+        rate = Math.round((data.attended / data.totalSessions) * 100);
       }
       return {
         subject_id,
         subject_name: data.name,
-        totalSessions: data.totalCompleted,
+        totalSessions: data.totalSessions,
         attended: data.attended,
         rate: Math.min(rate, 100)
       };
@@ -977,10 +964,10 @@ export const db = {
 
     // Calculate overall rate
     const totalAttendedAll = bySubject.reduce((sum, s) => sum + s.attended, 0);
-    const totalCompletedAll = bySubject.reduce((sum, s) => sum + s.totalSessions, 0);
+    const totalSessionsAll = bySubject.reduce((sum, s) => sum + s.totalSessions, 0);
     let overallRate = 100;
-    if (totalCompletedAll > 0) {
-      overallRate = Math.round((totalAttendedAll / totalCompletedAll) * 100);
+    if (totalSessionsAll > 0) {
+      overallRate = Math.round((totalAttendedAll / totalSessionsAll) * 100);
     }
 
     return {
