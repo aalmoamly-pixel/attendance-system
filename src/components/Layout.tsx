@@ -68,7 +68,7 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
   ];
 
   return (
-    <div className="min-h-screen bg-dark-bg text-dark-text font-sans flex flex-row-reverse" dir="rtl">
+    <div className="min-h-screen bg-dark-bg text-dark-text font-sans flex flex-row" dir="rtl">
       {/* 1. RIGHT SIDEBAR (ALWAYS VISIBLE) */}
       <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 h-screen sticky top-0 z-40 shrink-0">
         {/* Brand Logo Header */}
