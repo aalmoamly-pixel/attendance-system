@@ -20,13 +20,18 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const isSupabaseConfigured = 
   SUPABASE_URL && 
   SUPABASE_ANON_KEY && 
-  SUPABASE_URL.includes('supabase.co') &&
-  SUPABASE_ANON_KEY.startsWith('ey');
+  SUPABASE_URL.includes('supabase.co');
 
 console.log(`[Database System] Mode: ${isSupabaseConfigured ? '⚡ Supabase Cloud' : '💾 Local Storage (Fallback)'}`);
 
 export const supabase = isSupabaseConfigured 
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        }
+      }
+    })
   : null;
 
 const LOCAL_KEYS = {
@@ -42,8 +47,163 @@ const LOCAL_KEYS = {
 };
 
 const initializeLocalData = async () => {
-  if (!isSupabaseConfigured) {
-    // Initialize departments only if not present
+  if (isSupabaseConfigured && supabase) {
+    // --- Supabase mode: Initialize data in Supabase
+    console.log('[initializeLocalData] Supabase mode: Initializing data');
+
+    // Initialize departments in Supabase
+    const { data: existingDepartments, error: deptError } = await supabase.from('departments').select('*');
+    if (deptError) {
+      console.error('[initializeLocalData] Departments error:', deptError);
+    } else if (!existingDepartments || existingDepartments.length === 0) {
+      const { error: insertDeptError } = await supabase.from('departments').insert([
+        { department_id: 1, department_name: 'هندسة البرمجيات', degree_type: 'بكالوريوس' },
+        { department_id: 2, department_name: 'علوم الحاسب', degree_type: 'بكالوريوس' },
+        { department_id: 3, department_name: 'نظم المعلومات', degree_type: 'بكالوريوس' },
+        { department_id: 4, department_name: 'عام', degree_type: 'بكالوريوس' }
+      ]);
+      if (insertDeptError) {
+        console.error('[initializeLocalData] Departments insert error:', insertDeptError);
+      } else {
+        console.log('[initializeLocalData] Departments initialized in Supabase');
+      }
+    }
+
+    // Initialize subjects in Supabase
+    const { data: existingSubjects, error: subjError } = await supabase.from('subjects').select('*');
+    if (subjError) {
+      console.error('[initializeLocalData] Subjects error:', subjError);
+    } else if (!existingSubjects || existingSubjects.length === 0) {
+      const { error: insertSubjError } = await supabase.from('subjects').insert([
+        { subject_id: 1, subject_name: 'هندسة البرمجيات', department_id: 1 },
+        { subject_id: 2, subject_name: 'قواعد البيانات', department_id: 2 },
+        { subject_id: 3, subject_name: 'أمن المعلومات', department_id: 4 },
+        { subject_id: 4, subject_name: 'ذكاء الاصطناعي', department_id: 1 },
+        { subject_id: 5, subject_name: 'شبكات الحاسب', department_id: 2 }
+      ]);
+      if (insertSubjError) {
+        console.error('[initializeLocalData] Subjects insert error:', insertSubjError);
+      } else {
+        console.log('[initializeLocalData] Subjects initialized in Supabase');
+      }
+    }
+
+    // Initialize weekdays in Supabase
+    const { data: existingWeekdays, error: weekdayError } = await supabase.from('weekdays').select('*');
+    if (weekdayError) {
+      console.error('[initializeLocalData] Weekdays error:', weekdayError);
+    } else if (!existingWeekdays || existingWeekdays.length === 0) {
+      const { error: insertWeekdayError } = await supabase.from('weekdays').insert([
+        { weekday_id: 1, weekday_name_ar: 'الأحد', weekday_name_en: 'Sunday' },
+        { weekday_id: 2, weekday_name_ar: 'الإثنين', weekday_name_en: 'Monday' },
+        { weekday_id: 3, weekday_name_ar: 'الثلاثاء', weekday_name_en: 'Tuesday' },
+        { weekday_id: 4, weekday_name_ar: 'الأربعاء', weekday_name_en: 'Wednesday' },
+        { weekday_id: 5, weekday_name_ar: 'الخميس', weekday_name_en: 'Thursday' },
+        { weekday_id: 6, weekday_name_ar: 'الجمعة', weekday_name_en: 'Friday' },
+        { weekday_id: 7, weekday_name_ar: 'السبت', weekday_name_en: 'Saturday' }
+      ]);
+      if (insertWeekdayError) {
+        console.error('[initializeLocalData] Weekdays insert error:', insertWeekdayError);
+      } else {
+        console.log('[initializeLocalData] Weekdays initialized in Supabase');
+      }
+    }
+
+    // Initialize time slots in Supabase
+    const { data: existingTimeSlots, error: slotError } = await supabase.from('time_slots').select('*');
+    if (slotError) {
+      console.error('[initializeLocalData] Time slots error:', slotError);
+    } else if (!existingTimeSlots || existingTimeSlots.length === 0) {
+      const { error: insertSlotError } = await supabase.from('time_slots').insert([
+        { slot_id: 1, slot_name: 'الفترة الأولى (4-7 م)', start_time: '16:00', end_time: '19:00' },
+        { slot_id: 2, slot_name: 'الفترة الثانية (7-10 م)', start_time: '19:00', end_time: '22:00' }
+      ]);
+      if (insertSlotError) {
+        console.error('[initializeLocalData] Time slots insert error:', insertSlotError);
+      } else {
+        console.log('[initializeLocalData] Time slots initialized in Supabase');
+      }
+    }
+
+    // Initialize admin and test students in Supabase
+    const { data: existingStudents, error: studentError } = await supabase.from('students').select('*');
+    if (studentError) {
+      console.error('[initializeLocalData] Students error:', studentError);
+    } else if (!existingStudents || existingStudents.length === 0) {
+      const adminPassword = await hashPassword('Abdullah772091');
+      const student1Password = 'Student123';
+      const student1Hash = await hashPassword(student1Password);
+      const student2Password = 'Student456';
+      const student2Hash = await hashPassword(student2Password);
+
+      const { error: insertStudentError } = await supabase.from('students').insert([
+        { 
+          student_id: 1, 
+          full_name: 'أدمن النظام', 
+          phone: null, 
+          academic_id: 'ADMIN001', 
+          national_id: '715580715',
+          password_hash: adminPassword, 
+          password: 'Abdullah772091',
+          role: 'admin' as UserRole,
+          department_id: 1 
+        },
+        { 
+          student_id: 2, 
+          full_name: 'أحمد محمد علي', 
+          phone: '0501234567', 
+          academic_id: '26204116', 
+          national_id: '123456789',
+          password_hash: student1Hash, 
+          password: student1Password,
+          role: 'student' as UserRole,
+          department_id: 1 
+        },
+        { 
+          student_id: 3, 
+          full_name: 'فاطمة أحمد سعيد', 
+          phone: '0507654321', 
+          academic_id: '26204117', 
+          national_id: '987654321',
+          password_hash: student2Hash, 
+          password: student2Password,
+          role: 'student' as UserRole,
+          department_id: 2 
+        }
+      ]);
+      if (insertStudentError) {
+        console.error('[initializeLocalData] Students insert error:', insertStudentError);
+      } else {
+        console.log('[initializeLocalData] Students initialized in Supabase');
+      }
+    }
+
+    // Initialize sample schedules in Supabase
+    const { data: existingSchedules, error: scheduleError } = await supabase.from('student_schedule').select('*');
+    if (scheduleError) {
+      console.error('[initializeLocalData] Schedules error:', scheduleError);
+    } else if (!existingSchedules || existingSchedules.length === 0) {
+      const { error: insertScheduleError } = await supabase.from('student_schedule').insert([
+        { schedule_id: 1, student_id: 2, subject_id: 1, weekday_id: 1, slot_id: 1 },
+        { schedule_id: 2, student_id: 2, subject_id: 4, weekday_id: 3, slot_id: 2 },
+        { schedule_id: 3, student_id: 2, subject_id: 3, weekday_id: 5, slot_id: 1 },
+        { schedule_id: 4, student_id: 3, subject_id: 2, weekday_id: 2, slot_id: 1 },
+        { schedule_id: 5, student_id: 3, subject_id: 5, weekday_id: 4, slot_id: 2 },
+        { schedule_id: 6, student_id: 3, subject_id: 3, weekday_id: 6, slot_id: 1 }
+      ]);
+      if (insertScheduleError) {
+        console.error('[initializeLocalData] Schedules insert error:', insertScheduleError);
+      } else {
+        console.log('[initializeLocalData] Schedules initialized in Supabase');
+      }
+    }
+
+    // Migrate any existing Local Storage data to Supabase
+    await migrateLocalToSupabase();
+    
+    console.log('[initializeLocalData] Supabase initialization complete!');
+  } else {
+    // --- Local Storage fallback mode ---
     if (!localStorage.getItem(LOCAL_KEYS.DEPARTMENTS)) {
       localStorage.setItem(LOCAL_KEYS.DEPARTMENTS, JSON.stringify([
         { department_id: 1, department_name: 'هندسة البرمجيات', degree_type: 'بكالوريوس' },
@@ -54,7 +214,6 @@ const initializeLocalData = async () => {
       console.log('[initializeLocalData] Departments initialized');
     }
 
-    // Initialize subjects only if not present
     if (!localStorage.getItem(LOCAL_KEYS.SUBJECTS)) {
       localStorage.setItem(LOCAL_KEYS.SUBJECTS, JSON.stringify([
         { subject_id: 1, subject_name: 'هندسة البرمجيات', department_id: 1 },
@@ -66,7 +225,6 @@ const initializeLocalData = async () => {
       console.log('[initializeLocalData] Subjects initialized');
     }
 
-    // Initialize weekdays only if not present
     if (!localStorage.getItem(LOCAL_KEYS.WEEKDAYS)) {
       localStorage.setItem(LOCAL_KEYS.WEEKDAYS, JSON.stringify([
         { weekday_id: 1, weekday_name_ar: 'الأحد', weekday_name_en: 'Sunday' },
@@ -80,7 +238,6 @@ const initializeLocalData = async () => {
       console.log('[initializeLocalData] Weekdays initialized');
     }
 
-    // Initialize time slots only if not present
     if (!localStorage.getItem(LOCAL_KEYS.TIME_SLOTS)) {
       localStorage.setItem(LOCAL_KEYS.TIME_SLOTS, JSON.stringify([
         { slot_id: 1, slot_name: 'الفترة الأولى (4-7 م)', start_time: '16:00', end_time: '19:00' },
@@ -89,9 +246,7 @@ const initializeLocalData = async () => {
       console.log('[initializeLocalData] Time slots initialized');
     }
 
-    // Initialize students only if not present
     if (!localStorage.getItem(LOCAL_KEYS.STUDENTS)) {
-      // Add admin and test students
       const adminPassword = await hashPassword('Abdullah772091');
       const student1Password = 'Student123';
       const student1Hash = await hashPassword(student1Password);
@@ -138,9 +293,7 @@ const initializeLocalData = async () => {
       console.log('[initializeLocalData] Students initialized');
     }
 
-    // Initialize schedules only if not present
     if (!localStorage.getItem(LOCAL_KEYS.SCHEDULES)) {
-      // Add sample schedules for test students
       const schedules = [
         { schedule_id: 1, student_id: 2, subject_id: 1, weekday_id: 1, slot_id: 1 },
         { schedule_id: 2, student_id: 2, subject_id: 4, weekday_id: 3, slot_id: 2 },
@@ -153,9 +306,7 @@ const initializeLocalData = async () => {
       console.log('[initializeLocalData] Sample schedules added');
     }
 
-    // Initialize attendance logs only if not present
     if (!localStorage.getItem(LOCAL_KEYS.ATTENDANCE_LOGS)) {
-      // Add sample attendance logs
       const today = new Date().toISOString().split('T')[0];
       const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
       
@@ -170,13 +321,11 @@ const initializeLocalData = async () => {
       console.log('[initializeLocalData] Sample attendance logs added');
     }
 
-    // Initialize notifications only if not present
     if (!localStorage.getItem(LOCAL_KEYS.NOTIFICATIONS)) {
       localStorage.setItem(LOCAL_KEYS.NOTIFICATIONS, JSON.stringify([]));
       console.log('[initializeLocalData] Notifications initialized');
     }
 
-    // Initialize personal notes only if not present
     if (!localStorage.getItem(LOCAL_KEYS.PERSONAL_NOTES)) {
       localStorage.setItem(LOCAL_KEYS.PERSONAL_NOTES, JSON.stringify([]));
       console.log('[initializeLocalData] Personal notes initialized');
