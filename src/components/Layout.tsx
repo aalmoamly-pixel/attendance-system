@@ -6,8 +6,6 @@ import {
   CalendarCheck, 
   BarChart3,
   Sparkles, 
-  Menu, 
-  X, 
   Database, 
   Bell, 
   Info,
@@ -24,7 +22,6 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, activePage, setActivePage }: LayoutProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authState] = useState(getAuthState());
   const [unreadCount, setUnreadCount] = useState(0);
   const isSupabaseLive = !!supabase;
@@ -71,29 +68,9 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
   ];
 
   return (
-    <div className="min-h-screen bg-dark-bg text-dark-text font-sans flex flex-col md:flex-row-reverse" dir="rtl">
-      
-      {/* 1. TOP MOBILE BAR */}
-      <header className="md:hidden bg-dark-card border-b border-dark-border/40 px-4 py-3 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center shadow-lg shadow-brand-primary/20">
-            <Sparkles className="w-5 h-5 text-white animate-pulse" />
-          </div>
-          <div>
-            <h1 className="font-extrabold text-sm text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-brand-secondary">حضورك الذكي</h1>
-            <p className="text-[10px] text-dark-muted">نظام الحضور والجداول</p>
-          </div>
-        </div>
-        <button 
-          onClick={() => setMobileMenuOpen(true)}
-          className="p-2 rounded-lg bg-dark-hover border border-dark-border/60 hover:bg-dark-border/40 text-dark-text transition-all"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-      </header>
-
-      {/* 2. RIGHT SIDEBAR (DESKTOP) */}
-      <aside className="hidden md:flex flex-col w-72 bg-dark-card border-l border-dark-border/40 h-screen sticky top-0 z-40">
+    <div className="min-h-screen bg-dark-bg text-dark-text font-sans flex flex-row-reverse" dir="rtl">
+      {/* 1. RIGHT SIDEBAR (ALWAYS VISIBLE) */}
+      <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 h-screen sticky top-0 z-40 shrink-0">
         {/* Brand Logo Header */}
         <div className="p-6 border-b border-dark-border/40 flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center shadow-xl shadow-brand-primary/30 transform hover:scale-105 transition-all">
@@ -121,7 +98,7 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 px-4 py-4 space-y-1">
+        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
@@ -182,82 +159,8 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
         </div>
       </aside>
 
-      {/* 3. MOBILE SIDEBAR DRAWER */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 md:hidden flex justify-end">
-          <div className="w-72 bg-dark-card h-full border-l border-dark-border/40 p-6 flex flex-col animate-slide-up">
-            <div className="flex items-center justify-between pb-6 border-b border-dark-border/40 mb-6">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-brand-primary animate-pulse" />
-                <h1 className="font-bold text-base text-white">حضورك الذكي</h1>
-              </div>
-              <button 
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-1.5 rounded-lg bg-dark-hover border border-dark-border/60 hover:bg-dark-border text-dark-muted hover:text-white transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <nav className="flex-1 space-y-1.5">
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activePage === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActivePage(item.id);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
-                      isActive 
-                        ? 'bg-gradient-to-l from-brand-primary to-brand-primary/80 text-white font-bold' 
-                        : 'text-dark-muted hover:text-white hover:bg-dark-hover'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-5 h-5" />
-                      <span>{item.label}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {item.badge && (
-                        <span className="px-2 py-0.5 text-[9px] font-bold rounded bg-brand-secondary/20 text-brand-secondary">
-                          {item.badge}
-                        </span>
-                      )}
-                      {item.notificationBadge && (
-                        <span className="bg-brand-danger text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
-                          {item.notificationBadge}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </nav>
-
-            <div className="pt-4 border-t border-dark-border/40 space-y-3">
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-dark-hover hover:bg-brand-danger/20 text-dark-muted hover:text-brand-danger transition-all border border-dark-border/60"
-              >
-                <LogOut className="w-5 h-5" />
-                تسجيل الخروج
-              </button>
-              <div className={`p-3 rounded-xl border text-center text-xs font-semibold ${
-                isSupabaseLive ? 'bg-brand-success/10 border-brand-success/20 text-brand-success' : 'bg-brand-warning/10 border-brand-warning/20 text-brand-warning'
-              }`}>
-                {isSupabaseLive ? 'قاعدة بيانات سحابية نشطة' : 'وضع التخزين المحلي النشط'}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto bg-dark-bg p-4 md:p-8 relative">
-        
+      {/* 2. MAIN CONTENT AREA */}
+      <main className="flex-1 flex flex-col h-screen overflow-y-auto bg-dark-bg p-4 md:p-8 relative min-w-0">
         {/* Top Navbar Context Info (e.g. alerts or notifications) */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-dark-border/20">
           <div>
