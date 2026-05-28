@@ -10,7 +10,9 @@ import {
   Bell, 
   Info,
   FileSpreadsheet,
-  LogOut
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react';
 import { supabase, db } from '../lib/supabase';
 import { getAuthState, logout } from '../lib/auth';
@@ -24,6 +26,7 @@ interface LayoutProps {
 export default function Layout({ children, activePage, setActivePage }: LayoutProps) {
   const [authState] = useState(getAuthState());
   const [unreadCount, setUnreadCount] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isSupabaseLive = !!supabase;
   const isAdmin = authState.role === 'admin';
   const currentUserId = authState.user?.student_id;
@@ -67,109 +70,147 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
     { id: 'import', label: 'الاستيراد الذكي', icon: Sparkles, badge: 'AI' },
   ];
 
+  const SidebarContent = () => (
+    <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 h-screen sticky top-0 z-40 shrink-0">
+      {/* Brand Logo Header */}
+      <div className="p-6 border-b border-dark-border/40 flex items-center gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center shadow-xl shadow-brand-primary/30 transform hover:scale-105 transition-all">
+          <Sparkles className="w-6 h-6 text-white animate-pulse" />
+        </div>
+        <div>
+          <h1 className="font-black text-lg tracking-wide text-white">حضورك الذكي</h1>
+          <span className="text-xs font-semibold text-brand-secondary">Smart Attendance AI</span>
+        </div>
+      </div>
+
+      {/* Database Status Tag */}
+      <div className="px-6 py-3">
+        <div className={`flex items-center justify-between px-3 py-2 rounded-xl border text-[11px] font-medium transition-all ${
+          isSupabaseLive 
+            ? 'bg-brand-success/10 border-brand-success/20 text-brand-success' 
+            : 'bg-brand-warning/10 border-brand-warning/20 text-brand-warning'
+        }`}>
+          <div className="flex items-center gap-1.5">
+            <Database className="w-3.5 h-3.5" />
+            <span>{isSupabaseLive ? 'قاعدة بيانات سحابية متصلة' : 'قاعدة بيانات محلية نشطة'}</span>
+          </div>
+          <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseLive ? 'bg-brand-success animate-ping' : 'bg-brand-warning animate-pulse'}`} />
+        </div>
+      </div>
+
+      {/* Navigation Items */}
+      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activePage === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActivePage(item.id);
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-300 group ${
+                isActive 
+                  ? 'bg-gradient-to-l from-brand-primary to-brand-primary/80 text-white shadow-lg shadow-brand-primary/30 font-bold scale-[1.02]' 
+                  : 'text-dark-muted hover:text-white hover:bg-dark-hover/70 font-medium'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110 text-white' : 'group-hover:scale-110 group-hover:text-white'}`} />
+                <span>{item.label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {item.badge && (
+                  <span className={`px-2 py-0.5 text-[9px] font-extrabold rounded-md ${
+                    isActive 
+                      ? 'bg-white text-brand-primary' 
+                      : 'bg-brand-secondary/20 text-brand-secondary'
+                  }`}>
+                    {item.badge}
+                  </span>
+                )}
+                {item.notificationBadge && (
+                  <span className="bg-brand-danger text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
+                    {item.notificationBadge}
+                  </span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Logout Button */}
+      <div className="p-4 border-t border-dark-border/40">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-dark-hover hover:bg-brand-danger/20 text-dark-muted hover:text-brand-danger transition-all border border-dark-border/60"
+        >
+          <LogOut className="w-5 h-5" />
+          تسجيل الخروج
+        </button>
+      </div>
+
+      {/* Footer Info */}
+      <div className="p-4 bg-dark-bg/30">
+        <div className="flex items-start gap-2.5 text-xs text-dark-muted">
+          <Info className="w-4 h-4 text-brand-secondary shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            هذا النظام متكامل وذكي يدعم الاستيراد المباشر للجداول عبر ملفات الإكسل وصور الجداول.
+          </p>
+        </div>
+      </div>
+    </aside>
+  );
+
   return (
     <div className="min-h-screen bg-dark-bg text-dark-text font-sans flex flex-row" dir="rtl">
-      {/* 1. RIGHT SIDEBAR (ALWAYS VISIBLE) */}
-      <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 h-screen sticky top-0 z-40 shrink-0">
-        {/* Brand Logo Header */}
-        <div className="p-6 border-b border-dark-border/40 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center shadow-xl shadow-brand-primary/30 transform hover:scale-105 transition-all">
-            <Sparkles className="w-6 h-6 text-white animate-pulse" />
-          </div>
-          <div>
-            <h1 className="font-black text-lg tracking-wide text-white">حضورك الذكي</h1>
-            <span className="text-xs font-semibold text-brand-secondary">Smart Attendance AI</span>
-          </div>
-        </div>
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
 
-        {/* Database Status Tag */}
-        <div className="px-6 py-3">
-          <div className={`flex items-center justify-between px-3 py-2 rounded-xl border text-[11px] font-medium transition-all ${
-            isSupabaseLive 
-              ? 'bg-brand-success/10 border-brand-success/20 text-brand-success' 
-              : 'bg-brand-warning/10 border-brand-warning/20 text-brand-warning'
-          }`}>
-            <div className="flex items-center gap-1.5">
-              <Database className="w-3.5 h-3.5" />
-              <span>{isSupabaseLive ? 'قاعدة بيانات سحابية متصلة' : 'قاعدة بيانات محلية نشطة'}</span>
-            </div>
-            <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseLive ? 'bg-brand-success animate-ping' : 'bg-brand-warning animate-pulse'}`} />
-          </div>
-        </div>
+      {/* Mobile Sidebar (Slide in) */}
+      <div className={`fixed right-0 top-0 z-50 h-full md:hidden transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <SidebarContent />
+        <button 
+          onClick={() => setMobileMenuOpen(false)}
+          className="absolute -left-12 top-4 bg-dark-card p-2 rounded-xl border border-dark-border/40"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
 
-        {/* Navigation Items */}
-        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activePage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActivePage(item.id)}
-                className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-300 group ${
-                  isActive 
-                    ? 'bg-gradient-to-l from-brand-primary to-brand-primary/80 text-white shadow-lg shadow-brand-primary/30 font-bold scale-[1.02]' 
-                    : 'text-dark-muted hover:text-white hover:bg-dark-hover/70 font-medium'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110 text-white' : 'group-hover:scale-110 group-hover:text-white'}`} />
-                  <span>{item.label}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {item.badge && (
-                    <span className={`px-2 py-0.5 text-[9px] font-extrabold rounded-md ${
-                      isActive 
-                        ? 'bg-white text-brand-primary' 
-                        : 'bg-brand-secondary/20 text-brand-secondary'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                  {item.notificationBadge && (
-                    <span className="bg-brand-danger text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
-                      {item.notificationBadge}
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Logout Button */}
-        <div className="p-4 border-t border-dark-border/40">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-dark-hover hover:bg-brand-danger/20 text-dark-muted hover:text-brand-danger transition-all border border-dark-border/60"
-          >
-            <LogOut className="w-5 h-5" />
-            تسجيل الخروج
-          </button>
-        </div>
-
-        {/* Footer Info */}
-        <div className="p-4 bg-dark-bg/30">
-          <div className="flex items-start gap-2.5 text-xs text-dark-muted">
-            <Info className="w-4 h-4 text-brand-secondary shrink-0 mt-0.5" />
-            <p className="leading-relaxed">
-              هذا النظام متكامل وذكي يدعم الاستيراد المباشر للجداول عبر ملفات الإكسل وصور الجداول.
-            </p>
-          </div>
-        </div>
-      </aside>
+      {/* Desktop Sidebar */}
+      <div className="hidden md:flex">
+        <SidebarContent />
+      </div>
 
       {/* 2. MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col h-screen overflow-y-auto bg-dark-bg p-4 md:p-8 relative min-w-0">
         {/* Top Navbar Context Info (e.g. alerts or notifications) */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-dark-border/20">
-          <div>
-            <h2 className="text-xl md:text-2xl font-black text-white">
-              {menuItems.find(i => i.id === activePage)?.label}
-            </h2>
-            <p className="text-xs md:text-sm text-dark-muted mt-1">
-              نظام إدارة الحضور والغياب الذكي والقائم على الذكاء الاصطناعي للمؤسسات الأكاديمية.
-            </p>
+          <div className="flex items-center gap-3">
+            {/* Mobile Menu Toggle */}
+            <button 
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden p-2.5 rounded-xl bg-dark-card border border-dark-border/40 hover:bg-dark-hover cursor-pointer transition-all"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            
+            <div>
+              <h2 className="text-xl md:text-2xl font-black text-white">
+                {menuItems.find(i => i.id === activePage)?.label}
+              </h2>
+              <p className="text-xs md:text-sm text-dark-muted mt-1">
+                نظام إدارة الحضور والغياب الذكي والقائم على الذكاء الاصطناعي للمؤسسات الأكاديمية.
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {/* Notification Alert */}
