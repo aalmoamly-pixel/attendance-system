@@ -12,7 +12,9 @@ import {
   FileSpreadsheet,
   LogOut,
   Menu,
-  X
+  X,
+  ChevronRight,
+  ChevronLeft
 } from 'lucide-react';
 import { supabase, db } from '../lib/supabase';
 import { getAuthState, logout } from '../lib/auth';
@@ -27,6 +29,7 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
   const [authState] = useState(getAuthState());
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isSupabaseLive = !!supabase;
   const isAdmin = authState.role === 'admin';
   const currentUserId = authState.user?.student_id;
@@ -71,32 +74,36 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
   ];
 
   const SidebarContent = () => (
-    <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 min-h-screen sticky top-0 z-40 shrink-0">
+    <aside className={`flex flex-col ${sidebarCollapsed ? 'w-20' : 'w-72'} bg-dark-card border-l border-dark-border/40 min-h-screen sticky top-0 z-40 shrink-0 transition-all duration-300`}>
       {/* Brand Logo Header */}
       <div className="p-6 border-b border-dark-border/40 flex items-center gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center shadow-xl shadow-brand-primary/30 transform hover:scale-105 transition-all">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center shadow-xl shadow-brand-primary/30 transform hover:scale-105 transition-all shrink-0">
           <Sparkles className="w-6 h-6 text-white animate-pulse" />
         </div>
-        <div>
-          <h1 className="font-black text-lg tracking-wide text-white">حضورك الذكي</h1>
-          <span className="text-xs font-semibold text-brand-secondary">Smart Attendance AI</span>
-        </div>
+        {!sidebarCollapsed && (
+          <div className="min-w-0">
+            <h1 className="font-black text-lg tracking-wide text-white truncate">حضورك الذكي</h1>
+            <span className="text-xs font-semibold text-brand-secondary">Smart Attendance AI</span>
+          </div>
+        )}
       </div>
 
       {/* Database Status Tag */}
-      <div className="px-6 py-3">
-        <div className={`flex items-center justify-between px-3 py-2 rounded-xl border text-[11px] font-medium transition-all ${
-          isSupabaseLive 
-            ? 'bg-brand-success/10 border-brand-success/20 text-brand-success' 
-            : 'bg-brand-warning/10 border-brand-warning/20 text-brand-warning'
-        }`}>
-          <div className="flex items-center gap-1.5">
-            <Database className="w-3.5 h-3.5" />
-            <span>{isSupabaseLive ? 'قاعدة بيانات سحابية متصلة' : 'قاعدة بيانات محلية نشطة'}</span>
+      {!sidebarCollapsed && (
+        <div className="px-6 py-3">
+          <div className={`flex items-center justify-between px-3 py-2 rounded-xl border text-[11px] font-medium transition-all ${
+            isSupabaseLive 
+              ? 'bg-brand-success/10 border-brand-success/20 text-brand-success' 
+              : 'bg-brand-warning/10 border-brand-warning/20 text-brand-warning'
+          }`}>
+            <div className="flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5" />
+              <span>{isSupabaseLive ? 'قاعدة بيانات سحابية متصلة' : 'قاعدة بيانات محلية نشطة'}</span>
+            </div>
+            <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseLive ? 'bg-brand-success animate-ping' : 'bg-brand-warning animate-pulse'}`} />
           </div>
-          <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseLive ? 'bg-brand-success animate-ping' : 'bg-brand-warning animate-pulse'}`} />
         </div>
-      </div>
+      )}
 
       {/* Navigation Items */}
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
@@ -110,32 +117,40 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
                 setActivePage(item.id);
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-300 group ${
+              className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3.5 rounded-xl transition-all duration-300 group ${
                 isActive 
                   ? 'bg-gradient-to-l from-brand-primary to-brand-primary/80 text-white shadow-lg shadow-brand-primary/30 font-bold scale-[1.02]' 
                   : 'text-dark-muted hover:text-white hover:bg-dark-hover/70 font-medium'
               }`}
+              title={sidebarCollapsed ? item.label : undefined}
             >
               <div className="flex items-center gap-3">
                 <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110 text-white' : 'group-hover:scale-110 group-hover:text-white'}`} />
-                <span>{item.label}</span>
+                {!sidebarCollapsed && <span>{item.label}</span>}
               </div>
-              <div className="flex items-center gap-2">
-                {item.badge && (
-                  <span className={`px-2 py-0.5 text-[9px] font-extrabold rounded-md ${
-                    isActive 
-                      ? 'bg-white text-brand-primary' 
-                      : 'bg-brand-secondary/20 text-brand-secondary'
-                  }`}>
-                    {item.badge}
-                  </span>
-                )}
-                {item.notificationBadge && (
-                  <span className="bg-brand-danger text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
-                    {item.notificationBadge}
-                  </span>
-                )}
-              </div>
+              {!sidebarCollapsed && (
+                <div className="flex items-center gap-2">
+                  {item.badge && (
+                    <span className={`px-2 py-0.5 text-[9px] font-extrabold rounded-md ${
+                      isActive 
+                        ? 'bg-white text-brand-primary' 
+                        : 'bg-brand-secondary/20 text-brand-secondary'
+                    }`}>
+                      {item.badge}
+                    </span>
+                  )}
+                  {item.notificationBadge && (
+                    <span className="bg-brand-danger text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
+                      {item.notificationBadge}
+                    </span>
+                  )}
+                </div>
+              )}
+              {sidebarCollapsed && item.notificationBadge && (
+                <span className="absolute top-2 right-2 bg-brand-danger text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full animate-pulse">
+                  {item.notificationBadge}
+                </span>
+              )}
             </button>
           );
         })}
@@ -145,27 +160,30 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
       <div className="p-4 border-t border-dark-border/40">
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-dark-hover hover:bg-brand-danger/20 text-dark-muted hover:text-brand-danger transition-all border border-dark-border/60"
+          className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-center'} gap-2 px-4 py-3 rounded-xl bg-dark-hover hover:bg-brand-danger/20 text-dark-muted hover:text-brand-danger transition-all border border-dark-border/60`}
+          title={sidebarCollapsed ? "تسجيل الخروج" : undefined}
         >
           <LogOut className="w-5 h-5" />
-          تسجيل الخروج
+          {!sidebarCollapsed && <span>تسجيل الخروج</span>}
         </button>
       </div>
 
       {/* Footer Info */}
-      <div className="p-4 bg-dark-bg/30">
-        <div className="flex items-start gap-2.5 text-xs text-dark-muted">
-          <Info className="w-4 h-4 text-brand-secondary shrink-0 mt-0.5" />
-          <p className="leading-relaxed">
-            هذا النظام متكامل وذكي يدعم الاستيراد المباشر للجداول عبر ملفات الإكسل وصور الجداول.
-          </p>
+      {!sidebarCollapsed && (
+        <div className="p-4 bg-dark-bg/30">
+          <div className="flex items-start gap-2.5 text-xs text-dark-muted">
+            <Info className="w-4 h-4 text-brand-secondary shrink-0 mt-0.5" />
+            <p className="leading-relaxed">
+              هذا النظام متكامل وذكي يدعم الاستيراد المباشر للجداول عبر ملفات الإكسل وصور الجداول.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 
   return (
-    <div className="min-h-screen bg-dark-bg text-dark-text font-sans flex flex-row" dir="rtl">
+    <div className="min-h-screen bg-dark-bg text-dark-text font-sans flex flex-row overflow-hidden" dir="rtl">
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div 
@@ -202,8 +220,16 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
             >
               <Menu className="w-5 h-5" />
             </button>
+            {/* Desktop Collapse Toggle */}
+            <button 
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="hidden md:flex p-2.5 rounded-xl bg-dark-card border border-dark-border/40 hover:bg-dark-hover cursor-pointer transition-all"
+              title={sidebarCollapsed ? "توسيع القائمة" : "طي القائمة"}
+            >
+              {sidebarCollapsed ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+            </button>
             
-            <div>
+            <div className="min-w-0">
               <h2 className="text-xl md:text-2xl font-black text-white">
                 {menuItems.find(i => i.id === activePage)?.label}
               </h2>
@@ -226,9 +252,9 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
               )}
             </button>
             
-            <div className="text-left md:text-right hidden sm:block">
-              <p className="text-xs text-dark-muted">أهلاً بك، {authState.user?.full_name || 'المشرف الأكاديمي'}</p>
-              <p className="text-xs font-bold text-white">التاريخ: {new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <div className="text-left md:text-right hidden sm:block min-w-0">
+              <p className="text-xs text-dark-muted truncate">أهلاً بك، {authState.user?.full_name || 'المشرف الأكاديمي'}</p>
+              <p className="text-xs font-bold text-white truncate">التاريخ: {new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
             </div>
           </div>
         </div>

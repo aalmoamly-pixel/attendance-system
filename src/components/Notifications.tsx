@@ -9,7 +9,9 @@ import {
   Search,
   CheckCircle2,
   Paperclip,
-  Smile
+  Smile,
+  ArrowLeft,
+  PanelRight
 } from 'lucide-react';
 import { db, supabase } from '../lib/supabase';
 import { getAuthState } from '../lib/auth';
@@ -29,6 +31,7 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [chatListVisible, setChatListVisible] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const authState = getAuthState();
@@ -267,16 +270,22 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
       </div>
 
       <div className="glass-card h-[calc(100vh-240px)] flex overflow-hidden rounded-3xl border-2 border-dark-border/50 shadow-2xl relative">
-        {/* Chat List - Only visible on mobile when no chat selected, or on desktop */}
+        {/* Chat List */}
         {isAdmin && (
-          <div className={`w-full md:w-96 border-l border-dark-border flex flex-col bg-dark-bg/30 absolute md:relative inset-0 z-10 ${
-            selectedChatStudent ? 'hidden md:flex' : 'flex'
-          }`}>
-            <div className="p-6 border-b border-dark-border bg-dark-card/50">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <div className={`${chatListVisible ? 'flex' : 'hidden'} md:flex md:w-96 w-full border-l border-dark-border flex flex-col bg-dark-bg/30 relative z-10`}>
+            <div className="p-6 border-b border-dark-border bg-dark-card/50 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <User className="w-5 h-5" />
                 قائمة الطلاب
               </h3>
+              <button 
+                onClick={() => setChatListVisible(false)} 
+                className="md:hidden p-2 rounded-xl bg-dark-hover hover:bg-dark-border text-dark-muted hover:text-white transition-all"
+              >
+                <PanelRight className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 border-b border-dark-border">
               <div className="relative">
                 <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-dark-muted" />
                 <input
@@ -297,7 +306,12 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
                 return (
                   <button
                     key={student.student_id}
-                    onClick={() => setSelectedChatStudent(student)}
+                    onClick={() => {
+                      setSelectedChatStudent(student);
+                      if (window.innerWidth < 768) {
+                        setChatListVisible(false);
+                      }
+                    }}
                     className={`w-full p-5 flex items-center gap-4 border-b border-dark-border/30 transition-all hover:translate-x-[-4px] ${
                       isSelected 
                         ? 'bg-gradient-to-l from-brand-primary/15 to-transparent border-l-4 border-l-brand-primary shadow-lg shadow-brand-primary/10' 
@@ -343,12 +357,10 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
               <div className="p-5 border-b border-dark-border flex items-center gap-4 bg-dark-card/30 backdrop-blur-sm">
                 {isAdmin && (
                   <button 
-                    onClick={() => setSelectedChatStudent(null)} 
-                    className="md:hidden p-2 rounded-xl bg-dark-hover hover:bg-dark-border text-dark-muted hover:text-white transition-all"
+                    onClick={() => setChatListVisible(true)} 
+                    className="p-2 rounded-xl bg-dark-hover hover:bg-dark-border text-dark-muted hover:text-white transition-all"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide">
-                      <path d="m15 18-6-6 6-6"/>
-                    </svg>
+                    <ArrowLeft className="w-5 h-5" />
                   </button>
                 )}
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center shadow-lg">
