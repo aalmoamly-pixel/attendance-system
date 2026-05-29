@@ -10,8 +10,7 @@ import {
   CheckCircle2,
   Paperclip,
   Smile,
-  ArrowLeft,
-  PanelRight
+  ArrowLeft
 } from 'lucide-react';
 import { db, supabase } from '../lib/supabase';
 import { getAuthState } from '../lib/auth';
@@ -31,7 +30,6 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [chatListVisible, setChatListVisible] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const authState = getAuthState();
@@ -83,11 +81,6 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
       if (isAdmin) {
         const filteredStudents = students.filter(s => s.role === 'student');
         setAllStudents(filteredStudents);
-        
-        if (!selectedChatStudent && filteredStudents.length > 0) {
-          const firstStudent = filteredStudents[0];
-          setSelectedChatStudent(firstStudent);
-        }
       }
     } catch (err) {
       console.error('[Notifications] Error loading data:', err);
@@ -269,21 +262,15 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
         )}
       </div>
 
-      <div className="glass-card h-[calc(100vh-240px)] flex overflow-hidden rounded-3xl border-2 border-dark-border/50 shadow-2xl relative">
+      <div className="glass-card h-[calc(100vh-240px)] flex overflow-hidden rounded-3xl border-2 border-dark-border/50 shadow-2xl">
         {/* Chat List */}
         {isAdmin && (
-          <div className={`${chatListVisible ? 'flex' : 'hidden'} md:flex md:w-96 w-full border-l border-dark-border flex flex-col bg-dark-bg/30 relative z-10`}>
-            <div className="p-6 border-b border-dark-border bg-dark-card/50 flex items-center justify-between">
+          <div className={`${!selectedChatStudent ? 'w-full' : 'hidden md:flex md:w-96'} md:border-l border-dark-border flex-col bg-dark-bg/30`}>
+            <div className="p-6 border-b border-dark-border bg-dark-card/50">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <User className="w-5 h-5" />
                 قائمة الطلاب
               </h3>
-              <button 
-                onClick={() => setChatListVisible(false)} 
-                className="md:hidden p-2 rounded-xl bg-dark-hover hover:bg-dark-border text-dark-muted hover:text-white transition-all"
-              >
-                <PanelRight className="w-5 h-5" />
-              </button>
             </div>
             <div className="p-4 border-b border-dark-border">
               <div className="relative">
@@ -293,7 +280,7 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
                   placeholder="بحث عن طالب..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-dark-bg border-2 border-dark-border rounded-2xl pr-12 pl-5 py-3.5 text-white focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all"
+                  className="w-full bg-dark-card border-2 border-dark-border rounded-2xl pr-12 pl-5 py-3.5 text-white focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all"
                 />
               </div>
             </div>
@@ -306,12 +293,7 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
                 return (
                   <button
                     key={student.student_id}
-                    onClick={() => {
-                      setSelectedChatStudent(student);
-                      if (window.innerWidth < 768) {
-                        setChatListVisible(false);
-                      }
-                    }}
+                    onClick={() => setSelectedChatStudent(student)}
                     className={`w-full p-5 flex items-center gap-4 border-b border-dark-border/30 transition-all hover:translate-x-[-4px] ${
                       isSelected 
                         ? 'bg-gradient-to-l from-brand-primary/15 to-transparent border-l-4 border-l-brand-primary shadow-lg shadow-brand-primary/10' 
@@ -350,20 +332,20 @@ export default function Notifications({ studentId, isAdmin = false }: Notificati
 
         {/* Chat Window */}
         <div className={`flex-1 flex flex-col bg-gradient-to-b from-dark-bg/50 to-dark-card/10 ${
-          isAdmin && selectedChatStudent ? 'flex' : (!isAdmin ? 'flex' : 'md:flex')
+          !isAdmin || selectedChatStudent ? 'flex' : 'hidden md:flex'
         }`}>
           {(!isAdmin || selectedChatStudent) ? (
             <>
               <div className="p-5 border-b border-dark-border flex items-center gap-4 bg-dark-card/30 backdrop-blur-sm">
                 {isAdmin && (
                   <button 
-                    onClick={() => setChatListVisible(true)} 
-                    className="p-2 rounded-xl bg-dark-hover hover:bg-dark-border text-dark-muted hover:text-white transition-all"
+                    onClick={() => setSelectedChatStudent(null)} 
+                    className="md:hidden p-2 rounded-xl bg-dark-hover hover:bg-dark-border text-dark-muted hover:text-white transition-all"
                   >
-                    <ArrowLeft className="w-5 h-5" />
+                    <ArrowLeft className="w-6 h-6" />
                   </button>
                 )}
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center shadow-lg shrink-0">
                   {isAdmin ? (
                     <span className="text-white font-black">{selectedChatStudent?.full_name.charAt(0)}</span>
                   ) : (
