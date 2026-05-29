@@ -14,7 +14,9 @@ import {
   Menu,
   X,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  MessageSquare,
+  UserCircle
 } from 'lucide-react';
 import { supabase, db } from '../lib/supabase';
 import { getAuthState, logout } from '../lib/auth';
@@ -29,7 +31,7 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
   const [authState] = useState(getAuthState());
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // default collapsed on mobile
   const isSupabaseLive = !!supabase;
   const isAdmin = authState.role === 'admin';
   const currentUserId = authState.user?.student_id;
@@ -71,6 +73,14 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
     { id: 'notifications', label: 'الرسائل والإشعارات', icon: Bell, notificationBadge: unreadCount > 0 ? String(unreadCount) : null },
     { id: 'schedule-import', label: 'استيراد الجداول', icon: FileSpreadsheet },
     { id: 'import', label: 'الاستيراد الذكي', icon: Sparkles, badge: 'AI' },
+  ];
+
+  const bottomNavItems = [
+    { id: 'dashboard', label: 'الرئيسية', icon: LayoutDashboard },
+    { id: 'subjects', label: 'المواد', icon: BookOpen },
+    { id: 'attendance', label: 'الحضور', icon: CalendarCheck },
+    { id: 'notifications', label: 'الرسائل', icon: MessageSquare, badge: unreadCount > 0 ? String(unreadCount) : null },
+    { id: 'account', label: 'الحساب', icon: UserCircle },
   ];
 
   const SidebarContent = () => (
@@ -116,8 +126,11 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
               onClick={() => {
                 setActivePage(item.id);
                 setMobileMenuOpen(false);
+                if (window.innerWidth < 768) {
+                  setSidebarCollapsed(true);
+                }
               }}
-              className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3.5 rounded-xl transition-all duration-300 group ${
+              className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3.5 rounded-xl transition-all duration-300 group relative ${
                 isActive 
                   ? 'bg-gradient-to-l from-brand-primary to-brand-primary/80 text-white shadow-lg shadow-brand-primary/30 font-bold scale-[1.02]' 
                   : 'text-dark-muted hover:text-white hover:bg-dark-hover/70 font-medium'
@@ -147,7 +160,7 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
                 </div>
               )}
               {sidebarCollapsed && item.notificationBadge && (
-                <span className="absolute top-2 right-2 bg-brand-danger text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full animate-pulse">
+                <span className="absolute -top-1 -left-1 bg-brand-danger text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full animate-pulse">
                   {item.notificationBadge}
                 </span>
               )}
@@ -260,9 +273,46 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
         </div>
 
         {/* Dynamic page contents wrapper */}
-        <div className="flex-1 animate-fade-in">
+        <div className="flex-1 animate-fade-in pb-20 md:pb-4"> {/* Padding for bottom nav on mobile */}
           {children}
         </div>
+
+        {/* Bottom Navigation (Mobile Only) */}
+        <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-dark-card border-t border-dark-border/40 z-30 px-2 py-2">
+          <div className="flex justify-around items-center gap-1">
+            {bottomNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activePage === item.id || 
+                (item.id === 'account' && !menuItems.some(m => m.id === activePage));
+                
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (item.id !== 'account') {
+                      setActivePage(item.id);
+                    }
+                  }}
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all relative ${
+                    isActive 
+                      ? 'text-brand-primary bg-brand-primary/10' 
+                      : 'text-dark-muted hover:text-white'
+                  }`}
+                >
+                  <Icon className={`w-6 h-6 transition-transform ${isActive ? 'scale-110' : ''}`} />
+                  <span className="text-[10px] font-medium">
+                    {item.label}
+                  </span>
+                  {item.badge && (
+                    <span className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-brand-danger text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
       </main>
     </div>
   );
