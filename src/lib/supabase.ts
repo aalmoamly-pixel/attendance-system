@@ -1441,35 +1441,35 @@ export async function migrateLocalToSupabase() {
     const paymentSettings = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENT_SETTINGS) || '[]');
 
     if (departments.length > 0) {
-      const { error } = await supabase.from('departments').upsert(departments);
+      const { error } = await supabase.from('departments').upsert(departments, { onConflict: 'department_id' });
       if (error) throw error;
     }
     if (students.length > 0) {
-      const { error } = await supabase.from('students').upsert(students);
+      const { error } = await supabase.from('students').upsert(students, { onConflict: 'academic_id' });
       if (error) throw error;
     }
     if (subjects.length > 0) {
-      const { error } = await supabase.from('subjects').upsert(subjects);
+      const { error } = await supabase.from('subjects').upsert(subjects, { onConflict: 'subject_id' });
       if (error) throw error;
     }
     if (schedules.length > 0) {
-      const { error } = await supabase.from('student_schedule').upsert(schedules);
+      const { error } = await supabase.from('student_schedule').upsert(schedules, { onConflict: 'schedule_id' });
       if (error) throw error;
     }
     if (attendanceLogs.length > 0) {
-      const { error } = await supabase.from('attendance_log').upsert(attendanceLogs);
+      const { error } = await supabase.from('attendance_log').upsert(attendanceLogs, { onConflict: 'log_id' });
       if (error) throw error;
     }
     if (notifications.length > 0) {
-      const { error } = await supabase.from('notifications').upsert(notifications);
+      const { error } = await supabase.from('notifications').upsert(notifications, { onConflict: 'notification_id' });
       if (error) throw error;
     }
     if (personalNotes.length > 0) {
-      const { error } = await supabase.from('personal_notes').upsert(personalNotes);
+      const { error } = await supabase.from('personal_notes').upsert(personalNotes, { onConflict: 'note_id' });
       if (error) throw error;
     }
     if (payments.length > 0) {
-      const { error } = await supabase.from('payments').upsert(payments);
+      const { error } = await supabase.from('payments').upsert(payments, { onConflict: 'id' });
       if (error) throw error;
     }
     if (paymentSettings.length > 0) {
