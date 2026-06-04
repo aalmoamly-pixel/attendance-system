@@ -103,3 +103,46 @@ export interface AuthState {
   user: Student | null;
   role: UserRole | null;
 }
+
+// ------------------------------ Payment Types ------------------------------
+
+export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'unpaid';
+
+export type PaymentMethod = 
+  | 'bank_transfer' 
+  | 'ria' 
+  | 'binance_usdt' 
+  | 'visa' 
+  | 'mastercard' 
+  | 'apple_pay' 
+  | 'google_pay' 
+  | 'paypal';
+
+export interface Payment {
+  id: number;
+  student_id: number;
+  invoice_number: string;
+  amount: number;
+  payment_method: PaymentMethod | null;
+  transaction_id: string | null;
+  receipt_image: string | null;
+  notes: string | null;
+  admin_notes: string | null;
+  status: PaymentStatus;
+  created_at: string;
+  approved_at: string | null;
+  approved_by: number | null;
+  subscription_start: string | null;
+  subscription_end: string | null;
+  students?: Student;
+}
+
+export interface PaymentSettings {
+  subscription_amount: number;
+  subscription_duration_days: number;
+  enabled_payment_methods: PaymentMethod[];
+  bank_transfer_details: string;
+  ria_details: string;
+  binance_wallet: string;
+  payment_instructions: string;
+}

@@ -10,12 +10,14 @@ import {
   X,
   Check,
   Bell,
-  Sparkles
+  Sparkles,
+  DollarSign
 } from 'lucide-react';
 import { db } from '../lib/supabase';
 import { getAuthState } from '../lib/auth';
 import type { Student, Notification, PersonalNote } from '../types/database';
 import Notifications from './Notifications';
+import StudentPayments from './StudentPayments';
 
 interface StudentDashboardProps {
   onLogout: () => void;
@@ -29,7 +31,7 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const [personalNote, setPersonalNote] = useState<PersonalNote | null>(null);
   const [showNote, setShowNote] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'notifications'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'notifications' | 'payments'>('dashboard');
 
   useEffect(() => {
     const authState = getAuthState();
@@ -112,6 +114,17 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
                   {unreadCount}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`flex-1 md:flex-none px-3 sm:px-4 py-2 rounded-xl flex items-center justify-center gap-2 transition-all text-sm ${
+                activeTab === 'payments'
+                  ? 'bg-brand-primary text-white'
+                  : 'bg-dark-card text-dark-muted hover:bg-dark-hover'
+              }`}
+            >
+              <DollarSign className="w-4 sm:w-5 h-4 sm:h-5" />
+              <span className="hidden sm:inline">المدفوعات</span>
             </button>
             <button
               onClick={() => setActiveTab('dashboard')}
@@ -328,6 +341,8 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
               </div>
             </div>
           </>
+        ) : activeTab === 'payments' ? (
+          <StudentPayments />
         ) : (
           <Notifications studentId={student?.student_id} isAdmin={false} />
         )}

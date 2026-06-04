@@ -12,7 +12,10 @@ import {
   FileSpreadsheet,
   LogOut,
   Menu,
-  X
+  X,
+  DollarSign,
+  Settings,
+  TrendingUp
 } from 'lucide-react';
 import { supabase, db } from '../lib/supabase';
 import { getAuthState, logout } from '../lib/auth';
@@ -59,16 +62,21 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
     window.location.reload();
   };
 
+  const isAdmin = authState.role === 'admin';
+  
   const menuItems = [
-    { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
-    { id: 'students', label: 'إدارة الطلاب', icon: Users },
-    { id: 'subjects', label: 'المواد الدراسية', icon: BookOpen },
-    { id: 'attendance', label: 'رصد الحضور', icon: CalendarCheck },
-    { id: 'attendance-report', label: 'تقارير الحضور', icon: BarChart3 },
-    { id: 'notifications', label: 'الرسائل والإشعارات', icon: Bell, notificationBadge: unreadCount > 0 ? String(unreadCount) : null },
-    { id: 'schedule-import', label: 'استيراد الجداول', icon: FileSpreadsheet },
-    { id: 'import', label: 'الاستيراد الذكي', icon: Sparkles, badge: 'AI' },
-  ];
+    { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard, show: true },
+    { id: 'students', label: 'إدارة الطلاب', icon: Users, show: isAdmin },
+    { id: 'subjects', label: 'المواد الدراسية', icon: BookOpen, show: isAdmin },
+    { id: 'attendance', label: 'رصد الحضور', icon: CalendarCheck, show: isAdmin },
+    { id: 'attendance-report', label: 'تقارير الحضور', icon: BarChart3, show: isAdmin },
+    { id: 'payments', label: isAdmin ? 'إدارة المدفوعات' : 'المدفوعات', icon: DollarSign, show: true },
+    { id: 'payment-settings', label: 'إعدادات المدفوعات', icon: Settings, show: isAdmin },
+    { id: 'financial-reports', label: 'التقارير المالية', icon: TrendingUp, show: isAdmin },
+    { id: 'notifications', label: 'الرسائل والإشعارات', icon: Bell, notificationBadge: unreadCount > 0 ? String(unreadCount) : null, show: true },
+    { id: 'schedule-import', label: 'استيراد الجداول', icon: FileSpreadsheet, show: isAdmin },
+    { id: 'import', label: 'الاستيراد الذكي', icon: Sparkles, badge: 'AI', show: isAdmin },
+  ].filter(item => item.show);
 
   const SidebarContent = () => (
     <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 min-h-screen">

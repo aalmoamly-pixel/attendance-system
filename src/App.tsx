@@ -10,6 +10,9 @@ import SmartImport from './components/SmartImport';
 import ScheduleImport from './components/ScheduleImport';
 import StudentDashboard from './components/StudentDashboard';
 import Notifications from './components/Notifications';
+import AdminPayments from './components/AdminPayments';
+import PaymentSettings from './components/PaymentSettings';
+import FinancialReports from './components/FinancialReports';
 import { getAuthState, logout, initializeDefaultAdmin } from './lib/auth';
 import { db } from './lib/supabase';
 import type { AuthState } from './types/database';
@@ -67,6 +70,12 @@ export default function App() {
         return <AttendancePage key={refreshTrigger} />;
       case 'attendance-report':
         return <AttendanceReport key={refreshTrigger} setActivePage={setActivePage} />;
+      case 'payments':
+        return <AdminPayments key={refreshTrigger} />;
+      case 'payment-settings':
+        return <PaymentSettings key={refreshTrigger} />;
+      case 'financial-reports':
+        return <FinancialReports key={refreshTrigger} />;
       case 'notifications':
         return <Notifications key={refreshTrigger} isAdmin={true} />;
       case 'import':

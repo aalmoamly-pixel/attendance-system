@@ -10,7 +10,11 @@ import type {
   DashboardStats,
   UserRole,
   Notification,
-  PersonalNote
+  PersonalNote,
+  Payment,
+  PaymentStatus,
+  PaymentMethod,
+  PaymentSettings
 } from '../types/database';
 import { hashPassword } from './auth';
 
@@ -43,7 +47,9 @@ const LOCAL_KEYS = {
   SCHEDULES: 'attendance_schedules',
   ATTENDANCE_LOGS: 'attendance_logs',
   NOTIFICATIONS: 'attendance_notifications',
-  PERSONAL_NOTES: 'attendance_personal_notes'
+  PERSONAL_NOTES: 'attendance_personal_notes',
+  PAYMENTS: 'attendance_payments',
+  PAYMENT_SETTINGS: 'attendance_payment_settings'
 };
 
 const initializeLocalData = async () => {
@@ -329,6 +335,25 @@ const initializeLocalData = async () => {
     if (!localStorage.getItem(LOCAL_KEYS.PERSONAL_NOTES)) {
       localStorage.setItem(LOCAL_KEYS.PERSONAL_NOTES, JSON.stringify([]));
       console.log('[initializeLocalData] Personal notes initialized');
+    }
+    
+    if (!localStorage.getItem(LOCAL_KEYS.PAYMENTS)) {
+      localStorage.setItem(LOCAL_KEYS.PAYMENTS, JSON.stringify([]));
+      console.log('[initializeLocalData] Payments initialized');
+    }
+    
+    if (!localStorage.getItem(LOCAL_KEYS.PAYMENT_SETTINGS)) {
+      const defaultSettings: PaymentSettings = {
+        subscription_amount: 299,
+        subscription_duration_days: 30,
+        enabled_payment_methods: ['bank_transfer', 'ria', 'binance_usdt'],
+        bank_transfer_details: 'اسم البنك: بنك الراجحي | رقم الحساب: 123456789 | الاسم: إدارة تحضير الطلاب',
+        ria_details: 'اسم المستلم: إدارة تحضير الطلاب | الدولة: السعودية',
+        binance_wallet: '0x123456789abcdef123456789abcdef123456789',
+        payment_instructions: 'يرجى إرسال إثبات الدفع عبر النظام بعد الدفع'
+      };
+      localStorage.setItem(LOCAL_KEYS.PAYMENT_SETTINGS, JSON.stringify(defaultSettings));
+      console.log('[initializeLocalData] Payment settings initialized');
     }
     
     console.log('[initializeLocalData] All data initialized successfully!');
@@ -1170,6 +1195,150 @@ export const db = {
       return data || [];
     }
     return JSON.parse(localStorage.getItem(LOCAL_KEYS.PERSONAL_NOTES) || '[]');
+  },
+
+  // ---------------- Payment Functions ----------------
+  async getPayments(filters?: { student_id?: number; status?: PaymentStatus; payment_method?: PaymentMethod }): Promise<Payment[]> {
+    if (supabase) {
+      let query = supabase.from('payments').select('*, students(*)').order('created_at', { ascending: false });
+      if (filters?.student_id) query = query.eq('student_id', filters.student_id);
+      if (filters?.status) query = query.eq('status', filters.status);
+      if (filters?.payment_method) query = query.eq('payment_method', filters.payment_method);
+      
+      const { data, error } = await query;
+      if (error) {
+        console.error('[Payments] Fetch error:', error);
+        throw error;
+      }
+      return data || [];
+    }
+    
+    let payments = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENTS) || '[]');
+    const students = await this.getStudents();
+    payments = payments.map((p: any) => ({ ...p, students: students.find(s => s.student_id === p.student_id) }));
+    
+    if (filters?.student_id) payments = payments.filter((p: any) => p.student_id === filters.student_id);
+    if (filters?.status) payments = payments.filter((p: any) => p.status === filters.status);
+    if (filters?.payment_method) payments = payments.filter((p: any) => p.payment_method === filters.payment_method);
+    return payments;
+  },
+
+  async createPayment(payment: Omit<Payment, 'id' | 'created_at'>): Promise<Payment> {
+    const now = new Date();
+    const newPayment = {
+      ...payment,
+      created_at: now.toISOString()
+    };
+    
+    if (supabase) {
+      const { data, error } = await supabase.from('payments').insert(newPayment).select('*').single();
+      if (error) {
+        console.error('[Payments] Create error:', error);
+        throw error;
+      }
+      return data;
+    } else {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENTS) || '[]');
+      const nextId = existing.length > 0 ? Math.max(...existing.map((p: any) => p.id)) + 1 : 1;
+      const paymentWithId = { ...newPayment, id: nextId };
+      existing.push(paymentWithId);
+      localStorage.setItem(LOCAL_KEYS.PAYMENTS, JSON.stringify(existing));
+      return paymentWithId;
+    }
+  },
+
+  async updatePayment(id: number, payment: Partial<Omit<Payment, 'id'>>): Promise<Payment> {
+    if (supabase) {
+      const { data, error } = await supabase.from('payments').update(payment).eq('id', id).select('*').single();
+      if (error) {
+        console.error('[Payments] Update error:', error);
+        throw error;
+      }
+      return data;
+    } else {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENTS) || '[]');
+      const index = existing.findIndex((p: any) => p.id === id);
+      if (index !== -1) {
+        existing[index] = { ...existing[index], ...payment };
+        localStorage.setItem(LOCAL_KEYS.PAYMENTS, JSON.stringify(existing));
+        return existing[index];
+      }
+      throw new Error('Payment not found');
+    }
+  },
+
+  async getPaymentSettings(): Promise<PaymentSettings> {
+    if (supabase) {
+      const { data, error } = await supabase.from('payment_settings').select('*').single();
+      if (error && error.code !== 'PGRST116') {
+        console.error('[PaymentSettings] Fetch error:', error);
+        throw error;
+      }
+      if (data) return data;
+      const defaultSettings: PaymentSettings = {
+        subscription_amount: 299,
+        subscription_duration_days: 30,
+        enabled_payment_methods: ['bank_transfer', 'ria', 'binance_usdt'],
+        bank_transfer_details: 'اسم البنك: بنك الراجحي | رقم الحساب: 123456789 | الاسم: إدارة تحضير الطلاب',
+        ria_details: 'اسم المستلم: إدارة تحضير الطلاب | الدولة: السعودية',
+        binance_wallet: '0x123456789abcdef123456789abcdef123456789',
+        payment_instructions: 'يرجى إرسال إثبات الدفع عبر النظام بعد الدفع'
+      };
+      await supabase.from('payment_settings').insert(defaultSettings);
+      return defaultSettings;
+    }
+    
+    const settings = localStorage.getItem(LOCAL_KEYS.PAYMENT_SETTINGS);
+    return settings ? JSON.parse(settings) : {
+      subscription_amount: 299,
+      subscription_duration_days: 30,
+      enabled_payment_methods: ['bank_transfer', 'ria', 'binance_usdt'],
+      bank_transfer_details: 'اسم البنك: بنك الراجحي | رقم الحساب: 123456789 | الاسم: إدارة تحضير الطلاب',
+      ria_details: 'اسم المستلم: إدارة تحضير الطلاب | الدولة: السعودية',
+      binance_wallet: '0x123456789abcdef123456789abcdef123456789',
+      payment_instructions: 'يرجى إرسال إثبات الدفع عبر النظام بعد الدفع'
+    };
+  },
+
+  async updatePaymentSettings(settings: Partial<PaymentSettings>): Promise<PaymentSettings> {
+    if (supabase) {
+      const { data, error } = await supabase.from('payment_settings').update(settings).select('*').single();
+      if (error) {
+        console.error('[PaymentSettings] Update error:', error);
+        throw error;
+      }
+      return data;
+    } else {
+      const existing = await this.getPaymentSettings();
+      const newSettings = { ...existing, ...settings };
+      localStorage.setItem(LOCAL_KEYS.PAYMENT_SETTINGS, JSON.stringify(newSettings));
+      return newSettings;
+    }
+  },
+
+  async getStudentSubscription(student_id: number): Promise<{ active: boolean; end_date: string | null; days_remaining: number }> {
+    const payments = await this.getPayments({ student_id, status: 'approved' });
+    if (payments.length === 0) return { active: false, end_date: null, days_remaining: 0 };
+
+    const sortedPayments = payments.sort((a, b) => {
+      const dateA = new Date(a.approved_at || a.created_at).getTime();
+      const dateB = new Date(b.approved_at || b.created_at).getTime();
+      return dateB - dateA;
+    });
+    const lastPayment = sortedPayments[0];
+    if (!lastPayment.subscription_end) {
+      return { active: false, end_date: null, days_remaining: 0 };
+    }
+    const subscriptionEnd = new Date(lastPayment.subscription_end);
+    const now = new Date();
+    const daysRemaining = Math.max(0, Math.ceil((subscriptionEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    const active = now < subscriptionEnd;
+    
+    return {
+      active,
+      end_date: lastPayment.subscription_end,
+      days_remaining: daysRemaining
+    };
   }
 };
 
