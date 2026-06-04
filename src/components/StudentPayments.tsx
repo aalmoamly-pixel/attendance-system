@@ -275,22 +275,29 @@ export default function StudentPayments() {
                   type="number"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                  className="w-full input"
+                  className="w-full glass-input"
                   required
                 />
               </div>
               <div>
                 <label className="block text-white font-semibold mb-2">طريقة الدفع</label>
-                <select
-                  value={formData.payment_method}
-                  onChange={(e) => setFormData({ ...formData, payment_method: e.target.value as PaymentMethod })}
-                  className="w-full input"
-                  required
-                >
-                  <option value="bank_transfer">تحويل بنكي</option>
-                  <option value="ria">RIA Money Transfer</option>
-                  <option value="binance_usdt">Binance USDT</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={formData.payment_method}
+                    onChange={(e) => setFormData({ ...formData, payment_method: e.target.value as PaymentMethod })}
+                    className="w-full glass-input cursor-pointer"
+                    required
+                  >
+                    <option value="bank_transfer">تحويل بنكي</option>
+                    <option value="ria">RIA Money Transfer</option>
+                    <option value="binance_usdt">Binance USDT</option>
+                  </select>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-5 h-5 text-dark-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-white font-semibold mb-2">رقم العملية</label>
@@ -298,7 +305,7 @@ export default function StudentPayments() {
                   type="text"
                   value={formData.transaction_id}
                   onChange={(e) => setFormData({ ...formData, transaction_id: e.target.value })}
-                  className="w-full input"
+                  className="w-full glass-input"
                   placeholder="مثال: TRX-123456789"
                 />
               </div>
@@ -340,7 +347,7 @@ export default function StudentPayments() {
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full input"
+                  className="w-full glass-input"
                   rows={3}
                 />
               </div>

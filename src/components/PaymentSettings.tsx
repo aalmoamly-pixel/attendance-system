@@ -95,7 +95,7 @@ export default function PaymentSettings() {
               type="number"
               value={settings.subscription_amount || 0}
               onChange={(e) => setSettings({ ...settings, subscription_amount: Number(e.target.value) })}
-              className="w-full input"
+              className="w-full glass-input"
               min={0}
             />
           </div>
@@ -105,7 +105,7 @@ export default function PaymentSettings() {
               type="number"
               value={settings.subscription_duration_days || 30}
               onChange={(e) => setSettings({ ...settings, subscription_duration_days: Number(e.target.value) })}
-              className="w-full input"
+              className="w-full glass-input"
               min={1}
             />
           </div>
@@ -133,7 +133,7 @@ export default function PaymentSettings() {
           <textarea
             value={settings.bank_transfer_details || ''}
             onChange={(e) => setSettings({ ...settings, bank_transfer_details: e.target.value })}
-            className="w-full input"
+            className="w-full glass-input"
             rows={4}
             placeholder="أدخل تفاصيل الحساب البنكي هنا..."
           />
@@ -144,7 +144,7 @@ export default function PaymentSettings() {
           <textarea
             value={settings.ria_details || ''}
             onChange={(e) => setSettings({ ...settings, ria_details: e.target.value })}
-            className="w-full input"
+            className="w-full glass-input"
             rows={3}
             placeholder="أدخل تفاصيل RIA هنا..."
           />
@@ -156,7 +156,7 @@ export default function PaymentSettings() {
             type="text"
             value={settings.binance_wallet || ''}
             onChange={(e) => setSettings({ ...settings, binance_wallet: e.target.value })}
-            className="w-full input font-mono"
+            className="w-full glass-input font-mono"
             placeholder="0x..."
           />
         </div>
@@ -166,7 +166,7 @@ export default function PaymentSettings() {
           <textarea
             value={settings.payment_instructions || ''}
             onChange={(e) => setSettings({ ...settings, payment_instructions: e.target.value })}
-            className="w-full input"
+            className="w-full glass-input"
             rows={5}
             placeholder="أضف تعليمات دفع مفصلة للطلاب..."
           />

@@ -189,3 +189,24 @@ body {
 .rtl-grid {
   direction: rtl;
 }
+
+/* Custom select dropdown styling for payment modules */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Style for dropdown options */
+select option {
+  background-color: white;
+  color: black;
+}
+
+select option:hover,
+select option:focus,
+select option:active,
+select option:checked {
+  background-color: #2563eb !important;
+  color: white !important;
+}

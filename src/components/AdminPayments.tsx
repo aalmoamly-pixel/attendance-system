@@ -230,37 +230,51 @@ export default function AdminPayments() {
                 type="text"
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                className="w-full input pr-10"
+                className="w-full glass-input pr-10"
                 placeholder="بحث بالاسم، رقم الهوية أو رقم الفاتورة..."
               />
             </div>
           </div>
           <div>
             <label className="block text-white font-semibold mb-2">الحالة</label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value as PaymentStatus })}
-              className="w-full input"
-            >
-              <option value="">الكل</option>
-              <option value="pending">قيد المراجعة</option>
-              <option value="approved">معتمد</option>
-              <option value="rejected">مرفوض</option>
-              <option value="unpaid">غير مدفوع</option>
-            </select>
+            <div className="relative">
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value as PaymentStatus })}
+                className="w-full glass-input cursor-pointer"
+              >
+                <option value="">الكل</option>
+                <option value="pending">قيد المراجعة</option>
+                <option value="approved">معتمد</option>
+                <option value="rejected">مرفوض</option>
+                <option value="unpaid">غير مدفوع</option>
+              </select>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-5 h-5 text-dark-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
           <div>
             <label className="block text-white font-semibold mb-2">طريقة الدفع</label>
-            <select
-              value={filters.payment_method}
-              onChange={(e) => setFilters({ ...filters, payment_method: e.target.value as PaymentMethod })}
-              className="w-full input"
-            >
-              <option value="">الكل</option>
-              <option value="bank_transfer">تحويل بنكي</option>
-              <option value="ria">RIA Money Transfer</option>
-              <option value="binance_usdt">Binance USDT</option>
-            </select>
+            <div className="relative">
+              <select
+                value={filters.payment_method}
+                onChange={(e) => setFilters({ ...filters, payment_method: e.target.value as PaymentMethod })}
+                className="w-full glass-input cursor-pointer"
+              >
+                <option value="">الكل</option>
+                <option value="bank_transfer">تحويل بنكي</option>
+                <option value="ria">RIA Money Transfer</option>
+                <option value="binance_usdt">Binance USDT</option>
+              </select>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-5 h-5 text-dark-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
           <div>
             <label className="block text-white font-semibold mb-2">من التاريخ</label>
