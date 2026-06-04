@@ -269,7 +269,12 @@ const initializeLocalData = async () => {
           password_hash: adminPassword, 
           password: 'Abdullah772091',
           role: 'admin' as UserRole,
-          department_id: 1 
+          department_id: 1,
+          personal_note: null,
+          subscription_amount: 0,
+          due_date: null,
+          subscription_status: 'active',
+          financial_notes: null
         },
         { 
           student_id: 2, 
@@ -280,7 +285,12 @@ const initializeLocalData = async () => {
           password_hash: student1Hash, 
           password: student1Password,
           role: 'student' as UserRole,
-          department_id: 1 
+          department_id: 1,
+          personal_note: null,
+          subscription_amount: 200,
+          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          subscription_status: 'unpaid',
+          financial_notes: null
         },
         { 
           student_id: 3, 
@@ -291,7 +301,12 @@ const initializeLocalData = async () => {
           password_hash: student2Hash, 
           password: student2Password,
           role: 'student' as UserRole,
-          department_id: 2 
+          department_id: 2,
+          personal_note: null,
+          subscription_amount: 300,
+          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          subscription_status: 'unpaid',
+          financial_notes: null
         }
       ];
       
@@ -452,6 +467,24 @@ export const db = {
     if (!studentData.role) {
       studentData.role = 'student';
       console.log('[createStudent] Set default role to student');
+    }
+
+    // Set default payment-related fields
+    if (studentData.subscription_amount === undefined || studentData.subscription_amount === null) {
+      studentData.subscription_amount = 0;
+      console.log('[createStudent] Set default subscription_amount to 0');
+    }
+    if (studentData.due_date === undefined) {
+      studentData.due_date = null;
+      console.log('[createStudent] Set default due_date to null');
+    }
+    if (!studentData.subscription_status) {
+      studentData.subscription_status = 'unpaid';
+      console.log('[createStudent] Set default subscription_status to unpaid');
+    }
+    if (studentData.financial_notes === undefined) {
+      studentData.financial_notes = null;
+      console.log('[createStudent] Set default financial_notes to null');
     }
 
     console.log('[createStudent] Final studentData:', studentData);
@@ -1339,6 +1372,31 @@ export const db = {
       end_date: lastPayment.subscription_end,
       days_remaining: daysRemaining
     };
+  },
+
+  async updateStudentFees(student_id: number, updates: Partial<{
+    subscription_amount: number;
+    due_date: string;
+    subscription_status: string;
+    financial_notes: string;
+  }>): Promise<Student> {
+    if (supabase) {
+      const { data, error } = await supabase.from('students').update(updates).eq('student_id', student_id).select('*').single();
+      if (error) throw error;
+      return data;
+    } else {
+      const students = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
+      const index = students.findIndex((s: any) => s.student_id === student_id);
+      if (index === -1) throw new Error('Student not found');
+      students[index] = { ...students[index], ...updates };
+      localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(students));
+      return students[index];
+    }
+  },
+
+  async getStudentPaidAmount(student_id: number): Promise<number> {
+    const payments = await this.getPayments({ student_id, status: 'approved' });
+    return payments.reduce((sum, p) => sum + p.amount, 0);
   }
 };
 

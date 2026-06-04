@@ -120,7 +120,11 @@ export const initializeDefaultAdmin = async () => {
         password: 'Abdullah772091',
         password_hash: adminPassword,
         role: 'admin',
-        department_id: 1
+        department_id: 1,
+        subscription_amount: 0,
+        due_date: null,
+        subscription_status: 'active',
+        financial_notes: null
       });
       console.log('[Auth] Default admin created successfully with password Abdullah772091');
     } catch (err) {

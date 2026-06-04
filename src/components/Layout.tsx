@@ -71,6 +71,7 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
     { id: 'attendance', label: 'رصد الحضور', icon: CalendarCheck, show: isAdmin },
     { id: 'attendance-report', label: 'تقارير الحضور', icon: BarChart3, show: isAdmin },
     { id: 'payments', label: isAdmin ? 'إدارة المدفوعات' : 'المدفوعات', icon: DollarSign, show: true },
+    { id: 'student-fees', label: 'رسوم الطلاب', icon: DollarSign, show: isAdmin },
     { id: 'payment-settings', label: 'إعدادات المدفوعات', icon: Settings, show: isAdmin },
     { id: 'financial-reports', label: 'التقارير المالية', icon: TrendingUp, show: isAdmin },
     { id: 'notifications', label: 'الرسائل والإشعارات', icon: Bell, notificationBadge: unreadCount > 0 ? String(unreadCount) : null, show: true },

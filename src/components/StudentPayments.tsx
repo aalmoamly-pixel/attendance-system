@@ -10,12 +10,13 @@ import {
 } from 'lucide-react';
 import { db } from '../lib/supabase';
 import { getAuthState } from '../lib/auth';
-import type { Payment, PaymentMethod } from '../types/database';
+import type { Payment, PaymentMethod, Student } from '../types/database';
 
 export default function StudentPayments() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [subscription, setSubscription] = useState({ active: false, end_date: null as string | null, days_remaining: 0 });
   const [paymentSettings, setPaymentSettings] = useState<any>(null);
+  const [student, setStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -40,16 +41,19 @@ export default function StudentPayments() {
     if (!studentId) return;
     try {
       setLoading(true);
-      const [paymentsData, subscriptionData, settingsData] = await Promise.all([
+      const [studentsData, paymentsData, subscriptionData, settingsData] = await Promise.all([
+        db.getStudents(),
         db.getPayments({ student_id: studentId }),
         db.getStudentSubscription(studentId),
         db.getPaymentSettings()
       ]);
       
+      const currentStudent = studentsData.find(s => s.student_id === studentId) || null;
+      setStudent(currentStudent);
       setPayments(paymentsData);
       setSubscription(subscriptionData);
       setPaymentSettings(settingsData);
-      setFormData(prev => ({ ...prev, amount: settingsData.subscription_amount }));
+      setFormData(prev => ({ ...prev, amount: currentStudent?.subscription_amount || settingsData.subscription_amount }));
     } catch (err) {
       console.error('[StudentPayments] Error loading data:', err);
     } finally {
@@ -83,7 +87,7 @@ export default function StudentPayments() {
       
       setShowPaymentModal(false);
       setFormData({
-        amount: paymentSettings?.subscription_amount || 0,
+        amount: student?.subscription_amount || paymentSettings?.subscription_amount || 0,
         payment_method: 'bank_transfer',
         transaction_id: '',
         receipt_image: null,
@@ -165,7 +169,7 @@ export default function StudentPayments() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-dark-muted">المبلغ المطلوب</span>
-              <span className="text-lg font-bold text-white">{paymentSettings?.subscription_amount || 0} ر.س</span>
+              <span className="text-lg font-bold text-white">{student?.subscription_amount || paymentSettings?.subscription_amount || 0} ر.س</span>
             </div>
             {subscription.end_date && (
               <>

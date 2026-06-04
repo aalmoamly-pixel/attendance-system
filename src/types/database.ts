@@ -18,6 +18,10 @@ export interface Student {
   department_id: number | null;
   departments?: Department;
   personal_note?: string;
+  subscription_amount: number;
+  due_date: string | null;
+  subscription_status: string;
+  financial_notes: string | null;
 }
 
 export interface Notification {

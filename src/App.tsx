@@ -13,6 +13,7 @@ import Notifications from './components/Notifications';
 import AdminPayments from './components/AdminPayments';
 import PaymentSettings from './components/PaymentSettings';
 import FinancialReports from './components/FinancialReports';
+import StudentFees from './components/StudentFees';
 import { getAuthState, logout, initializeDefaultAdmin } from './lib/auth';
 import { db } from './lib/supabase';
 import type { AuthState } from './types/database';
@@ -72,6 +73,8 @@ export default function App() {
         return <AttendanceReport key={refreshTrigger} setActivePage={setActivePage} />;
       case 'payments':
         return <AdminPayments key={refreshTrigger} />;
+      case 'student-fees':
+        return <StudentFees key={refreshTrigger} />;
       case 'payment-settings':
         return <PaymentSettings key={refreshTrigger} />;
       case 'financial-reports':
