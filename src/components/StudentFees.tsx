@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Edit, X, Save } from 'lucide-react';
+import { Search, Edit, X, Save, CheckCircle2, XCircle } from 'lucide-react';
 import { db } from '../lib/supabase';
 import type { Student } from '../types/database';
 
@@ -15,6 +15,7 @@ export default function StudentFees() {
     subscription_status: 'unpaid'
   });
   const [payments, setPayments] = useState<any[]>([]);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -57,20 +58,27 @@ export default function StudentFees() {
 
   const cancelEdit = () => {
     setEditingId(null);
+    setNotification(null);
   };
 
   const saveEdit = async () => {
     if (!editingId) return;
     try {
+      setLoading(true);
       await db.updateStudentFees(editingId, editForm);
       await loadData();
       setEditingId(null);
+      setNotification({ type: 'success', message: 'تم حفظ الرسوم بنجاح.' });
+      setTimeout(() => setNotification(null), 3000);
     } catch (error) {
       console.error('[StudentFees] Error updating fees:', error);
+      setNotification({ type: 'error', message: `فشل الحفظ: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` });
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
+  if (loading && !students.length) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin w-10 h-10 border-4 border-brand-primary border-t-transparent rounded-full"></div>
@@ -85,6 +93,24 @@ export default function StudentFees() {
           رسوم الطلاب
         </h1>
       </div>
+
+      {notification && (
+        <div className={`glass-card p-4 flex items-center gap-3 ${
+          notification.type === 'success' ? 'border border-brand-success/30 bg-brand-success/10' : 
+          'border border-brand-danger/30 bg-brand-danger/10'
+        }`}>
+          {notification.type === 'success' ? (
+            <CheckCircle2 className="w-6 h-6 text-brand-success" />
+          ) : (
+            <XCircle className="w-6 h-6 text-brand-danger" />
+          )}
+          <span className={`font-semibold ${
+            notification.type === 'success' ? 'text-brand-success' : 'text-brand-danger'
+          }`}>
+            {notification.message}
+          </span>
+        </div>
+      )}
 
       <div className="glass-card p-6">
         <div className="flex items-center gap-4 mb-6">
@@ -134,6 +160,7 @@ export default function StudentFees() {
                           value={editForm.subscription_amount}
                           onChange={(e) => setEditForm({ ...editForm, subscription_amount: Number(e.target.value) })}
                           className="w-full glass-input"
+                          min="0"
                         />
                       ) : (
                         <span className="font-bold">{student.subscription_amount} ريال</span>
