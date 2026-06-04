@@ -1380,17 +1380,32 @@ export const db = {
     subscription_status: string;
     financial_notes: string;
   }>): Promise<Student> {
-    if (supabase) {
-      const { data, error } = await supabase.from('students').update(updates).eq('student_id', student_id).select('*').single();
-      if (error) throw error;
-      return data;
-    } else {
-      const students = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
-      const index = students.findIndex((s: any) => s.student_id === student_id);
-      if (index === -1) throw new Error('Student not found');
-      students[index] = { ...students[index], ...updates };
-      localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(students));
-      return students[index];
+    console.log('[updateStudentFees] Starting update:', { student_id, updates });
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from('students').update(updates).eq('student_id', student_id).select('*').single();
+        if (error) {
+          console.error('[updateStudentFees] Supabase error:', error);
+          throw error;
+        }
+        console.log('[updateStudentFees] Supabase update successful:', data);
+        return data;
+      } else {
+        const students = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
+        const index = students.findIndex((s: any) => s.student_id === student_id);
+        if (index === -1) {
+          const error = new Error('Student not found');
+          console.error('[updateStudentFees]', error);
+          throw error;
+        }
+        students[index] = { ...students[index], ...updates };
+        localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(students));
+        console.log('[updateStudentFees] localStorage update successful:', students[index]);
+        return students[index];
+      }
+    } catch (err) {
+      console.error('[updateStudentFees] Unhandled error:', err);
+      throw err;
     }
   },
 
