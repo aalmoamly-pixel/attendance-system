@@ -205,7 +205,7 @@ const initializeLocalData = async () => {
     }
 
     // Migrate any existing Local Storage data to Supabase
-    // await migrateLocalToSupabase();
+    await migrateLocalToSupabase();
     
     console.log('[initializeLocalData] Supabase initialization complete!');
   } else {
@@ -1406,11 +1406,39 @@ export async function migrateLocalToSupabase() {
   }
 
   try {
-    const departments = JSON.parse(localStorage.getItem(LOCAL_KEYS.DEPARTMENTS) || '[]');
-    const students = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
-    const subjects = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]');
-    const schedules = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
-    const attendanceLogs = JSON.parse(localStorage.getItem(LOCAL_KEYS.ATTENDANCE_LOGS) || '[]');
+    const departments = JSON.parse(localStorage.getItem(LOCAL_KEYS.DEPARTMENTS) || '[]').map((d: any) => {
+      const { organization_id, ...cleaned } = d;
+      return cleaned;
+    });
+    const students = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]').map((s: any) => {
+      const { organization_id, ...cleaned } = s;
+      return cleaned;
+    });
+    const subjects = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]').map((s: any) => {
+      const { organization_id, ...cleaned } = s;
+      return cleaned;
+    });
+    const schedules = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]').map((s: any) => {
+      const { organization_id, ...cleaned } = s;
+      return cleaned;
+    });
+    const attendanceLogs = JSON.parse(localStorage.getItem(LOCAL_KEYS.ATTENDANCE_LOGS) || '[]').map((a: any) => {
+      const { organization_id, ...cleaned } = a;
+      return cleaned;
+    });
+    const notifications = JSON.parse(localStorage.getItem(LOCAL_KEYS.NOTIFICATIONS) || '[]').map((n: any) => {
+      const { organization_id, ...cleaned } = n;
+      return cleaned;
+    });
+    const personalNotes = JSON.parse(localStorage.getItem(LOCAL_KEYS.PERSONAL_NOTES) || '[]').map((p: any) => {
+      const { organization_id, ...cleaned } = p;
+      return cleaned;
+    });
+    const payments = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENTS) || '[]').map((p: any) => {
+      const { organization_id, ...cleaned } = p;
+      return cleaned;
+    });
+    const paymentSettings = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENT_SETTINGS) || '[]');
 
     if (departments.length > 0) {
       const { error } = await supabase.from('departments').upsert(departments);
@@ -1432,10 +1460,26 @@ export async function migrateLocalToSupabase() {
       const { error } = await supabase.from('attendance_log').upsert(attendanceLogs);
       if (error) throw error;
     }
+    if (notifications.length > 0) {
+      const { error } = await supabase.from('notifications').upsert(notifications);
+      if (error) throw error;
+    }
+    if (personalNotes.length > 0) {
+      const { error } = await supabase.from('personal_notes').upsert(personalNotes);
+      if (error) throw error;
+    }
+    if (payments.length > 0) {
+      const { error } = await supabase.from('payments').upsert(payments);
+      if (error) throw error;
+    }
+    if (paymentSettings.length > 0) {
+      const { error } = await supabase.from('payment_settings').upsert(paymentSettings);
+      if (error) throw error;
+    }
 
     return {
       success: true,
-      message: `✅ تم استيراد البيانات بنجاح: ${departments.length} تخصص، ${students.length} طالب، ${subjects.length} مادة، ${schedules.length} جدول، ${attendanceLogs.length} سجل حضور`
+      message: `✅ تم استيراد البيانات بنجاح: ${departments.length} تخصص، ${students.length} طالب، ${subjects.length} مادة، ${schedules.length} جدول، ${attendanceLogs.length} سجل حضور، ${notifications.length} إشعار، ${payments.length} دفعة`
     };
   } catch (err: any) {
     console.error('[Migration] Error:', err);
