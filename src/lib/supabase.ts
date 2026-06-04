@@ -205,7 +205,7 @@ const initializeLocalData = async () => {
     }
 
     // Migrate any existing Local Storage data to Supabase
-    await migrateLocalToSupabase();
+    // await migrateLocalToSupabase();
     
     console.log('[initializeLocalData] Supabase initialization complete!');
   } else {
