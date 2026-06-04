@@ -158,7 +158,13 @@ export default function StudentFees() {
                         <input
                           type="number"
                           value={editForm.subscription_amount}
-                          onChange={(e) => setEditForm({ ...editForm, subscription_amount: Number(e.target.value) })}
+                          onChange={(e) => {
+                            const newValue = e.target.value;
+                            setEditForm({
+                              ...editForm,
+                              subscription_amount: newValue === '' ? 0 : Number(newValue)
+                            });
+                          }}
                           className="w-full glass-input"
                           min="0"
                         />

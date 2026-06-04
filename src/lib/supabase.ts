@@ -1382,8 +1382,15 @@ export const db = {
   }>): Promise<Student> {
     console.log('[updateStudentFees] Starting update:', { student_id, updates });
     try {
+      // Convert empty due_date to null
+      const processedUpdates = {
+        ...updates,
+        due_date: updates.due_date === '' ? null : updates.due_date
+      };
+      console.log('[updateStudentFees] Processed updates:', processedUpdates);
+
       if (supabase) {
-        const { data, error } = await supabase.from('students').update(updates).eq('student_id', student_id).select('*').single();
+        const { data, error } = await supabase.from('students').update(processedUpdates).eq('student_id', student_id).select('*').single();
         if (error) {
           console.error('[updateStudentFees] Supabase error:', error);
           throw error;
@@ -1398,7 +1405,7 @@ export const db = {
           console.error('[updateStudentFees]', error);
           throw error;
         }
-        students[index] = { ...students[index], ...updates };
+        students[index] = { ...students[index], ...processedUpdates };
         localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(students));
         console.log('[updateStudentFees] localStorage update successful:', students[index]);
         return students[index];
