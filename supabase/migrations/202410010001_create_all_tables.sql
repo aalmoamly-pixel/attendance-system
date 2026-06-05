@@ -112,3 +112,20 @@ VALUES
   ('نظم المعلومات', 'بكالوريوس'),
   ('عام', 'بكالوريوس')
 ON CONFLICT DO NOTHING;
+
+-- ----------------------------------------------------
+-- 8. جدول بيانات CMS (cms_data)
+-- ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.cms_data (
+  id SERIAL PRIMARY KEY,
+  general JSONB NOT NULL DEFAULT '{}',
+  homepage JSONB NOT NULL DEFAULT '{}',
+  about JSONB NOT NULL DEFAULT '{}',
+  services JSONB NOT NULL DEFAULT '{}',
+  pricing JSONB NOT NULL DEFAULT '{}',
+  contact JSONB NOT NULL DEFAULT '{}',
+  footer JSONB NOT NULL DEFAULT '{}',
+  partners JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by INTEGER REFERENCES public.students(student_id) ON DELETE SET NULL
+);
