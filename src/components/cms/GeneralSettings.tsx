@@ -4,10 +4,11 @@ import { useCMS } from '../../contexts/CMSContext';
 import type { CMSGeneralSettings } from '../../types/database';
 
 export default function GeneralSettings() {
-  const { cmsData, loading, updateCMSData } = useCMS();
+  const { cmsData, loading, updateCMSData, refreshCMSData } = useCMS();
   const [formData, setFormData] = useState<CMSGeneralSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (cmsData && !loading) {
@@ -19,12 +20,15 @@ export default function GeneralSettings() {
     e.preventDefault();
     if (!formData) return;
     setSaving(true);
+    setError(null);
     try {
       await updateCMSData({ general: formData });
+      await refreshCMSData();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err?.message || 'حدث خطأ أثناء الحفظ');
     } finally {
       setSaving(false);
     }
@@ -40,17 +44,25 @@ export default function GeneralSettings() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white mb-2">الإعدادات العامة</h2>
           <p className="text-dark-muted">قم بتعديل معلومات المنصة الأساسية</p>
         </div>
-        {saved && (
-          <div className="flex items-center gap-2 text-brand-success bg-brand-success/10 px-4 py-2 rounded-xl">
-            <AlertCircle className="w-5 h-5" />
-            <span className="font-medium">تم الحفظ بنجاح!</span>
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          {error && (
+            <div className="flex items-center gap-2 text-brand-danger bg-brand-danger/10 px-4 py-2 rounded-xl">
+              <AlertCircle className="w-5 h-5" />
+              <span className="font-medium">{error}</span>
+            </div>
+          )}
+          {saved && (
+            <div className="flex items-center gap-2 text-brand-success bg-brand-success/10 px-4 py-2 rounded-xl">
+              <AlertCircle className="w-5 h-5" />
+              <span className="font-medium">تم الحفظ بنجاح!</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSave} className="glass-card p-8 space-y-6">
