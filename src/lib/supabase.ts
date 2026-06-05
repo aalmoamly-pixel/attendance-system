@@ -14,9 +14,10 @@ import type {
   Payment,
   PaymentStatus,
   PaymentMethod,
-  PaymentSettings
+  PaymentSettings,
+  CMSData
 } from '../types/database';
-import { hashPassword } from './auth';
+import { hashPassword } from './crypto';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -49,7 +50,8 @@ const LOCAL_KEYS = {
   NOTIFICATIONS: 'attendance_notifications',
   PERSONAL_NOTES: 'attendance_personal_notes',
   PAYMENTS: 'attendance_payments',
-  PAYMENT_SETTINGS: 'attendance_payment_settings'
+  PAYMENT_SETTINGS: 'attendance_payment_settings',
+  CMS_DATA: 'cms_data'
 };
 
 const initializeLocalData = async () => {
@@ -1428,6 +1430,209 @@ export const db = {
   async getStudentPaidAmount(student_id: number): Promise<number> {
     const payments = await this.getPayments({ student_id, status: 'approved' });
     return payments.reduce((sum, p) => sum + p.amount, 0);
+  },
+
+  // ---------------- CMS Functions ----------------
+  async getCMSData(): Promise<CMSData> {
+    // Default CMS data
+    const defaultPartners: CMSData['partners'] = {
+      isActive: true,
+      pageTitle: 'شركاء الدفع',
+      pageSubtitle: 'تعاون معنا لتقديم حلول دفع متكاملة لآلاف الطلاب والمعاهد',
+      aboutUs: 'منصة تعليم هي منصة تعليمية متكاملة تخدم آلاف الطلاب والمعاهد. نحن نبحث عن شراكات استراتيجية مع مزودي خدمات الدفع والبنوك لتقديم تجربة دفع سلسة لطلابنا.',
+      totalStudents: '10,000+',
+      activeUsers: '8,500',
+      avgMonthlyTransactions: '5,000',
+      currentPaymentMethods: ['التحويل البنكي', 'UrPay', 'Binance USDT', 'RIA'],
+      platformFeatures: [
+        { id: 1, title: 'إدارة الطلاب', description: 'إدارة شاملة للطلاب مع بيانات كاملة' },
+        { id: 2, title: 'إدارة الرسوم', description: 'تحديد وتتبع الرسوم الدراسية' },
+        { id: 3, title: 'إدارة المدفوعات', description: 'تتبع جميع المدفوعات بسهولة' },
+        { id: 4, title: 'رفع إثباتات الدفع', description: 'إمكانية رفع إثباتات الدفع إلكترونياً' },
+        { id: 5, title: 'مراجعة واعتماد المدفوعات', description: 'عملية مراجعة واعتماد سريعة' },
+        { id: 6, title: 'الإشعارات', description: 'إشعارات تلقائية للطلاب' },
+        { id: 7, title: 'التقارير المالية', description: 'تقارير مالية شاملة ومفصلة' },
+        { id: 8, title: 'الإحصائيات', description: 'إحصائيات حية ومفصلة' },
+      ],
+      dashboardStats: {
+        studentsCount: '10,000+',
+        paymentsCount: '50,000+',
+        totalRevenue: '2,500,000 ريال',
+        pendingCount: '120',
+        paymentRate: '95%'
+      },
+      screenshots: [
+        { id: 1, title: 'لوحة الطالب', description: 'واجهة طالب سهلة للدفع والمتابعة', imageUrl: 'https://coresg-normal.trae.ai/api/ide/v1/text-to-image?prompt=modern%20student%20dashboard%20for%20educational%20platform%20with%20payment%20section&image_size=square' },
+        { id: 2, title: 'صفحة المدفوعات', description: 'قائمة المدفوعات مع حالة كل عملية', imageUrl: 'https://coresg-normal.trae.ai/api/ide/v1/text-to-image?prompt=modern%20payment%20history%20page%20dashboard%20for%20educational%20platform&image_size=square' },
+        { id: 3, title: 'رفع إثبات الدفع', description: 'واجهة رفع إثبات الدفع بسهولة', imageUrl: 'https://coresg-normal.trae.ai/api/ide/v1/text-to-image?prompt=modern%20receipt%20upload%20page%20for%20educational%20platform&image_size=square' },
+        { id: 4, title: 'لوحة الإدارة', description: 'لوحة إدارة شاملة للمدفوعات', imageUrl: 'https://coresg-normal.trae.ai/api/ide/v1/text-to-image?prompt=modern%20admin%20dashboard%20for%20educational%20platform%20payment%20management&image_size=square' },
+        { id: 5, title: 'التقارير المالية', description: 'تقارير مالية شاملة ومفصلة', imageUrl: 'https://coresg-normal.trae.ai/api/ide/v1/text-to-image?prompt=modern%20financial%20reports%20dashboard%20charts%20for%20educational%20platform&image_size=square' }
+      ],
+      integrationReadyTitle: 'Payment Integration Ready',
+      integrationReadyDescription: 'منصتنا جاهزة تقنياً للربط مع جميع مزودي خدمات الدفع',
+      integrationMethods: [
+        { id: 1, name: 'Visa' },
+        { id: 2, name: 'Mastercard' },
+        { id: 3, name: 'Mada' },
+        { id: 4, name: 'Apple Pay' },
+        { id: 5, name: 'Google Pay' },
+        { id: 6, name: 'UrPay' },
+        { id: 7, name: 'Bank Transfer' },
+      ],
+      securityTitle: 'الأمان والخصوصية',
+      securityDescription: 'منصتنا مصممة لتقديم أعلى مستويات الأمان والخصوصية للبيانات المالية للطلاب والمعاهد',
+      securityFeatures: ['تشفير البيانات من طرف إلى طرف', 'توافق مع PCI DSS', 'نسخ احتياطي يومي', 'مراقبة مستمرة للأنظمة']
+    };
+    const defaultData: CMSData = {
+      general: {
+        site_name: 'منصة تعليم',
+        site_description: 'منصة ذكية لمتابعة الطالب الجامعي وإدارة الخدمات الأكاديمية المتكاملة',
+        copyright_text: '© 2025 منصة تعليم. جميع الحقوق محفوظة'
+      },
+      homepage: {
+        hero_title: 'منصة تعليمية ذكية للخدمات الجامعية المتكاملة',
+        hero_subtitle: 'منصة رقمية متكاملة لمتابعة المستوى الأكاديمي للطالب الجامعي وإدارة جميع الخدمات التعليمية من مكان واحد، وتشمل الحضور والغياب، الاختبارات الإلكترونية، الواجبات والمشاريع، النتائج الأكاديمية، متابعة الرسوم الدراسية، المدفوعات الإلكترونية، الإشعارات الفورية والتقارير التعليمية.',
+        hero_subtitle_2: 'صممت المنصة لتسهيل تجربة الطالب الجامعية ومتابعة مستواه الأكاديمي ورسومه الدراسية وإشعاراته بشكل فوري ومنظم.',
+        hero_button_primary: 'استكشف خدمات الطالب',
+        hero_button_primary_link: '#services',
+        hero_button_secondary: 'المزيد عنا',
+        hero_button_secondary_link: '/about',
+        hero_quick_features: [
+          'متابعة المستوى الأكاديمي للطالب الجامعي',
+          'متابعة الحضور والغياب',
+          'الاختبارات الإلكترونية',
+          'الواجبات والمشاريع',
+          'النتائج والتقديرات',
+          'متابعة الرسوم الدراسية',
+          'رفع وإدارة إثباتات الدفع',
+          'الإشعارات والتنبيهات الفورية',
+          'التقارير والإحصائيات',
+          'الخدمات الجامعية المتكاملة',
+          'دعم التعليم الحضوري والتعليم عن بعد',
+          'دعم الأكاديميات ومراكز التدريب والبرامج المهنية'
+        ],
+        stats: [
+          { number: '1000+', label: 'طالب جامعي' },
+          { number: '50+', label: 'مؤسسة أكاديمية' },
+          { number: '98%', label: 'رضا العملاء' },
+          { number: '24/7', label: 'دعم فني' }
+        ]
+      },
+      about: {
+        page_title: 'من نحن',
+        about_description: 'منصة تعليم هي منصة تعليمية ذكية لمتابعة الطالب الجامعي وإدارة الخدمات الأكاديمية المتكاملة',
+        goals: [
+          'تقديم تجربة تعليمية متكاملة ومبتكرة للطلاب الجامعيين',
+          'تسهيل متابعة الحضور والغياب والنتائج الأكاديمية',
+          'تحسين تجربة التعلم للطلاب الجامعيين',
+          'توفير أدوات فعالة لمتابعة الرسوم الدراسية للطلاب'
+        ],
+        features: [
+          { id: 1, icon: 'BookOpen', title: 'الاختبارات الإلكترونية', description: 'متابعة نتائج الاختبارات بسهولة' },
+          { id: 2, icon: 'Calendar', title: 'متابعة الحضور', description: 'تتبع حضور الطالب الجامعي بدقة' },
+          { id: 3, icon: 'Award', title: 'النتائج والتقديرات', description: 'عرض وتحليل النتائج الأكاديمية' },
+          { id: 4, icon: 'CreditCard', title: 'متابعة الرسوم', description: 'متابعة الرسوم الدراسية والدفعات' }
+        ]
+      },
+      services: {
+        page_title: 'الخدمات',
+        page_subtitle: 'كل ما يحتاجه الطالب الجامعي في مكان واحد',
+        services: [
+          { id: 1, icon: 'FileText', title: 'الاختبارات الإلكترونية', description: 'متابعة نتائج الاختبارات بسهولة مع تحليل النتائج وتقارير مفصلة' },
+          { id: 2, icon: 'BookOpen', title: 'الواجبات والمشاريع', description: 'تسليم الواجبات إلكترونياً مع تقييم وملاحظات فورية' },
+          { id: 3, icon: 'Calendar', title: 'متابعة الحضور والغياب', description: 'تتبع حضور الطالب الجامعي بدقة مع تقارير يومية وشهرية' },
+          { id: 4, icon: 'Award', title: 'النتائج والتقديرات', description: 'عرض وتحليل النتائج الأكاديمية مع إمكانية مشاركتها' },
+          { id: 5, icon: 'CreditCard', title: 'متابعة الرسوم الدراسية', description: 'متابعة الرسوم الدراسية والدفعات مع تقارير مفصلة' }
+        ]
+      },
+      pricing: {
+        page_title: 'الأسعار',
+        page_subtitle: 'اختر الخطة التي تناسب احتياجات الطالب الجامعي',
+        plans: [
+          { id: 1, name: 'الخطة الأساسية', price: '299', period: 'ريال/شهر', features: ['متابعة الحضور', 'النتائج والتقديرات', 'الواجبات', 'دعم عبر البريد'] },
+          { id: 2, name: 'الخطة المتقدمة', price: '599', period: 'ريال/شهر', popular: true, features: ['جميع مميزات الخطة الأساسية', 'الاختبارات الإلكترونية', 'متابعة الرسوم', 'الإشعارات الفورية', 'دعم عبر الهاتف'] },
+          { id: 3, name: 'الخطة المؤسسية', price: 'مخصصة', period: 'اتصل بنا', features: ['جميع المميزات', 'تقارير مالية مفصلة', 'دعم مخصص', 'تخصيص متقدم', 'تكامل مع أنظمة الدفع'] }
+        ]
+      },
+      contact: {
+        email: 'info@example.com',
+        phone: '+966 50 123 4567',
+        whatsapp: '+966 50 123 4567',
+        address: 'الرياض، المملكة العربية السعودية',
+        social_links: [
+          { platform: 'Facebook', url: 'https://facebook.com' },
+          { platform: 'Twitter', url: 'https://twitter.com' },
+          { platform: 'Instagram', url: 'https://instagram.com' }
+        ]
+      },
+      footer: {
+        quick_links: [
+          { label: 'الرئيسية', url: '/' },
+          { label: 'من نحن', url: '/about' },
+          { label: 'الخدمات', url: '/services' },
+          { label: 'الأسعار', url: '/pricing' },
+          { label: 'تواصل معنا', url: '/contact' }
+        ],
+        terms_url: '/terms',
+        privacy_url: '/privacy',
+        copyright_text: '© 2025 منصة تعليم. جميع الحقوق محفوظة'
+      },
+      partners: defaultPartners
+    };
+
+    if (supabase) {
+      const { data, error } = await supabase.from('cms_data').select('*').single();
+      if (error && error.code !== 'PGRST116') {
+        console.error('[CMS] Fetch error:', error);
+        // Fallback to default if there's an error
+        return defaultData;
+      }
+      if (data) {
+        // Merge with all defaults
+        return { 
+          ...defaultData, 
+          ...data, 
+          partners: { ...defaultPartners, ...data.partners },
+          homepage: { 
+            ...defaultData.homepage, 
+            ...data.homepage, 
+            hero_quick_features: data.homepage?.hero_quick_features || defaultData.homepage.hero_quick_features,
+            hero_subtitle_2: data.homepage?.hero_subtitle_2 || defaultData.homepage.hero_subtitle_2
+          } 
+        };
+      }
+    }
+
+    // Save default data to localStorage (reset to new defaults)
+    localStorage.setItem(LOCAL_KEYS.CMS_DATA, JSON.stringify(defaultData));
+    return defaultData;
+  },
+
+  async updateCMSData(partialData: Partial<CMSData>): Promise<CMSData> {
+    const currentData = await this.getCMSData();
+    const newData: CMSData = {
+      ...currentData,
+      ...partialData,
+      general: { ...currentData.general, ...partialData.general },
+      homepage: { ...currentData.homepage, ...partialData.homepage },
+      about: { ...currentData.about, ...partialData.about },
+      services: { ...currentData.services, ...partialData.services },
+      pricing: { ...currentData.pricing, ...partialData.pricing },
+      contact: { ...currentData.contact, ...partialData.contact },
+      footer: { ...currentData.footer, ...partialData.footer },
+      partners: { ...currentData.partners, ...partialData.partners }
+    };
+    if (supabase) {
+      const { data, error } = await supabase.from('cms_data').upsert(newData, { onConflict: 'id' }).select('*').single();
+      if (error) {
+        console.error('[CMS] Update error:', error);
+        throw error;
+      }
+      return data;
+    } else {
+      localStorage.setItem(LOCAL_KEYS.CMS_DATA, JSON.stringify(newData));
+      return newData;
+    }
   }
 };
 

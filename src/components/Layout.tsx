@@ -15,22 +15,38 @@ import {
   X,
   DollarSign,
   Settings,
-  TrendingUp
+  TrendingUp,
+  Globe,
+  ChevronsDown,
+  ChevronsUp,
+  AlertTriangle
 } from 'lucide-react';
 import { supabase, db } from '../lib/supabase';
-import { getAuthState, logout } from '../lib/auth';
+import { getAuthState, logout, isDemoMode } from '../lib/auth';
 
 interface LayoutProps {
   children: React.ReactNode;
   activePage: string;
   setActivePage: (page: string) => void;
+  onLogout?: () => void;
 }
 
-export default function Layout({ children, activePage, setActivePage }: LayoutProps) {
+export default function Layout({ children, activePage, setActivePage, onLogout }: LayoutProps) {
   const [authState] = useState(getAuthState());
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cmsMenuOpen, setCmsMenuOpen] = useState(false);
   const isSupabaseLive = !!supabase;
+
+  const cmsMenuItems = [
+    { id: 'cms-general', label: 'الإعدادات العامة', show: true },
+    { id: 'cms-homepage', label: 'الصفحة الرئيسية', show: true },
+    { id: 'cms-about', label: 'صفحة من نحن', show: true },
+    { id: 'cms-services', label: 'صفحة الخدمات', show: true },
+    { id: 'cms-pricing', label: 'صفحة الأسعار', show: true },
+    { id: 'cms-contact', label: 'صفحة التواصل', show: true },
+    { id: 'cms-footer', label: 'الفوتر', show: true },
+  ].filter(item => item.show);
 
   useEffect(() => {
     loadUnreadCount();
@@ -58,8 +74,12 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
   };
 
   const handleLogout = () => {
-    logout();
-    window.location.reload();
+    if (onLogout) {
+      onLogout();
+    } else {
+      logout();
+      window.location.reload();
+    }
   };
 
   const isAdmin = authState.role === 'admin';
@@ -77,6 +97,8 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
     { id: 'notifications', label: 'الرسائل والإشعارات', icon: Bell, notificationBadge: unreadCount > 0 ? String(unreadCount) : null, show: true },
     { id: 'schedule-import', label: 'استيراد الجداول', icon: FileSpreadsheet, show: isAdmin },
     { id: 'import', label: 'الاستيراد الذكي', icon: Sparkles, badge: 'AI', show: isAdmin },
+    { id: 'cms', label: 'إدارة الموقع', icon: Globe, show: isAdmin, isDropdown: true },
+    { id: 'cms-partners', label: '🤝 شركاء الدفع', icon: Globe, show: isAdmin },
   ].filter(item => item.show);
 
   const SidebarContent = () => (
@@ -111,7 +133,54 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activePage === item.id;
+          const isActive = activePage === item.id || activePage.startsWith('cms-') && item.id === 'cms';
+
+          if (item.isDropdown) {
+            return (
+              <div key={item.id}>
+                <button
+                  onClick={() => setCmsMenuOpen(!cmsMenuOpen)}
+                  className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-300 group ${
+                    isActive 
+                      ? 'bg-gradient-to-l from-brand-primary to-brand-primary/80 text-white shadow-lg shadow-brand-primary/30 font-bold scale-[1.02]' 
+                      : 'text-dark-muted hover:text-white hover:bg-dark-hover/70 font-medium'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110 text-white' : 'group-hover:scale-110 group-hover:text-white'}`} />
+                    <span>{item.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {cmsMenuOpen ? <ChevronsUp className="w-4 h-4" /> : <ChevronsDown className="w-4 h-4" />}
+                  </div>
+                </button>
+                {cmsMenuOpen && (
+                  <div className="pr-4 pb-2">
+                    {cmsMenuItems.map((subItem) => {
+                      const isSubActive = activePage === subItem.id;
+                      return (
+                        <button
+                          key={subItem.id}
+                          onClick={() => {
+                            setActivePage(subItem.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full text-right flex items-center px-4 py-2.5 rounded-xl transition-all duration-300 text-sm ${
+                            isSubActive 
+                              ? 'bg-brand-primary/20 text-white font-bold border-r-2 border-brand-primary' 
+                              : 'text-dark-muted hover:text-white hover:bg-dark-hover/70'
+                          }`}
+                        >
+                          <span>{subItem.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
             <button
               key={item.id}
@@ -173,8 +242,21 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
     </aside>
   );
 
+  const demoMode = isDemoMode();
+
   return (
     <div className="min-h-screen bg-dark-bg text-dark-text font-sans flex flex-row">
+      {demoMode && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-gradient-to-r from-brand-warning/20 to-brand-danger/20 border-b border-brand-warning/30 py-3 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-brand-warning" />
+            <span className="text-white font-semibold text-sm">
+              وضع تجريبي - البيانات المعروضة لأغراض العرض فقط ولا يتم حفظ أي تعديلات
+            </span>
+          </div>
+        </div>
+      )}
+      
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div 
@@ -200,7 +282,7 @@ export default function Layout({ children, activePage, setActivePage }: LayoutPr
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-h-screen overflow-y-auto bg-dark-bg p-4 md:p-8 relative">
+      <main className={`flex-1 flex flex-col min-h-screen overflow-y-auto bg-dark-bg p-4 md:p-8 relative ${demoMode ? 'pt-16' : ''}`}>
         {/* Top Navbar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-dark-border/20">
           <div className="flex items-center gap-3">

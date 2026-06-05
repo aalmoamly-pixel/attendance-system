@@ -155,3 +155,149 @@ export interface PaymentSettings {
   payment_instructions: string;
   [key: string]: any;
 }
+
+// ------------------------------ CMS Types ------------------------------
+
+export interface CMSFeature {
+  id: number;
+  icon?: string;
+  title: string;
+  description: string;
+}
+
+export interface CMSService {
+  id: number;
+  icon: string;
+  title: string;
+  description: string;
+}
+
+export interface CMSPricingPlan {
+  id: number;
+  name: string;
+  price: string;
+  period: string;
+  features: string[];
+  popular?: boolean;
+}
+
+export interface CMSHomepage {
+  hero_title: string;
+  hero_subtitle: string;
+  hero_subtitle_2: string;
+  hero_button_primary: string;
+  hero_button_primary_link: string;
+  hero_button_secondary: string;
+  hero_button_secondary_link: string;
+  hero_image?: string;
+  hero_quick_features: string[];
+  stats: {
+    number: string;
+    label: string;
+  }[];
+}
+
+export interface CMSAboutPage {
+  page_title: string;
+  about_description: string;
+  goals: string[];
+  features: CMSFeature[];
+}
+
+export interface CMSServicesPage {
+  page_title: string;
+  page_subtitle: string;
+  services: CMSService[];
+}
+
+export interface CMSPricingPage {
+  page_title: string;
+  page_subtitle: string;
+  plans: CMSPricingPlan[];
+}
+
+export interface CMSContactPage {
+  email: string;
+  phone: string;
+  whatsapp: string;
+  address: string;
+  social_links: {
+    platform: string;
+    url: string;
+  }[];
+}
+
+export interface CMSFooter {
+  quick_links: {
+    label: string;
+    url: string;
+  }[];
+  terms_url: string;
+  privacy_url: string;
+  copyright_text: string;
+}
+
+export interface CMSGeneralSettings {
+  site_name: string;
+  site_logo?: string;
+  site_description: string;
+  copyright_text: string;
+}
+
+// ------------------------------ Payment Partners Page Types ------------------------------
+
+export interface CMSPartnerPage {
+  isActive: boolean;
+  pageTitle: string;
+  pageSubtitle: string;
+  aboutUs: string;
+  // Stats
+  totalStudents: string;
+  activeUsers: string;
+  avgMonthlyTransactions: string;
+  // Payment Methods
+  currentPaymentMethods: string[];
+  // Features
+  platformFeatures: {
+    id: number;
+    title: string;
+    description: string;
+  }[];
+  // Real-time Dashboard Stats (for the page)
+  dashboardStats: {
+    studentsCount: string;
+    paymentsCount: string;
+    totalRevenue: string;
+    pendingCount: string;
+    paymentRate: string;
+  };
+  // Screenshots Gallery
+  screenshots: {
+    id: number;
+    title: string;
+    description: string;
+    imageUrl: string;
+  }[];
+  // Integration Ready Section
+  integrationReadyTitle: string;
+  integrationReadyDescription: string;
+  integrationMethods: {
+    id: number;
+    name: string;
+  }[];
+  // Security Info
+  securityTitle: string;
+  securityDescription: string;
+  securityFeatures: string[];
+}
+
+export interface CMSData {
+  general: CMSGeneralSettings;
+  homepage: CMSHomepage;
+  about: CMSAboutPage;
+  services: CMSServicesPage;
+  pricing: CMSPricingPage;
+  contact: CMSContactPage;
+  footer: CMSFooter;
+  partners: CMSPartnerPage;
+}

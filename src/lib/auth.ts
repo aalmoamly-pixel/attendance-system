@@ -1,21 +1,10 @@
 import { db } from './supabase';
+import { hashPassword, verifyPassword } from './crypto';
 import type { AuthState, LoginCredentials } from '../types/database';
 
 const AUTH_KEY = 'attendance_auth';
 
-export const hashPassword = async (password: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + 'attendance_salt_2024');
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
-};
-
-export const verifyPassword = async (password: string, hash: string): Promise<boolean> => {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
-};
+export { hashPassword, verifyPassword };
 
 export const getAuthState = (): AuthState => {
   const stored = localStorage.getItem(AUTH_KEY);
@@ -93,6 +82,53 @@ export const login = async (credentials: LoginCredentials): Promise<AuthState> =
 
 export const logout = () => {
   clearAuthState();
+  setDemoMode(false);
+};
+
+const DEMO_KEY = 'demo_mode';
+
+export const isDemoMode = (): boolean => {
+  return localStorage.getItem(DEMO_KEY) === 'true';
+};
+
+export const setDemoMode = (enabled: boolean) => {
+  if (enabled) {
+    localStorage.setItem(DEMO_KEY, 'true');
+  } else {
+    localStorage.removeItem(DEMO_KEY);
+  }
+};
+
+export const loginDemo = async (): Promise<AuthState> => {
+  // Clear any old authentication data first!
+  clearAuthState();
+  
+  const demoUser = {
+    student_id: 999,
+    full_name: 'محمد أحمد',
+    phone: '0501234567',
+    academic_id: 'STD001',
+    national_id: '123456789',
+    password: 'demo123',
+    password_hash: await hashPassword('demo123'),
+    role: 'student' as const,
+    department_id: 1,
+    personal_note: undefined,
+    subscription_amount: 500,
+    due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    subscription_status: 'active',
+    financial_notes: null
+  };
+
+  const authState: AuthState = {
+    isAuthenticated: true,
+    user: demoUser,
+    role: 'student'
+  };
+
+  setAuthState(authState);
+  setDemoMode(true);
+  return authState;
 };
 
 export const initializeDefaultAdmin = async () => {
