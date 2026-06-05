@@ -84,6 +84,11 @@ export default function StudentPayments() {
         subscription_start: null,
         subscription_end: null
       });
+
+      // Update student's subscription status to pending
+      await db.updateStudentFees(studentId, {
+        subscription_status: 'pending'
+      });
       
       setShowPaymentModal(false);
       setFormData({

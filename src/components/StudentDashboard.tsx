@@ -11,7 +11,8 @@ import {
   Check,
   Bell,
   Sparkles,
-  DollarSign
+  DollarSign,
+  Upload
 } from 'lucide-react';
 import { db } from '../lib/supabase';
 import { getAuthState } from '../lib/auth';
@@ -29,8 +30,10 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const [attendanceRates, setAttendanceRates] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [personalNote, setPersonalNote] = useState<PersonalNote | null>(null);
-  const [showNote, setShowNote] = useState(true);
+  const [showNote, setShowNote] = useState(false);
+  const [showFeeReminder, setShowFeeReminder] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'notifications' | 'payments'>('dashboard');
 
   useEffect(() => {
@@ -44,23 +47,51 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const loadData = async (studentId: number) => {
     try {
       setLoading(true);
-      const [studentSchedule, rates, note, notifs] = await Promise.all([
+      const [studentSchedule, rates, note, notifs, studentPayments] = await Promise.all([
         db.getStudentSchedule(studentId),
         db.calculateAttendanceRates(studentId),
         db.getPersonalNote(studentId),
-        db.getNotifications(studentId)
+        db.getNotifications(studentId),
+        db.getPayments({ student_id: studentId })
       ]);
       
       setSchedule(studentSchedule);
       setAttendanceRates(rates);
       setPersonalNote(note);
       setNotifications(notifs);
-      setShowNote(note?.is_active ?? false);
+      setPayments(studentPayments);
+      
+      // Show notes first, then fees reminder
+      if (note?.is_active) {
+        setShowNote(true);
+      } else {
+        // Check if student has unpaid fees
+        checkFees(studentPayments);
+      }
     } catch (err) {
       console.error('[StudentDashboard] Error loading data:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const checkFees = (studentPayments: any[]) => {
+    if (!student) return;
+    
+    // Calculate total paid
+    const totalPaid = studentPayments.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0);
+    const remaining = (student.subscription_amount || 0) - totalPaid;
+    const isUnpaid = (student.subscription_status !== 'active' || remaining > 0);
+    
+    if (isUnpaid && remaining > 0 || student.subscription_status === 'unpaid') {
+      setShowFeeReminder(true);
+    }
+  };
+
+  const onCloseNote = () => {
+    setShowNote(false);
+    // After closing note, check fees
+    checkFees(payments);
   };
 
   const getRateColor = (rate: number) => {
@@ -149,7 +180,7 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
 
         {showNote && personalNote && (
           <div className="fixed inset-0 z-[9999999] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/60 to-black/70 backdrop-blur-md" onClick={() => setShowNote(false)} />
+            <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/60 to-black/70 backdrop-blur-md" onClick={onCloseNote} />
             <div className="relative glass-card w-full max-w-2xl animate-slide-up overflow-hidden border-2 border-brand-warning/30 shadow-2xl shadow-brand-warning/20">
               <div className="bg-gradient-to-r from-brand-warning/20 to-brand-primary/20 p-6 border-b border-dark-border">
                 <div className="flex items-center justify-between">
@@ -163,7 +194,7 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
                     </div>
                   </div>
                   <button
-                    onClick={() => setShowNote(false)}
+                    onClick={onCloseNote}
                     className="p-3 rounded-xl bg-dark-card border border-dark-border hover:bg-dark-hover text-dark-muted hover:text-white transition-all hover:scale-105"
                   >
                     <X className="w-6 h-6" />
@@ -186,11 +217,86 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
               
               <div className="bg-dark-bg/50 p-6 border-t border-dark-border flex items-center justify-end gap-4">
                 <button
-                  onClick={() => setShowNote(false)}
+                  onClick={onCloseNote}
                   className="btn-primary px-8 py-3.5 flex items-center gap-3 text-lg font-bold hover:scale-105 transition-transform"
                 >
                   <Check className="w-6 h-6" />
                   فهمت والشكر
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showFeeReminder && (
+          <div className="fixed inset-0 z-[9999998] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/60 to-black/70 backdrop-blur-md" onClick={() => setShowFeeReminder(false)} />
+            <div className="relative glass-card w-full max-w-2xl animate-slide-up overflow-hidden border-2 border-brand-danger/30 shadow-2xl shadow-brand-danger/20">
+              <div className="bg-gradient-to-r from-brand-danger/20 to-brand-primary/20 p-6 border-b border-dark-border">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-danger to-brand-primary flex items-center justify-center animate-pulse">
+                      <DollarSign className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">تذكير بالرسوم الدراسية</h2>
+                      <p className="text-sm text-dark-muted mt-1">من إدارة تحضير الطلاب</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowFeeReminder(false)}
+                    className="p-3 rounded-xl bg-dark-card border border-dark-border hover:bg-dark-hover text-dark-muted hover:text-white transition-all hover:scale-105"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-brand-primary/10 rounded-xl p-4 border border-brand-primary/30">
+                    <p className="text-dark-muted text-sm">المبلغ المطلوب</p>
+                    <p className="text-2xl font-bold text-white">{student?.subscription_amount || 0} ر.س</p>
+                  </div>
+                  <div className="bg-brand-success/10 rounded-xl p-4 border border-brand-success/30">
+                    <p className="text-dark-muted text-sm">المدفوع</p>
+                    <p className="text-2xl font-bold text-brand-success">
+                      {payments.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0)} ر.س
+                    </p>
+                  </div>
+                  <div className="bg-brand-danger/10 rounded-xl p-4 border border-brand-danger/30">
+                    <p className="text-dark-muted text-sm">المتبقي</p>
+                    <p className="text-2xl font-bold text-brand-danger">
+                      {(student?.subscription_amount || 0) - payments.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0)} ر.س
+                    </p>
+                  </div>
+                </div>
+                {student?.due_date && (
+                  <div className="bg-dark-card rounded-xl p-4 border border-dark-border mb-6">
+                    <p className="text-dark-muted text-sm">تاريخ الاستحقاق</p>
+                    <p className="text-lg font-bold text-white">
+                      {new Date(student.due_date).toLocaleDateString('ar-SA')}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="bg-dark-bg/50 p-6 border-t border-dark-border flex items-center justify-end gap-4">
+                <button
+                  onClick={() => setShowFeeReminder(false)}
+                  className="btn-secondary px-8 py-3.5 flex items-center gap-3 text-lg font-bold hover:scale-105 transition-transform"
+                >
+                  لاحقاً
+                </button>
+                <button
+                  onClick={() => {
+                    setShowFeeReminder(false);
+                    setActiveTab('payments');
+                  }}
+                  className="btn-primary px-8 py-3.5 flex items-center gap-3 text-lg font-bold hover:scale-105 transition-transform"
+                >
+                  <Upload className="w-6 h-6" />
+                  رفع إثبات الدفع
                 </button>
               </div>
             </div>
