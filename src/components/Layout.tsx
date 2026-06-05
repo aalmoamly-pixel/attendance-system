@@ -103,9 +103,9 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
   ].filter(item => item.show);
 
   const SidebarContent = () => (
-    <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 min-h-screen">
+    <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 h-screen overflow-hidden">
       {/* Brand Logo Header */}
-      <div className="p-6 border-b border-dark-border/40 flex items-center gap-3">
+      <div className="p-6 border-b border-dark-border/40 flex items-center gap-3 shrink-0">
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center shadow-xl shadow-brand-primary/30 transform hover:scale-105 transition-all shrink-0">
           <Sparkles className="w-6 h-6 text-white animate-pulse" />
         </div>
@@ -116,7 +116,7 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
       </div>
 
       {/* Database Status Tag */}
-      <div className="px-6 py-3">
+      <div className="px-6 py-3 shrink-0">
         <div className={`flex items-center justify-between px-3 py-2 rounded-xl border text-[11px] font-medium transition-all ${
           isSupabaseLive 
             ? 'bg-brand-success/10 border-brand-success/20 text-brand-success' 
@@ -221,7 +221,7 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
       </nav>
 
       {/* Logout Button */}
-      <div className="p-4 border-t border-dark-border/40">
+      <div className="p-4 border-t border-dark-border/40 shrink-0">
         <button
           onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-dark-hover hover:bg-brand-danger/20 text-dark-muted hover:text-brand-danger transition-all border border-dark-border/60"
@@ -232,7 +232,7 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
       </div>
 
       {/* Footer Info */}
-      <div className="p-4 bg-dark-bg/30">
+      <div className="p-4 bg-dark-bg/30 shrink-0">
         <div className="flex items-start gap-2.5 text-xs text-dark-muted">
           <Info className="w-4 h-4 text-brand-secondary shrink-0 mt-0.5" />
           <p className="leading-relaxed">
@@ -244,6 +244,17 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
   );
 
   const demoMode = isDemoMode();
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
 
   return (
     <div className="min-h-screen bg-dark-bg text-dark-text font-sans flex flex-row">
