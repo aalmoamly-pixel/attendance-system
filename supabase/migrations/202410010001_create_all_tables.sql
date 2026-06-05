@@ -188,3 +188,35 @@ CREATE TABLE IF NOT EXISTS public.cms_data (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   updated_by INTEGER REFERENCES public.students(student_id) ON DELETE SET NULL
 );
+
+-- ----------------------------------------------------
+-- Row Level Security (RLS) Policies - Allow full access for all (simple setup)
+-- ----------------------------------------------------
+
+-- Enable RLS on all tables
+ALTER TABLE public.cms_data ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.weekdays ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.time_slots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.student_schedule ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attendance_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.personal_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payment_settings ENABLE ROW LEVEL SECURITY;
+
+-- Create policies allowing full access to all tables
+CREATE POLICY "Allow full access to all" ON public.cms_data FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.departments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.subjects FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.weekdays FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.time_slots FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.students FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.student_schedule FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.attendance_log FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.personal_notes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.payments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to all" ON public.payment_settings FOR ALL USING (true) WITH CHECK (true);
