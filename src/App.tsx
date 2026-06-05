@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import ScrollToTop from './components/ScrollToTop';
 import HomePage from './components/public/HomePage';
 import AboutPage from './components/public/AboutPage';
 import ServicesPage from './components/public/ServicesPage';
@@ -187,6 +188,7 @@ function AppContent() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AppContent />
     </BrowserRouter>
   );
