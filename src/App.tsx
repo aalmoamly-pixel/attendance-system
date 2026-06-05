@@ -59,8 +59,8 @@ function DashboardRoutes({ authState, setAuthStateLocal }: { authState: AuthStat
 
   const handleLogout = () => {
     logout();
-    setAuthStateLocal(getAuthState());
-    navigate('/');
+    // Force full page redirect to homepage
+    window.location.href = '/';
   };
 
   const handleImportSuccess = () => {
