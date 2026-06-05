@@ -61,13 +61,13 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
       setNotifications(notifs);
       setPayments(studentPayments);
       
-      // Show notes first, then fees reminder
+      // Show notes first if active
       if (note?.is_active) {
         setShowNote(true);
-      } else {
-        // Check if student has unpaid fees
-        checkFees(studentPayments);
       }
+      
+      // Always check fees regardless of notes
+      checkFees(studentPayments);
     } catch (err) {
       console.error('[StudentDashboard] Error loading data:', err);
     } finally {
@@ -81,9 +81,14 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
     // Calculate total paid
     const totalPaid = studentPayments.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0);
     const remaining = (student.subscription_amount || 0) - totalPaid;
-    const isUnpaid = (student.subscription_status !== 'active' || remaining > 0);
     
-    if (isUnpaid && remaining > 0 || student.subscription_status === 'unpaid') {
+    // Check conditions: unpaid OR pending OR remaining > 0
+    const needsReminder = 
+      student.subscription_status === 'unpaid' || 
+      student.subscription_status === 'pending' || 
+      remaining > 0;
+    
+    if (needsReminder) {
       setShowFeeReminder(true);
     }
   };
