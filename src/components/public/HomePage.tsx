@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { 
   Users, 
   BookOpen, 
@@ -13,16 +13,10 @@ import {
   Bell, 
   BarChart3, 
   Globe, 
-  School,
-  FileText as FileDocument,
-  ClipboardList,
-  Receipt,
-  TrendingUp as TrendingUpIcon,
-  Building2
+  School
 } from 'lucide-react';
 import PublicLayout from './PublicLayout';
 import { useCMS } from '../../contexts/CMSContext';
-import { useEffect } from 'react';
 
 const iconMap: Record<string, React.ReactNode> = {
   Users: <Users className="w-8 h-8" />,
@@ -38,69 +32,11 @@ const iconMap: Record<string, React.ReactNode> = {
   Bell: <Bell className="w-6 h-6" />,
   BarChart3: <BarChart3 className="w-6 h-6" />,
   Globe: <Globe className="w-6 h-6" />,
-  School: <School className="w-6 h-6" />,
-  ClipboardList: <ClipboardList className="w-6 h-6" />,
-  Receipt: <Receipt className="w-6 h-6" />,
-  TrendingUp: <TrendingUpIcon className="w-6 h-6" />,
-  Building2: <Building2 className="w-6 h-6" />,
-  FileDocument: <FileDocument className="w-6 h-6" />
+  School: <School className="w-6 h-6" />
 };
-
-const studentServices = [
-  { id: 1, title: 'متابعة المستوى الأكاديمي', icon: 'GraduationCap' },
-  { id: 2, title: 'متابعة الحضور والغياب', icon: 'Calendar' },
-  { id: 3, title: 'الاختبارات الإلكترونية', icon: 'CheckSquare' },
-  { id: 4, title: 'الواجبات والمشاريع', icon: 'FileDocument' },
-  { id: 5, title: 'النتائج والتقديرات', icon: 'Award' },
-  { id: 6, title: 'متابعة الرسوم الدراسية', icon: 'Receipt' },
-  { id: 7, title: 'رفع إثباتات الدفع', icon: 'Upload' },
-  { id: 8, title: 'الإشعارات والتنبيهات الفورية', icon: 'Bell' },
-  { id: 9, title: 'التقارير والإحصائيات', icon: 'TrendingUp' },
-  { id: 10, title: 'الخدمات الجامعية المتكاملة', icon: 'Building2' }
-];
 
 export default function HomePage() {
   const { cmsData, loading } = useCMS();
-  const location = useLocation();
-
-  // Handle smooth scroll to hash when location changes
-  useEffect(() => {
-    if (location.hash) {
-      const id = location.hash.slice(1);
-      const element = document.getElementById(id);
-      if (element) {
-        const offset = 100;
-        const elementPosition = element.getBoundingClientRect().top;
-        const offsetPosition = elementPosition + window.pageYOffset - offset;
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        });
-      }
-    }
-  }, [location.hash]);
-
-  const handleSmoothScroll = (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    
-    if (location.pathname !== '/') {
-      window.location.href = `/#${id}`;
-      return;
-    }
-
-    const element = document.getElementById(id);
-    if (element) {
-      const offset = 100;
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - offset;
-
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      });
-    }
-  };
 
   if (loading || !cmsData) {
     return (
@@ -116,7 +52,7 @@ export default function HomePage() {
     <PublicLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Hero Section */}
-        <section id="home" className="text-center py-16 lg:py-24">
+        <section className="text-center py-16 lg:py-24">
           <div className="max-w-5xl mx-auto">
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
               {cmsData.homepage.hero_title}
@@ -128,12 +64,9 @@ export default function HomePage() {
               {cmsData.homepage.hero_subtitle_2}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button 
-                onClick={(e) => handleSmoothScroll(e, 'student-services')} 
-                className="btn-primary text-lg px-8 py-4"
-              >
-                استكشف خدمات الطالب
-              </button>
+              <Link to={cmsData.homepage.hero_button_primary_link} className="btn-primary text-lg px-8 py-4">
+                {cmsData.homepage.hero_button_primary}
+              </Link>
               <Link to={cmsData.homepage.hero_button_secondary_link} className="btn-secondary text-lg px-8 py-4">
                 {cmsData.homepage.hero_button_secondary}
               </Link>
@@ -168,37 +101,6 @@ export default function HomePage() {
                 <div className="text-dark-muted text-lg">{stat.label}</div>
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* Student Services Section */}
-        <section id="student-services" className="py-20">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">الخدمات الطلابية</h2>
-            <p className="text-dark-muted text-lg max-w-2xl mx-auto">
-              كل ما يحتاجه الطالب الجامعي في منصة واحدة
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-            {studentServices.map((service, index) => (
-              <div 
-                key={service.id} 
-                className="glass-card p-6 hover:border-brand-primary/50 transition-all group animate-slide-up flex flex-col items-center text-center" 
-                style={{ animationDelay: `${index * 60}ms` }}
-              >
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-primary/20 to-brand-secondary/20 flex items-center justify-center text-brand-primary mb-4 group-hover:scale-110 transition-transform">
-                  {iconMap[service.icon]}
-                </div>
-                <h3 className="text-lg font-bold text-white">{service.title}</h3>
-              </div>
-            ))}
-          </div>
-          
-          <div className="mt-12 text-center">
-            <p className="text-xl md:text-2xl font-semibold bg-gradient-to-r from-brand-primary to-brand-secondary bg-clip-text text-transparent">
-              كل ما يحتاجه الطالب الجامعي في منصة واحدة
-            </p>
           </div>
         </section>
 
