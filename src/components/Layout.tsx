@@ -78,7 +78,8 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
       onLogout();
     } else {
       logout();
-      window.location.reload();
+      // Redirect manually to home
+      window.location.href = '/';
     }
   };
 
