@@ -52,10 +52,9 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function DashboardRoutes({ authState, setAuthStateLocal }: { authState: AuthState; setAuthStateLocal: (state: AuthState) => void }) {
+function DashboardRoutes({ authState }: { authState: AuthState }) {
   const [activePage, setActivePage] = useState('dashboard');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
@@ -174,7 +173,7 @@ function AppContent() {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <DashboardRoutes authState={authState} setAuthStateLocal={setAuthStateLocal} />
+            <DashboardRoutes authState={authState} />
           </ProtectedRoute>
         }
       />
