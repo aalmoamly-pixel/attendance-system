@@ -47,7 +47,8 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const loadData = async (studentId: number) => {
     try {
       setLoading(true);
-      const [studentSchedule, rates, note, notifs, studentPayments] = await Promise.all([
+      const [students, studentSchedule, rates, note, notifs, studentPayments] = await Promise.all([
+        db.getStudents(), // Fetch all students
         db.getStudentSchedule(studentId),
         db.calculateAttendanceRates(studentId),
         db.getPersonalNote(studentId),
@@ -55,6 +56,10 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
         db.getPayments({ student_id: studentId })
       ]);
       
+      const currentStudent = students.find(s => s.student_id === studentId) || null;
+      console.log('[loadData] currentStudent:', currentStudent);
+      
+      setStudent(currentStudent);
       setSchedule(studentSchedule);
       setAttendanceRates(rates);
       setPersonalNote(note);
@@ -67,7 +72,9 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
       }
       
       // Always check fees regardless of notes
-      checkFees(studentPayments);
+      if (currentStudent) { // Only check if we have currentStudent
+        checkFees(studentPayments);
+      }
     } catch (err) {
       console.error('[StudentDashboard] Error loading data:', err);
     } finally {
@@ -78,15 +85,20 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const checkFees = (studentPayments: any[]) => {
     if (!student) return;
     
+    console.log('[checkFees] Student:', student);
+    console.log('[checkFees] Payments:', studentPayments);
     // Calculate total paid
     const totalPaid = studentPayments.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0);
     const remaining = (student.subscription_amount || 0) - totalPaid;
     
+    console.log('[checkFees] remaining:', remaining);
     // Check conditions: unpaid OR pending OR remaining > 0
     const needsReminder = 
       student.subscription_status === 'unpaid' || 
       student.subscription_status === 'pending' || 
       remaining > 0;
+    
+    console.log('[checkFees] needsReminder:', needsReminder);
     
     if (needsReminder) {
       setShowFeeReminder(true);
