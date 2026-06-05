@@ -114,7 +114,66 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 -- ----------------------------------------------------
--- 8. جدول بيانات CMS (cms_data)
+-- 8. جدول الإشعارات (notifications)
+-- ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.notifications (
+  notification_id SERIAL PRIMARY KEY,
+  student_id INTEGER REFERENCES public.students(student_id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------
+-- 9. جدول الملاحظات الشخصية (personal_notes)
+-- ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.personal_notes (
+  note_id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL REFERENCES public.students(student_id) ON DELETE CASCADE,
+  note TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(student_id)
+);
+
+-- ----------------------------------------------------
+-- 10. جدول إعدادات الدفع (payment_settings)
+-- ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.payment_settings (
+  id SERIAL PRIMARY KEY,
+  bank_transfer_enabled BOOLEAN DEFAULT TRUE,
+  ria_enabled BOOLEAN DEFAULT TRUE,
+  binance_enabled BOOLEAN DEFAULT TRUE,
+  urpay_enabled BOOLEAN DEFAULT TRUE,
+  bank_name TEXT,
+  bank_account_number TEXT,
+  bank_iban TEXT,
+  binance_wallet TEXT,
+  urpay_number TEXT,
+  ria_details TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------
+-- 11. جدول المدفوعات (payments)
+-- ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.payments (
+  payment_id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL REFERENCES public.students(student_id) ON DELETE CASCADE,
+  amount NUMERIC NOT NULL,
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('التحويل البنكي', 'UrPay', 'Binance USDT', 'RIA')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+  receipt_url TEXT,
+  receipt_text TEXT,
+  admin_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------
+-- 12. جدول بيانات CMS (cms_data)
 -- ----------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.cms_data (
   id SERIAL PRIMARY KEY,
