@@ -31,7 +31,8 @@ export const setAuthState = (state: AuthState) => {
 };
 
 export const clearAuthState = () => {
-  localStorage.removeItem(AUTH_KEY);
+  localStorage.clear();
+  sessionStorage.clear();
 };
 
 export const login = async (credentials: LoginCredentials): Promise<AuthState> => {
@@ -82,7 +83,6 @@ export const login = async (credentials: LoginCredentials): Promise<AuthState> =
 
 export const logout = () => {
   clearAuthState();
-  setDemoMode(false);
 };
 
 const DEMO_KEY = 'demo_mode';
@@ -102,6 +102,10 @@ export const setDemoMode = (enabled: boolean) => {
 export const loginDemo = async (): Promise<AuthState> => {
   // Clear any old authentication data first!
   clearAuthState();
+
+  // Re-initialize default data (departments, students, CMS, etc.)!
+  const { initializeLocalData } = await import('./supabase');
+  await initializeLocalData();
   
   const demoUser = {
     student_id: 999,

@@ -54,7 +54,7 @@ const LOCAL_KEYS = {
   CMS_DATA: 'cms_data'
 };
 
-const initializeLocalData = async () => {
+export const initializeLocalData = async () => {
   if (isSupabaseConfigured && supabase) {
     // --- Supabase mode: Initialize data in Supabase
     console.log('[initializeLocalData] Supabase mode: Initializing data');
