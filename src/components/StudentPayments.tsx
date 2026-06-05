@@ -123,6 +123,7 @@ export default function StudentPayments() {
       case 'bank_transfer': return 'تحويل بنكي';
       case 'ria': return 'RIA Money Transfer';
       case 'binance_usdt': return 'Binance USDT';
+      case 'urpay': return 'UrPay';
       case 'visa': return 'Visa';
       case 'mastercard': return 'MasterCard';
       case 'apple_pay': return 'Apple Pay';
@@ -228,6 +229,18 @@ export default function StudentPayments() {
                 <p className="text-sm font-mono break-all">{paymentSettings.binance_wallet}</p>
               </div>
             )}
+            {paymentSettings?.urpay_number && (
+              <div className="bg-dark-card p-4 rounded-xl border border-dark-border">
+                <h4 className="font-bold text-white mb-2">📱 UrPay</h4>
+                <p className="text-sm">رقم الحساب: {paymentSettings.urpay_number}</p>
+                <p className="text-sm mt-1">اسم صاحب الحساب: {paymentSettings.urpay_account_name}</p>
+                {paymentSettings?.urpay_qr_image && (
+                  <div className="mt-4">
+                    <img src={paymentSettings.urpay_qr_image} alt="UrPay QR" className="max-w-48 mx-auto rounded-lg" />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -300,6 +313,7 @@ export default function StudentPayments() {
                     <option value="bank_transfer">تحويل بنكي</option>
                     <option value="ria">RIA Money Transfer</option>
                     <option value="binance_usdt">Binance USDT</option>
+                    <option value="urpay">UrPay</option>
                   </select>
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                     <svg className="w-5 h-5 text-dark-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">

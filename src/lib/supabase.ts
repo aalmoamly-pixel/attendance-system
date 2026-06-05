@@ -361,10 +361,13 @@ const initializeLocalData = async () => {
       const defaultSettings: PaymentSettings = {
         subscription_amount: 299,
         subscription_duration_days: 30,
-        enabled_payment_methods: ['bank_transfer', 'ria', 'binance_usdt'],
+        enabled_payment_methods: ['bank_transfer', 'ria', 'binance_usdt', 'urpay'],
         bank_transfer_details: 'اسم البنك: بنك الراجحي | رقم الحساب: 123456789 | الاسم: إدارة تحضير الطلاب',
         ria_details: 'اسم المستلم: إدارة تحضير الطلاب | الدولة: السعودية',
         binance_wallet: '0x123456789abcdef123456789abcdef123456789',
+        urpay_number: '',
+        urpay_account_name: '',
+        urpay_qr_image: null,
         payment_instructions: 'يرجى إرسال إثبات الدفع عبر النظام بعد الدفع'
       };
       localStorage.setItem(LOCAL_KEYS.PAYMENT_SETTINGS, JSON.stringify(defaultSettings));
@@ -1311,10 +1314,13 @@ export const db = {
       const defaultSettings: PaymentSettings = {
         subscription_amount: 299,
         subscription_duration_days: 30,
-        enabled_payment_methods: ['bank_transfer', 'ria', 'binance_usdt'],
+        enabled_payment_methods: ['bank_transfer', 'ria', 'binance_usdt', 'urpay'],
         bank_transfer_details: 'اسم البنك: بنك الراجحي | رقم الحساب: 123456789 | الاسم: إدارة تحضير الطلاب',
         ria_details: 'اسم المستلم: إدارة تحضير الطلاب | الدولة: السعودية',
         binance_wallet: '0x123456789abcdef123456789abcdef123456789',
+        urpay_number: '',
+        urpay_account_name: '',
+        urpay_qr_image: null,
         payment_instructions: 'يرجى إرسال إثبات الدفع عبر النظام بعد الدفع'
       };
       await supabase.from('payment_settings').insert(defaultSettings);
@@ -1325,10 +1331,13 @@ export const db = {
     return settings ? JSON.parse(settings) : {
       subscription_amount: 299,
       subscription_duration_days: 30,
-      enabled_payment_methods: ['bank_transfer', 'ria', 'binance_usdt'],
+      enabled_payment_methods: ['bank_transfer', 'ria', 'binance_usdt', 'urpay'],
       bank_transfer_details: 'اسم البنك: بنك الراجحي | رقم الحساب: 123456789 | الاسم: إدارة تحضير الطلاب',
       ria_details: 'اسم المستلم: إدارة تحضير الطلاب | الدولة: السعودية',
       binance_wallet: '0x123456789abcdef123456789abcdef123456789',
+      urpay_number: '',
+      urpay_account_name: '',
+      urpay_qr_image: null,
       payment_instructions: 'يرجى إرسال إثبات الدفع عبر النظام بعد الدفع'
     };
   },

@@ -55,6 +55,7 @@ export default function PaymentSettings() {
     'bank_transfer': 'تحويل بنكي',
     'ria': 'RIA Money Transfer',
     'binance_usdt': 'Binance USDT',
+    'urpay': 'UrPay',
     'visa': 'Visa',
     'mastercard': 'MasterCard',
     'apple_pay': 'Apple Pay',
@@ -158,6 +159,39 @@ export default function PaymentSettings() {
             onChange={(e) => setSettings({ ...settings, binance_wallet: e.target.value })}
             className="w-full glass-input font-mono"
             placeholder="0x..."
+          />
+        </div>
+
+        <div>
+          <label className="block text-white font-semibold mb-2">رقم حساب UrPay</label>
+          <input
+            type="text"
+            value={settings.urpay_number || ''}
+            onChange={(e) => setSettings({ ...settings, urpay_number: e.target.value })}
+            className="w-full glass-input"
+            placeholder="أدخل رقم حساب UrPay..."
+          />
+        </div>
+
+        <div>
+          <label className="block text-white font-semibold mb-2">اسم صاحب حساب UrPay</label>
+          <input
+            type="text"
+            value={settings.urpay_account_name || ''}
+            onChange={(e) => setSettings({ ...settings, urpay_account_name: e.target.value })}
+            className="w-full glass-input"
+            placeholder="أدخل اسم صاحب الحساب..."
+          />
+        </div>
+
+        <div>
+          <label className="block text-white font-semibold mb-2">صورة QR لـ UrPay (اختياري)</label>
+          <input
+            type="text"
+            value={settings.urpay_qr_image || ''}
+            onChange={(e) => setSettings({ ...settings, urpay_qr_image: e.target.value })}
+            className="w-full glass-input"
+            placeholder="أدخل رابط صورة QR..."
           />
         </div>
 

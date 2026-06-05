@@ -116,6 +116,7 @@ export type PaymentMethod =
   | 'bank_transfer' 
   | 'ria' 
   | 'binance_usdt' 
+  | 'urpay'
   | 'visa' 
   | 'mastercard' 
   | 'apple_pay' 
@@ -148,5 +149,9 @@ export interface PaymentSettings {
   bank_transfer_details: string;
   ria_details: string;
   binance_wallet: string;
+  urpay_number: string;
+  urpay_account_name: string;
+  urpay_qr_image: string | null;
   payment_instructions: string;
+  [key: string]: any;
 }
