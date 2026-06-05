@@ -44,6 +44,13 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
     }
   }, []);
 
+  // Always check fees when student or payments data change
+  useEffect(() => {
+    if (student && payments) {
+      checkFees(payments);
+    }
+  }, [student, payments]);
+
   const loadData = async (studentId: number) => {
     try {
       setLoading(true);
@@ -70,11 +77,6 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
       if (note?.is_active) {
         setShowNote(true);
       }
-      
-      // Always check fees regardless of notes
-      if (currentStudent) { // Only check if we have currentStudent
-        checkFees(studentPayments);
-      }
     } catch (err) {
       console.error('[StudentDashboard] Error loading data:', err);
     } finally {
@@ -82,20 +84,20 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
     }
   };
 
-  const checkFees = (studentPayments: any[]) => {
-    if (!student) return;
+  const checkFees = (studentPayments: any[], currentStudent = student) => {
+    if (!currentStudent) return;
     
-    console.log('[checkFees] Student:', student);
+    console.log('[checkFees] currentStudent:', currentStudent);
     console.log('[checkFees] Payments:', studentPayments);
     // Calculate total paid
     const totalPaid = studentPayments.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0);
-    const remaining = (student.subscription_amount || 0) - totalPaid;
+    const remaining = (currentStudent.subscription_amount || 0) - totalPaid;
     
     console.log('[checkFees] remaining:', remaining);
     // Check conditions: unpaid OR pending OR remaining > 0
     const needsReminder = 
-      student.subscription_status === 'unpaid' || 
-      student.subscription_status === 'pending' || 
+      currentStudent.subscription_status === 'unpaid' || 
+      currentStudent.subscription_status === 'pending' || 
       remaining > 0;
     
     console.log('[checkFees] needsReminder:', needsReminder);
