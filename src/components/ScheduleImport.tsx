@@ -23,6 +23,7 @@ interface RawScheduleRow {
   الاسم?: string;
   'رقم الهوية'?: string;
   'الرقم الأكاديمي'?: string;
+  'رقم الجوال'?: string; // Added for phone number column
   البرنامج?: string;
   المقرر?: string;
   'عدد ساعات المقرر'?: string | number;
@@ -30,6 +31,7 @@ interface RawScheduleRow {
   المكان?: string;
   'الوقت من'?: string;
   'الوقت إلى'?: string;
+  [key: string]: any; // Allow any other properties for flexibility
 }
 
 interface ParsedStudent {
@@ -186,7 +188,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
       // First get existing students to check if they exist
       const existingStudents = await db.getStudents();
-      const existingAcademicIds = new Set(existingStudents.map(s => s.academic_id));
+      const existingNationalIds = new Set(existingStudents.map(s => s.national_id)); // NOW CHECK NATIONAL ID NOT ACADEMIC ID!
 
       const students: ParsedStudent[] = [];
       const subjects: ParsedSubject[] = [];
@@ -197,7 +199,8 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       for (const row of jsonData) {
         const studentName = row.الاسم || row['الاسم'] || '';
         const academicId = row['الرقم الأكاديمي'] || '';
-        const phone = row['رقم الهوية'] || '';
+        const nationalId = row['رقم الهوية'] || ''; // RENAMED! Now national_id comes from "رقم الهوية" column!
+        const phone = row['رقم الجوال'] || row['رقم الجوال'] || null; // Phone comes from "رقم الجوال" column (if exists)
         const departmentName = row.البرنامج || row['البرنامج'] || 'عام';
         const subjectName = row.المقرر || row['المقرر'] || '';
         const dayName = row.اليوم || row['اليوم'] || '';
@@ -208,12 +211,12 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           seenStudents.add(academicId);
           students.push({
             full_name: studentName || `طالب ${academicId}`,
-            phone: phone || null,
+            phone: phone,
             academic_id: academicId,
-            national_id: phone || `9${Math.floor(Math.random() * 900000000 + 100000000)}`,
+            national_id: nationalId || `9${Math.floor(Math.random() * 900000000 + 100000000)}`,
             password: 'Aa123456',
             department_name: departmentName,
-            isNew: !existingAcademicIds.has(academicId)
+            isNew: !existingNationalIds.has(nationalId) // NOW CHECK national_id!
           });
         }
 
@@ -306,11 +309,14 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         }))
       );
 
+      console.log('[ScheduleImport] parsedData.students:', parsedData.students);
+
       // First: make a map to link schedule's student academic id with national id (from parsedData.students)
       const studentNationalIdMap = new Map();
       parsedData.students.forEach(student => {
         studentNationalIdMap.set(student.academic_id, student.national_id);
       });
+      console.log('[ScheduleImport] studentNationalIdMap:', Object.fromEntries(studentNationalIdMap));
 
       const studentMap = await db.importStudents(
         parsedData.students.map(student => ({
@@ -322,16 +328,24 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           department_id: deptMap.get(student.department_name) || 1
         }))
       );
+      console.log('[ScheduleImport] studentMap:', Object.fromEntries(studentMap));
 
       const weekdays = await db.getWeekdays();
       const timeSlots = await db.getTimeSlots();
+      console.log('[ScheduleImport] weekdays:', weekdays);
+      console.log('[ScheduleImport] timeSlots:', timeSlots);
       const schedulesToImport = [];
 
       for (const schedule of parsedData.schedules) {
+        console.log('[ScheduleImport] processing schedule:', schedule);
         const nationalId = studentNationalIdMap.get(schedule.student_academic_id); // First get national id from schedule's academic id
+        console.log('[ScheduleImport] schedule nationalId:', nationalId);
         const studentId = studentMap.get(nationalId); // Now use national id to get student id
+        console.log('[ScheduleImport] schedule studentId:', studentId);
         const subjectId = subjectMap.get(schedule.subject_name);
+        console.log('[ScheduleImport] schedule subjectId:', subjectId);
         const weekday = weekdays.find(w => w.weekday_name_ar === schedule.weekday_name);
+        console.log('[ScheduleImport] schedule weekday:', weekday);
         
         if (studentId && subjectId && weekday) {
           let slotId = timeSlots[0]?.slot_id || 1;
@@ -352,6 +366,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         }
       }
 
+      console.log('[ScheduleImport] schedulesToImport:', schedulesToImport);
       if (schedulesToImport.length > 0) {
         await db.importSchedule(schedulesToImport);
       }
