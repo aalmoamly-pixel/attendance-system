@@ -1902,7 +1902,7 @@ export async function migrateLocalToSupabase() {
       return cleaned;
     });
     const students = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]').map((s: any) => {
-      const { organization_id, ...cleaned } = s;
+      const { organization_id, personal_note, ...cleaned } = s; // Remove columns not in students table
       return cleaned;
     });
     const subjects = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]').map((s: any) => {
