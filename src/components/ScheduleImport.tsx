@@ -89,7 +89,32 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     let studentAcademicId = '';
     let studentProgram = '';
     
-    // First pass: extract all student info
+    // Extract all numbers first
+    const allNumbers = text.match(/\b\d+\b/g) || [];
+    console.log('All numbers found:', allNumbers);
+    
+    // Find 10-digit numbers (national ID)
+    const tenDigitNumbers = allNumbers.filter(n => n.length === 10);
+    if (tenDigitNumbers.length > 0) {
+      studentNationalId = tenDigitNumbers[0];
+      console.log('Extracted studentNationalId (from all numbers):', studentNationalId);
+    }
+    
+    // Find 6-9-digit numbers (academic ID)
+    const academicIdCandidates = allNumbers.filter(n => n.length >= 6 && n.length <= 9 && n !== studentNationalId);
+    if (academicIdCandidates.length > 0) {
+      studentAcademicId = academicIdCandidates[0];
+      console.log('Extracted studentAcademicId (from all numbers):', studentAcademicId);
+    }
+    
+    // Find phone number (starts with 05, 10 digits)
+    const phoneCandidates = allNumbers.filter(n => n.length === 10 && n.startsWith('05'));
+    if (phoneCandidates.length > 0) {
+      studentPhone = phoneCandidates[0];
+      console.log('Extracted studentPhone (from all numbers):', studentPhone);
+    }
+    
+    // First pass: extract student info from labels
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       console.log(`[Pass 1] Line ${i}:`, line);
@@ -120,30 +145,30 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         console.log('Extracted studentName:', studentName);
       }
 
-      // Find studentNationalId (any 10-digit number)
-      if (!studentNationalId) {
-        const matches = line.match(/\b\d{10}\b/);
+      // Find studentNationalId from label
+      if ((line.includes('رقم الهوية') || line.includes('الهوية')) && !studentNationalId) {
+        const matches = line.match(/\b\d{10}\b/) || (lines[i+1]?.match(/\b\d{10}\b/)) || (lines[i-1]?.match(/\b\d{10}\b/));
         if (matches) {
           studentNationalId = matches[0];
-          console.log('Extracted studentNationalId (from current line):', studentNationalId);
+          console.log('Extracted studentNationalId (from label):', studentNationalId);
         }
       }
 
-      // Find studentAcademicId (6-10-digit number)
-      if (!studentAcademicId) {
-        const matches = line.match(/\b\d{6,10}\b/);
+      // Find studentAcademicId from label
+      if ((line.includes('الرقم الأكاديمي') || line.includes('رقم جامعي') || line.includes('رقم طالب')) && !studentAcademicId) {
+        const matches = line.match(/\b\d{6,10}\b/) || (lines[i+1]?.match(/\b\d{6,10}\b/)) || (lines[i-1]?.match(/\b\d{6,10}\b/));
         if (matches && matches[0] !== studentNationalId) {
           studentAcademicId = matches[0];
-          console.log('Extracted studentAcademicId (from current line):', studentAcademicId);
+          console.log('Extracted studentAcademicId (from label):', studentAcademicId);
         }
       }
 
-      // Find studentPhone (05 followed by 8 digits)
-      if (!studentPhone) {
-        const matches = line.match(/\b05\d{8}\b/);
+      // Find studentPhone from label
+      if ((line.includes('رقم الجوال') || line.includes('جوال') || line.includes('الهاتف')) && !studentPhone) {
+        const matches = line.match(/\b05\d{8}\b/) || (lines[i+1]?.match(/\b05\d{8}\b/)) || (lines[i-1]?.match(/\b05\d{8}\b/));
         if (matches) {
           studentPhone = matches[0];
-          console.log('Extracted studentPhone (from current line):', studentPhone);
+          console.log('Extracted studentPhone (from label):', studentPhone);
         }
       }
 
@@ -170,28 +195,23 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       }
     }
     
-    // Second pass: if we still don't have student info, look more broadly
-    if (!studentNationalId || !studentAcademicId) {
-      console.log('Second pass for student info...');
+    // Final pass for student name if still not found
+    if (!studentName) {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        if (!studentNationalId) {
-          const matches = line.match(/\b\d{10}\b/);
-          if (matches) {
-            studentNationalId = matches[0];
-            console.log('Second pass: studentNationalId:', studentNationalId);
-          }
-        }
-        if (!studentAcademicId) {
-          const matches = line.match(/\b\d{6,10}\b/);
-          if (matches && matches[0] !== studentNationalId) {
-            studentAcademicId = matches[0];
-            console.log('Second pass: studentAcademicId:', studentAcademicId);
-          }
-        }
-        if (!studentName && /[\u0600-\u06FF]/.test(line) && !/^\d+$/.test(line) && line.length > 3 && !line.includes('رقم') && !line.includes('برنامج') && !line.includes('مقرر') && !line.includes('اليوم') && !line.includes('قسم')) {
+        if (/[\u0600-\u06FF]/.test(line) && 
+            !/^\d+$/.test(line) && 
+            line.length > 3 && 
+            !line.includes('رقم') && 
+            !line.includes('برنامج') && 
+            !line.includes('مقرر') && 
+            !line.includes('اليوم') && 
+            !line.includes('قسم') &&
+            !line.includes('تخصص') &&
+            !['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].some(d => line.includes(d))) {
           studentName = line;
-          console.log('Second pass: studentName:', studentName);
+          console.log('Final pass: studentName:', studentName);
+          break;
         }
       }
     }
@@ -204,7 +224,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     
     console.log('========== PARSING SCHEDULE ==========');
     
-    // Find any line that has a day name
+    // First, find the schedule start - look for any line with day OR time OR subject-like text
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       console.log(`[Schedule parsing] Line ${i}:`, line);
@@ -223,57 +243,45 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         }
       }
       
-      // Even if no day found, check if it has times or looks like a schedule line
-      const hasTime = /\d{1,2}[:：]\d{2}/.test(line);
+      // Find all times in this line
+      const timeMatches = line.match(/\d{1,2}[:：]\d{2}/g);
+      if (timeMatches) {
+        const cleanTimes = timeMatches.map(t => t.replace(/[：]/g, ':'));
+        if (cleanTimes.length >= 1) timeFrom = cleanTimes[0];
+        if (cleanTimes.length >= 2) timeTo = cleanTimes[1];
+        console.log(`  Found times:`, cleanTimes);
+      }
       
-      if (day || hasTime) {
-        // Split into parts
-        const parts = line.split(/\s+/);
-        const arabicParts: string[] = [];
-        
-        for (const part of parts) {
-          // Collect Arabic text (subject name)
-          if (/[\u0600-\u06FF]/.test(part) && !possibleDays.some(d => part.includes(d))) {
-            arabicParts.push(part);
-          }
-          
-          // Extract time
-          const timeMatch = part.match(/\d{1,2}[:：]\d{2}/);
-          if (timeMatch) {
-            const cleanTime = timeMatch[0].replace(/[：]/g, ':');
-            if (!timeFrom) {
-              timeFrom = cleanTime;
-              console.log(`  Found timeFrom: ${timeFrom}`);
-            } else {
-              timeTo = cleanTime;
-              console.log(`  Found timeTo: ${timeTo}`);
-            }
-          }
+      // Extract subject: collect Arabic text that's NOT a day name
+      const parts = line.split(/\s+/);
+      const arabicParts: string[] = [];
+      for (const part of parts) {
+        if (/[\u0600-\u06FF]/.test(part) && !possibleDays.some(d => part.includes(d)) && part.length > 1) {
+          arabicParts.push(part);
         }
-        
-        subject = arabicParts.join(' ').trim();
-        
-        // If we don't have day yet but we have subject/time, maybe set a default or just add as is?
-        // For now, require at least some info
-        if (day || subject || hasTime) {
-          const row: RawScheduleRow = {
-            الاسم: studentName,
-            'رقم الهوية': studentNationalId,
-            'الرقم الأكاديمي': studentAcademicId,
-            'رقم الجوال': studentPhone,
-            البرنامج: studentProgram,
-            المقرر: subject,
-            اليوم: day,
-            'الوقت من': timeFrom,
-            'الوقت إلى': timeTo
-          };
-          console.log('  Adding row:', row);
-          rows.push(row);
-        }
+      }
+      subject = arabicParts.join(' ').trim();
+      console.log(`  Found subject:`, subject);
+      
+      // If we have ANY of these, add the row
+      if (day || subject || timeFrom || timeTo) {
+        const row: RawScheduleRow = {
+          الاسم: studentName,
+          'رقم الهوية': studentNationalId,
+          'الرقم الأكاديمي': studentAcademicId,
+          'رقم الجوال': studentPhone,
+          البرنامج: studentProgram,
+          المقرر: subject,
+          اليوم: day,
+          'الوقت من': timeFrom,
+          'الوقت إلى': timeTo
+        };
+        console.log('  Adding row:', row);
+        rows.push(row);
       }
     }
 
-    // If no rows found, add at least one row with student info so user can edit
+    // If no rows found, add at least one row with student info
     if (rows.length === 0 && (studentName || studentAcademicId || studentNationalId)) {
       console.log('No schedule found, adding blank row for editing');
       rows.push({
