@@ -3,7 +3,6 @@ import {
   Plus, 
   Search, 
   Edit3, 
-  Trash2, 
   X, 
   Check, 
   GraduationCap, 
@@ -147,7 +146,8 @@ export default function Students() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
+  // Disabled: Deleting students causes foreign key constraint issues
+  /* const handleDelete = async (id: number) => {
     if (window.confirm('هل أنت متأكد من حذف هذا الطالب؟')) {
       try {
         await db.deleteStudent(id);
@@ -157,7 +157,7 @@ export default function Students() {
         setFormError('فشل حذف الطالب');
       }
     }
-  };
+  }; */
 
   const handleOpenNote = async (student: Student) => {
     setSelectedStudentForNote(student);
@@ -249,16 +249,7 @@ export default function Students() {
         console.log('[Students handleSubmit] updateData:', updateData);
         await db.updateStudent(editingStudent.student_id, updateData);
         
-        const oldSchedule = await db.getStudentSchedule(editingStudent.student_id);
-        
-        for (const scheduleEntry of oldSchedule) {
-          try {
-            await db.deleteSchedule(scheduleEntry.schedule_id);
-          } catch (e) {
-            console.log('[Students] Error deleting schedule:', e);
-          }
-        }
-        
+        const schedulesToImport: any[] = [];
         for (const subj of studentSubjects) {
           if (subj.subject_name) {
             let subjectId = subjects.find(s => 
@@ -273,13 +264,18 @@ export default function Students() {
               subjectId = newSubject.subject_id;
             }
             
-            await db.createSchedule({
+            schedulesToImport.push({
               student_id: editingStudent.student_id,
               subject_id: subjectId,
               weekday_id: subj.weekday_id,
               slot_id: subj.slot_id
             });
           }
+        }
+        
+        // Use importSchedule to update existing schedules and add new ones
+        if (schedulesToImport.length > 0) {
+          await db.importSchedule(schedulesToImport);
         }
         
         showToast('تم تحديث الطالب والمواد بنجاح');
@@ -478,13 +474,6 @@ export default function Students() {
                           title="تعديل"
                         >
                           <Edit3 className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(student.student_id)}
-                          className="p-2 rounded-lg hover:bg-brand-danger/10 text-brand-danger transition-all"
-                          title="حذف"
-                        >
-                          <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
                     </td>
