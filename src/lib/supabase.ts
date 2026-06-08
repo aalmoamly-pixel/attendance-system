@@ -1063,41 +1063,76 @@ export const db = {
     if (schedules.length === 0) return;
     
     if (supabase) {
-      // Get unique student IDs to delete their existing schedules
-      const studentIds = [...new Set(schedules.map(s => s.student_id))];
-      
-      // Delete existing schedules for these students
-      if (studentIds.length > 0) {
-        const { error: deleteError } = await supabase
-          .from('student_schedule')
-          .delete()
-          .in('student_id', studentIds);
-        if (deleteError) {
-          console.error('[Schedules] Delete old schedules error:', deleteError);
-          throw deleteError;
-        }
+      // Get all existing schedules
+      const { data: existingSchedules, error: fetchError } = await supabase
+        .from('student_schedule')
+        .select('*');
+      if (fetchError) {
+        console.error('[Schedules] Fetch existing schedules error:', fetchError);
+        throw fetchError;
       }
       
-      // Insert new schedules
-      const { error } = await supabase.from('student_schedule').insert(schedules);
-      if (error) {
-        console.error('[Schedules] Insert new schedules error:', error);
-        throw error;
+      // Create a map to check for existing schedules
+      const existingMap = new Map<string, number>();
+      existingSchedules?.forEach(s => {
+        const key = `${s.student_id}-${s.subject_id}-${s.weekday_id}-${s.slot_id}`;
+        existingMap.set(key, s.schedule_id);
+      });
+      
+      // Split into updates and inserts
+      for (const schedule of schedules) {
+        const key = `${schedule.student_id}-${schedule.subject_id}-${schedule.weekday_id}-${schedule.slot_id}`;
+        const existingId = existingMap.get(key);
+        
+        if (existingId) {
+          // Update existing schedule
+          const { error: updateError } = await supabase
+            .from('student_schedule')
+            .update(schedule)
+            .eq('schedule_id', existingId);
+          if (updateError) {
+            console.warn('[Schedules] Update schedule warning:', updateError);
+          }
+        } else {
+          // Insert new schedule
+          const { error: insertError } = await supabase
+            .from('student_schedule')
+            .insert(schedule);
+          if (insertError) {
+            console.warn('[Schedules] Insert schedule warning:', insertError);
+          }
+        }
       }
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
-      const studentIds = [...new Set(schedules.map(s => s.student_id))];
       
-      // Remove existing schedules for these students
-      const filtered = existing.filter((s: any) => !studentIds.includes(s.student_id));
-      
-      let nextId = filtered.length > 0 ? Math.max(...filtered.map((s: any) => s.schedule_id)) + 1 : 1;
-      
-      // Add new schedules
-      schedules.forEach(sch => {
-        filtered.push({ ...sch, schedule_id: nextId++ });
+      // Create a map to check for existing schedules
+      const existingMap = new Map<string, number>();
+      existing.forEach((s: any) => {
+        const key = `${s.student_id}-${s.subject_id}-${s.weekday_id}-${s.slot_id}`;
+        existingMap.set(key, s.schedule_id);
       });
-      localStorage.setItem(LOCAL_KEYS.SCHEDULES, JSON.stringify(filtered));
+      
+      let nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.schedule_id)) + 1 : 1;
+      
+      // Process each schedule
+      for (const schedule of schedules) {
+        const key = `${schedule.student_id}-${schedule.subject_id}-${schedule.weekday_id}-${schedule.slot_id}`;
+        const existingId = existingMap.get(key);
+        
+        if (existingId) {
+          // Update existing schedule
+          const index = existing.findIndex((s: any) => s.schedule_id === existingId);
+          if (index !== -1) {
+            existing[index] = { ...existing[index], ...schedule };
+          }
+        } else {
+          // Insert new schedule
+          existing.push({ ...schedule, schedule_id: nextId++ });
+        }
+      }
+      
+      localStorage.setItem(LOCAL_KEYS.SCHEDULES, JSON.stringify(existing));
     }
   },
 

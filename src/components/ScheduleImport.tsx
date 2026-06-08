@@ -91,7 +91,6 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
       // Find studentName
       if (line.includes('الاسم') && !studentName) {
-        const parts = line.split(/[:：\t]/).map(p => p.trim());
         // Take everything after the label
         const afterLabel = line.split(/[:：\t]/)[1] || '';
         studentName = afterLabel.trim() || lines[i + 1]?.trim() || '';
