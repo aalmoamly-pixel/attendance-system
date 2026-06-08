@@ -91,7 +91,6 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
       // Find studentName
       if (line.includes('الاسم') && !studentName) {
-        // Look for name in current or next line
         const parts = line.split(/[:：\t]/).map(p => p.trim());
         studentName = parts[1] || (lines[i + 1]?.trim() || '');
         if (!/[\u0600-\u06FF]/.test(studentName)) {
@@ -136,32 +135,112 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     if (!studentProgram) studentProgram = 'دبلوم إدارة المشاريع (مشارك مهني)';
     
     console.log('Extracted student info:', { studentName, studentNationalId, studentPhone, studentAcademicId, studentProgram });
-    
-    const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-    const subjects = [
-      'مبادئ المحاسبة',
-      'مدخل إلى إدارة المشاريع',
-      'تمويل المشاريع',
-      'الجدوى والتحليل المالي للمشاريع',
-      'إدارة النطاق والوقت'
-    ];
-    
+
+    // Now let's parse the actual schedule table from OCR text!
     const rows: RawScheduleRow[] = [];
     
-    for (let i = 0; i < days.length; i++) {
-      rows.push({
-        الاسم: studentName,
-        'رقم الهوية': studentNationalId, // Now uses national ID!
-        'الرقم الأكاديمي': studentAcademicId,
-        'رقم الجوال': studentPhone, // Now uses mobile number as phone!
-        البرنامج: studentProgram,
-        المقرر: subjects[i % subjects.length],
-        اليوم: days[i],
-        'الوقت من': '16:00',
-        'الوقت إلى': '19:00'
-      });
-    }
+    // Let's look for schedule lines (looking for day names!
+    const possibleDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+    let scheduleStartIndex = -1;
     
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('اليوم') || lines[i].includes('المقرر')) {
+        scheduleStartIndex = i + 1;
+        break;
+      }
+    }
+
+    // Parse table!
+    if (scheduleStartIndex === -1) {
+      console.log('Could not find schedule start, using fallback!');
+      const fallbackDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+      const fallbackSubjects = ['مبادئ المحاسبة', 'مدخل إلى إدارة المشاريع', 'تمويل المشاريع', 'الجدوى والتحليل المالي للمشاريع', 'إدارة النطاق والوقت'];
+      for (let i = 0; i < fallbackDays.length; i++) {
+        rows.push({
+          الاسم: studentName,
+          'رقم الهوية': studentNationalId,
+          'الرقم الأكاديمي': studentAcademicId,
+          'رقم الجوال': studentPhone,
+          البرنامج: studentProgram,
+          المقرر: fallbackSubjects[i % fallbackSubjects.length],
+          اليوم: fallbackDays[i],
+          'الوقت من': '16:00',
+          'الوقت إلى': '19:00'
+        });
+      }
+    } else {
+      // Try to parse each row by row!
+      for (let i = scheduleStartIndex; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        let day = '';
+        let subject = '';
+        let timeFrom = '';
+        let timeTo = '';
+        
+        // Find day!
+        for (const d of possibleDays) {
+          if (line.includes(d)) {
+            day = d;
+            break;
+          }
+        }
+        
+        if (day) {
+          // Try to extract other fields!
+          // Let's split the line into parts!
+          const parts = line.split(/\s+/);
+          
+          for (const part of parts) {
+            if (/[\u0600-\u06FF]/.test(part) && !day.includes(part) && part.length > 3) {
+              subject = part;
+            }
+            if (part.match(/\d{1,2}[:：]\d{2}/)) {
+              if (!timeFrom) timeFrom = part;
+              else timeTo = part;
+            }
+          }
+          
+          // Fill defaults!
+          if (!subject) subject = 'مقرر ' + (rows.length + 1);
+          if (!timeFrom) timeFrom = '16:00';
+          if (!timeTo) timeTo = '19:00';
+          
+          rows.push({
+            الاسم: studentName,
+            'رقم الهوية': studentNationalId,
+            'الرقم الأكاديمي': studentAcademicId,
+            'رقم الجوال': studentPhone,
+            البرنامج: studentProgram,
+            المقرر: subject,
+            اليوم: day,
+            'الوقت من': timeFrom,
+            'الوقت إلى': timeTo
+          });
+        }
+      }
+
+      if (rows.length === 0) {
+        // Fallback again!
+        const fallbackDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+        const fallbackSubjects = ['مبادئ المحاسبة', 'مدخل إلى إدارة المشاريع', 'تمويل المشاريع', 'الجدوى والتحليل المالي للمشاريع', 'إدارة النطاق والوقت'];
+        for (let i = 0; i < fallbackDays.length; i++) {
+          rows.push({
+            الاسم: studentName,
+            'رقم الهوية': studentNationalId,
+            'الرقم الأكاديمي': studentAcademicId,
+            'رقم الجوال': studentPhone,
+            البرنامج: studentProgram,
+            المقرر: fallbackSubjects[i % fallbackSubjects.length],
+            اليوم: fallbackDays[i],
+            'الوقت من': '16:00',
+            'الوقت إلى': '19:00'
+          });
+        }
+      }
+    }
+
     console.log('Generated rows:', rows);
     return rows;
   };
