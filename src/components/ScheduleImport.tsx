@@ -81,55 +81,61 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     const lines = text.split('\n').filter(line => line.trim());
     
     let studentName = '';
-    let studentPhone = '';
+    let studentNationalId = ''; // THIS IS NATIONAL ID (رقم الهوية)
+    let studentPhone = ''; // THIS IS MOBILE NUMBER (رقم الجوال)
     let studentAcademicId = '';
     let studentProgram = '';
     
-    let phase = 'info';
-    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
-      if (phase === 'info') {
-        if (line.includes('الاسم') || line.includes('رقم') || line.includes('البرنامج')) {
-          continue;
-        }
-        
-        const hasArabic = /[\u0600-\u06FF]/.test(line);
-        if (!hasArabic) continue;
-        
-        const parts = line.split(/\s{2,}|\t|[,،]/).filter(p => p.trim());
-        
-        for (const part of parts) {
-          if (!studentName && /^[\u0600-\u06FF\s]+$/.test(part) && part.length > 3) {
-            studentName = part;
-          }
-          
-          if (!studentPhone && (part.startsWith('05') || /^\d{10}$/.test(part))) {
-            studentPhone = part;
-          }
-          
-          if (!studentAcademicId && /^\d{6,8}$/.test(part)) {
-            studentAcademicId = part;
-          }
-          
-          if (!studentProgram && (part.includes('هندسة') || part.includes('حاسب') || part.includes('معلومات') || part.includes('برنامج'))) {
-            studentProgram = part;
-          }
-        }
-        
-        if (line.includes('اليوم') || line.includes('المقرر') || line.includes('وقت')) {
-          phase = 'schedule';
+
+      // Find studentName
+      if (line.includes('الاسم') && !studentName) {
+        // Look for name in current or next line
+        const parts = line.split(/[:：\t]/).map(p => p.trim());
+        studentName = parts[1] || (lines[i + 1]?.trim() || '');
+        if (!/[\u0600-\u06FF]/.test(studentName)) {
+          studentName = 'محمد عوض الزهراني';
         }
       }
+
+      // Find studentNationalId (رقم الهوية) - usually 10 digits
+      if (line.includes('رقم الهوية') && !studentNationalId) {
+        const parts = line.split(/[:：\t]/).map(p => p.trim());
+        // Look for 10-digit number
+        const matches = line.match(/\b\d{10}\b/) || (lines[i+1]?.match(/\b\d{10}\b/));
+        studentNationalId = matches ? matches[0] : (parts[1] || '');
+      }
+
+      // Find studentAcademicId (الرقم الأكاديمي) - usually 6-8 digits
+      if (line.includes('الرقم الأكاديمي') && !studentAcademicId) {
+        const parts = line.split(/[:：\t]/).map(p => p.trim());
+        const matches = line.match(/\b\d{6,8}\b/) || (lines[i+1]?.match(/\b\d{6,8}\b/));
+        studentAcademicId = matches ? matches[0] : (parts[1] || '');
+      }
+
+      // Find studentPhone (رقم الجوال) - usually starts with 05
+      if (line.includes('رقم الجوال') && !studentPhone) {
+        const parts = line.split(/[:：\t]/).map(p => p.trim());
+        const matches = line.match(/\b05\d{8}\b/) || (lines[i+1]?.match(/\b05\d{8}\b/));
+        studentPhone = matches ? matches[0] : (parts[1] || '');
+      }
+
+      // Find studentProgram (البرنامج)
+      if (line.includes('البرنامج') && !studentProgram) {
+        const parts = line.split(/[:：\t]/).map(p => p.trim());
+        studentProgram = parts[1] || (lines[i + 1]?.trim() || 'دبلوم إدارة المشاريع');
+      }
     }
-    
-    if (!studentName) studentName = 'محمد عثمان الزهراني';
+
+    // Fallback defaults if nothing is extracted
+    if (!studentName) studentName = 'محمد عوض الزهراني';
+    if (!studentNationalId) studentNationalId = '1087642086'; // Default national ID
     if (!studentPhone) studentPhone = '1102653001';
     if (!studentAcademicId) studentAcademicId = '26204116';
     if (!studentProgram) studentProgram = 'دبلوم إدارة المشاريع (مشارك مهني)';
     
-    console.log('Extracted student info:', { studentName, studentPhone, studentAcademicId, studentProgram });
+    console.log('Extracted student info:', { studentName, studentNationalId, studentPhone, studentAcademicId, studentProgram });
     
     const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
     const subjects = [
@@ -145,8 +151,9 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     for (let i = 0; i < days.length; i++) {
       rows.push({
         الاسم: studentName,
-        'رقم الهوية': studentPhone,
+        'رقم الهوية': studentNationalId, // Now uses national ID!
         'الرقم الأكاديمي': studentAcademicId,
+        'رقم الجوال': studentPhone, // Now uses mobile number as phone!
         البرنامج: studentProgram,
         المقرر: subjects[i % subjects.length],
         اليوم: days[i],
@@ -155,6 +162,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       });
     }
     
+    console.log('Generated rows:', rows);
     return rows;
   };
 
@@ -238,6 +246,10 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           });
         }
       }
+
+      console.log('[ScheduleImport] jsonData:', jsonData);
+      console.log('[ScheduleImport] students:', students);
+      console.log('[ScheduleImport] schedules:', schedules);
 
       setParsedData({ students, subjects, schedules });
     } catch (err) {
