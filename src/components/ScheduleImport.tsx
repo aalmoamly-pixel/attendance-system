@@ -76,9 +76,12 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
   };
 
   const parseTextToRows = (text: string): RawScheduleRow[] => {
-    console.log('Raw OCR Text:', text);
+    console.log('========== RAW OCR TEXT ==========');
+    console.log(text);
+    console.log('===================================');
     
-    const lines = text.split('\n').filter(line => line.trim());
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    console.log('Split into lines:', lines);
     
     let studentName = '';
     let studentNationalId = '';
@@ -86,119 +89,174 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     let studentAcademicId = '';
     let studentProgram = '';
     
+    // First pass: extract all student info
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+      const line = lines[i];
+      console.log(`[Pass 1] Line ${i}:`, line);
 
       // Find studentName
-      if (line.includes('الاسم') && !studentName) {
-        const afterLabel = line.split(/[:：\t]/)[1] || '';
-        studentName = afterLabel.trim() || '';
-        if (studentName.length < 3 && lines[i + 1]) {
-          for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
-            const nextLine = lines[j].trim();
-            if (/[\u0600-\u06FF]/.test(nextLine) && !nextLine.includes('رقم') && !nextLine.includes('برنامج') && !nextLine.includes('مقرر') && !nextLine.includes('اليوم')) {
+      if ((line.includes('الاسم') || line.includes('اسم الطالب')) && !studentName) {
+        const afterLabel = line.split(/[:：\t]/)[1]?.trim() || '';
+        studentName = afterLabel;
+        
+        // Check next few lines for name
+        if (studentName.length < 3 || !/[\u0600-\u06FF]/.test(studentName)) {
+          for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+            const nextLine = lines[j];
+            if (/[\u0600-\u06FF]/.test(nextLine) && 
+                !nextLine.includes('رقم') && 
+                !nextLine.includes('برنامج') && 
+                !nextLine.includes('مقرر') && 
+                !nextLine.includes('اليوم') &&
+                !nextLine.includes('قسم') &&
+                !nextLine.includes('تخصص') &&
+                !/^\d+$/.test(nextLine)) {
               studentName += (studentName ? ' ' : '') + nextLine;
-              // Stop if we have a reasonable name
-              if (studentName.length > 5) break;
+              if (studentName.length > 6) break;
             }
           }
         }
         studentName = studentName.trim();
+        console.log('Extracted studentName:', studentName);
       }
 
-      // Find studentNationalId (رقم الهوية) - usually 10 digits
-      if ((line.includes('رقم الهوية') || line.includes('الهوية')) && !studentNationalId) {
-        const matches = line.match(/\b\d{10}\b/) || (lines[i+1]?.match(/\b\d{10}\b/)) || (lines[i-1]?.match(/\b\d{10}\b/));
-        studentNationalId = matches ? matches[0] : '';
+      // Find studentNationalId (any 10-digit number)
+      if (!studentNationalId) {
+        const matches = line.match(/\b\d{10}\b/);
+        if (matches) {
+          studentNationalId = matches[0];
+          console.log('Extracted studentNationalId (from current line):', studentNationalId);
+        }
       }
 
-      // Find studentAcademicId (الرقم الأكاديمي) - usually 6-9 digits
-      if ((line.includes('الرقم الأكاديمي') || line.includes('رقم جامعي') || line.includes('رقم طالب')) && !studentAcademicId) {
-        const matches = line.match(/\b\d{6,9}\b/) || (lines[i+1]?.match(/\b\d{6,9}\b/)) || (lines[i-1]?.match(/\b\d{6,9}\b/));
-        studentAcademicId = matches ? matches[0] : '';
+      // Find studentAcademicId (6-10-digit number)
+      if (!studentAcademicId) {
+        const matches = line.match(/\b\d{6,10}\b/);
+        if (matches && matches[0] !== studentNationalId) {
+          studentAcademicId = matches[0];
+          console.log('Extracted studentAcademicId (from current line):', studentAcademicId);
+        }
       }
 
-      // Find studentPhone (رقم الجوال)
-      if ((line.includes('رقم الجوال') || line.includes('جوال')) && !studentPhone) {
-        const matches = line.match(/\b05\d{8}\b/) || (lines[i+1]?.match(/\b05\d{8}\b/)) || (lines[i-1]?.match(/\b05\d{8}\b/));
-        studentPhone = matches ? matches[0] : '';
+      // Find studentPhone (05 followed by 8 digits)
+      if (!studentPhone) {
+        const matches = line.match(/\b05\d{8}\b/);
+        if (matches) {
+          studentPhone = matches[0];
+          console.log('Extracted studentPhone (from current line):', studentPhone);
+        }
       }
 
-      // Find studentProgram (البرنامج / التخصص)
+      // Find studentProgram
       if ((line.includes('البرنامج') || line.includes('التخصص') || line.includes('قسم')) && !studentProgram) {
-        const afterLabel = line.split(/[:：\t]/)[1] || '';
-        studentProgram = afterLabel.trim() || '';
-        if (studentProgram.length < 3 && lines[i + 1]) {
-          for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
-            const nextLine = lines[j].trim();
-            if (/[\u0600-\u06FF]/.test(nextLine) && !nextLine.includes('رقم') && !nextLine.includes('مقرر') && !nextLine.includes('اليوم')) {
+        const afterLabel = line.split(/[:：\t]/)[1]?.trim() || '';
+        studentProgram = afterLabel;
+        
+        if (studentProgram.length < 3 || !/[\u0600-\u06FF]/.test(studentProgram)) {
+          for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+            const nextLine = lines[j];
+            if (/[\u0600-\u06FF]/.test(nextLine) && 
+                !nextLine.includes('رقم') && 
+                !nextLine.includes('مقرر') && 
+                !nextLine.includes('اليوم') &&
+                !/^\d+$/.test(nextLine)) {
               studentProgram += (studentProgram ? ' ' : '') + nextLine;
-              if (studentProgram.length > 5) break;
+              if (studentProgram.length > 8) break;
             }
           }
         }
         studentProgram = studentProgram.trim();
+        console.log('Extracted studentProgram:', studentProgram);
       }
     }
     
-    console.log('Extracted student info:', { studentName, studentNationalId, studentPhone, studentAcademicId, studentProgram });
+    // Second pass: if we still don't have student info, look more broadly
+    if (!studentNationalId || !studentAcademicId) {
+      console.log('Second pass for student info...');
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!studentNationalId) {
+          const matches = line.match(/\b\d{10}\b/);
+          if (matches) {
+            studentNationalId = matches[0];
+            console.log('Second pass: studentNationalId:', studentNationalId);
+          }
+        }
+        if (!studentAcademicId) {
+          const matches = line.match(/\b\d{6,10}\b/);
+          if (matches && matches[0] !== studentNationalId) {
+            studentAcademicId = matches[0];
+            console.log('Second pass: studentAcademicId:', studentAcademicId);
+          }
+        }
+        if (!studentName && /[\u0600-\u06FF]/.test(line) && !/^\d+$/.test(line) && line.length > 3 && !line.includes('رقم') && !line.includes('برنامج') && !line.includes('مقرر') && !line.includes('اليوم') && !line.includes('قسم')) {
+          studentName = line;
+          console.log('Second pass: studentName:', studentName);
+        }
+      }
+    }
+    
+    console.log('Final student info:', { studentName, studentNationalId, studentPhone, studentAcademicId, studentProgram });
 
-    // Now parse actual schedule table from OCR text!
+    // Now parse the schedule
     const rows: RawScheduleRow[] = [];
-    
     const possibleDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    let scheduleStartIndex = -1;
     
+    console.log('========== PARSING SCHEDULE ==========');
+    
+    // Find any line that has a day name
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes('اليوم') || lines[i].includes('المقرر') || lines[i].includes('المادة')) {
-        scheduleStartIndex = i + 1;
-        break;
+      const line = lines[i];
+      console.log(`[Schedule parsing] Line ${i}:`, line);
+      
+      let day = '';
+      let subject = '';
+      let timeFrom = '';
+      let timeTo = '';
+      
+      // Check if this line contains any day name
+      for (const d of possibleDays) {
+        if (line.includes(d)) {
+          day = d;
+          console.log(`  Found day: ${day}`);
+          break;
+        }
       }
-    }
-
-    // Parse table!
-    if (scheduleStartIndex !== -1) {
-      for (let i = scheduleStartIndex; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
+      
+      // Even if no day found, check if it has times or looks like a schedule line
+      const hasTime = /\d{1,2}[:：]\d{2}/.test(line);
+      
+      if (day || hasTime) {
+        // Split into parts
+        const parts = line.split(/\s+/);
+        const arabicParts: string[] = [];
         
-        let day = '';
-        let subject = '';
-        let timeFrom = '';
-        let timeTo = '';
-        
-        // Find day!
-        for (const d of possibleDays) {
-          if (line.includes(d)) {
-            day = d;
-            break;
+        for (const part of parts) {
+          // Collect Arabic text (subject name)
+          if (/[\u0600-\u06FF]/.test(part) && !possibleDays.some(d => part.includes(d))) {
+            arabicParts.push(part);
+          }
+          
+          // Extract time
+          const timeMatch = part.match(/\d{1,2}[:：]\d{2}/);
+          if (timeMatch) {
+            const cleanTime = timeMatch[0].replace(/[：]/g, ':');
+            if (!timeFrom) {
+              timeFrom = cleanTime;
+              console.log(`  Found timeFrom: ${timeFrom}`);
+            } else {
+              timeTo = cleanTime;
+              console.log(`  Found timeTo: ${timeTo}`);
+            }
           }
         }
         
-        if (day) {
-          // Extract subject (all Arabic parts except day)
-          const parts = line.split(/\s+/);
-          const arabicParts: string[] = [];
-          
-          for (const part of parts) {
-            if (/[\u0600-\u06FF]/.test(part) && !day.includes(part)) {
-              arabicParts.push(part);
-            }
-            // Extract time
-            if (part.match(/\d{1,2}[:：]\d{2}/)) {
-              const cleanTime = part.replace(/[：]/g, ':');
-              if (!timeFrom) {
-                timeFrom = cleanTime;
-              } else {
-                timeTo = cleanTime;
-              }
-            }
-          }
-          
-          subject = arabicParts.join(' ').trim();
-          
-          // Only add row if we at least have day
-          rows.push({
+        subject = arabicParts.join(' ').trim();
+        
+        // If we don't have day yet but we have subject/time, maybe set a default or just add as is?
+        // For now, require at least some info
+        if (day || subject || hasTime) {
+          const row: RawScheduleRow = {
             الاسم: studentName,
             'رقم الهوية': studentNationalId,
             'الرقم الأكاديمي': studentAcademicId,
@@ -208,12 +266,32 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
             اليوم: day,
             'الوقت من': timeFrom,
             'الوقت إلى': timeTo
-          });
+          };
+          console.log('  Adding row:', row);
+          rows.push(row);
         }
       }
     }
 
-    console.log('Generated rows:', rows);
+    // If no rows found, add at least one row with student info so user can edit
+    if (rows.length === 0 && (studentName || studentAcademicId || studentNationalId)) {
+      console.log('No schedule found, adding blank row for editing');
+      rows.push({
+        الاسم: studentName,
+        'رقم الهوية': studentNationalId,
+        'الرقم الأكاديمي': studentAcademicId,
+        'رقم الجوال': studentPhone,
+        البرنامج: studentProgram,
+        المقرر: '',
+        اليوم: '',
+        'الوقت من': '',
+        'الوقت إلى': ''
+      });
+    }
+
+    console.log('========== FINAL ROWS ==========');
+    console.log(rows);
+    console.log('=================================');
     return rows;
   };
 
