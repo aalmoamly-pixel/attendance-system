@@ -574,12 +574,29 @@ export const db = {
   async importDepartments(depts: Omit<Department, 'department_id'>[]): Promise<Map<string, number>> {
     const mapping = new Map<string, number>();
     if (supabase) {
-      const { data, error } = await supabase.from('departments').insert(depts).select('*');
-      if (error) {
-        console.error('[Departments] Import error:', error);
-        throw error;
+      // First get all existing departments
+      const { data: existingDepts } = await supabase.from('departments').select('*');
+      const existingMap = new Map((existingDepts || []).map(d => [d.department_name, d]));
+
+      // Separate new and existing depts
+      const newDepts: Omit<Department, 'department_id'>[] = [];
+      depts.forEach(dept => {
+        const existing = existingMap.get(dept.department_name);
+        if (existing) {
+          mapping.set(dept.department_name, existing.department_id);
+        } else {
+          newDepts.push(dept);
+        }
+      });
+
+      // Insert only new depts
+      if (newDepts.length > 0) {
+        const { data, error } = await supabase.from('departments').insert(newDepts).select('*');
+        if (error) {
+          console.error('[Departments] Import error:', error);
+        }
+        (data || []).forEach(d => mapping.set(d.department_name, d.department_id));
       }
-      (data || []).forEach(d => mapping.set(d.department_name, d.department_id));
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.DEPARTMENTS) || '[]');
       let nextId = existing.length > 0 ? Math.max(...existing.map((d: any) => d.department_id)) + 1 : 1;
@@ -738,12 +755,12 @@ export const db = {
         if (existing) {
           const existingStudent = existing as Student;
           console.log('[importStudents] Found existing student:', existingStudent);
-          // Update existing student, but don't overwrite academic_id if not needed!
+          // Update existing student with ALL data from file (file is primary source!)
           const updateData: any = {
             full_name: stu.full_name,
             phone: stu.phone,
+            academic_id: stu.academic_id,
             department_id: stu.department_id
-            // Don't update academic_id unless we have to!
           };
           if (stu.password) {
             updateData.password = stu.password;
@@ -756,7 +773,7 @@ export const db = {
           if (error) {
             console.warn('[importStudents] Update failed, but continuing:', error);
           }
-          mapping.set(stu.national_id, existingStudent.student_id); // Use existing student_id no matter what!
+          mapping.set(stu.national_id, existingStudent.student_id);
         } else {
           // Insert new student
           console.log('[importStudents] Inserting new student');
@@ -926,12 +943,29 @@ export const db = {
   async importSubjects(subjects: Omit<Subject, 'subject_id' | 'created_at'>[]): Promise<Map<string, number>> {
     const mapping = new Map<string, number>();
     if (supabase) {
-      const { data, error } = await supabase.from('subjects').insert(subjects).select('*');
-      if (error) {
-        console.error('[Subjects] Import error:', error);
-        throw error;
+      // First get all existing subjects
+      const { data: existingSubjects } = await supabase.from('subjects').select('*');
+      const existingMap = new Map((existingSubjects || []).map(s => [s.subject_name, s]));
+
+      // Separate new and existing subjects
+      const newSubjects: Omit<Subject, 'subject_id' | 'created_at'>[] = [];
+      subjects.forEach(sub => {
+        const existing = existingMap.get(sub.subject_name);
+        if (existing) {
+          mapping.set(sub.subject_name, existing.subject_id);
+        } else {
+          newSubjects.push(sub);
+        }
+      });
+
+      // Insert only new subjects
+      if (newSubjects.length > 0) {
+        const { data, error } = await supabase.from('subjects').insert(newSubjects).select('*');
+        if (error) {
+          console.error('[Subjects] Import error:', error);
+        }
+        (data || []).forEach(s => mapping.set(s.subject_name, s.subject_id));
       }
-      (data || []).forEach(s => mapping.set(s.subject_name, s.subject_id));
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]');
       let nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.subject_id)) + 1 : 1;
