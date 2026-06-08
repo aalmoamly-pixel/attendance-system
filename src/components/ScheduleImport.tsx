@@ -224,21 +224,25 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     
     console.log('========== PARSING SCHEDULE ==========');
     
-    // First, find the schedule start - look for any line with day OR time OR subject-like text
+    // First pass: collect all schedule-related info
+    let currentDay = '';
+    let currentSubject = '';
+    let currentTimeFrom = '';
+    let currentTimeTo = '';
+    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       console.log(`[Schedule parsing] Line ${i}:`, line);
       
-      let day = '';
-      let subject = '';
-      let timeFrom = '';
-      let timeTo = '';
+      let dayFound = '';
+      let subjectFound = '';
+      let timesFound: string[] = [];
       
       // Check if this line contains any day name
       for (const d of possibleDays) {
         if (line.includes(d)) {
-          day = d;
-          console.log(`  Found day: ${day}`);
+          dayFound = d;
+          console.log(`  Found day: ${dayFound}`);
           break;
         }
       }
@@ -246,10 +250,8 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       // Find all times in this line
       const timeMatches = line.match(/\d{1,2}[:：]\d{2}/g);
       if (timeMatches) {
-        const cleanTimes = timeMatches.map(t => t.replace(/[：]/g, ':'));
-        if (cleanTimes.length >= 1) timeFrom = cleanTimes[0];
-        if (cleanTimes.length >= 2) timeTo = cleanTimes[1];
-        console.log(`  Found times:`, cleanTimes);
+        timesFound = timeMatches.map(t => t.replace(/[：]/g, ':'));
+        console.log(`  Found times:`, timesFound);
       }
       
       // Extract subject: collect Arabic text that's NOT a day name
@@ -260,24 +262,64 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           arabicParts.push(part);
         }
       }
-      subject = arabicParts.join(' ').trim();
-      console.log(`  Found subject:`, subject);
+      subjectFound = arabicParts.join(' ').trim();
+      if (subjectFound) console.log(`  Found subject:`, subjectFound);
       
-      // If we have ANY of these, add the row
-      if (day || subject || timeFrom || timeTo) {
+      // Update current values
+      if (dayFound) currentDay = dayFound;
+      if (subjectFound) currentSubject = subjectFound;
+      if (timesFound.length >= 1) currentTimeFrom = timesFound[0];
+      if (timesFound.length >= 2) currentTimeTo = timesFound[1];
+      
+      // If we have enough info, create a row
+      if (currentDay && (currentSubject || currentTimeFrom || currentTimeTo)) {
         const row: RawScheduleRow = {
           الاسم: studentName,
           'رقم الهوية': studentNationalId,
           'الرقم الأكاديمي': studentAcademicId,
           'رقم الجوال': studentPhone,
           البرنامج: studentProgram,
-          المقرر: subject,
-          اليوم: day,
-          'الوقت من': timeFrom,
-          'الوقت إلى': timeTo
+          المقرر: currentSubject,
+          اليوم: currentDay,
+          'الوقت من': currentTimeFrom,
+          'الوقت إلى': currentTimeTo
         };
-        console.log('  Adding row:', row);
-        rows.push(row);
+        // Check if this row is already added (avoid duplicates)
+        const isDuplicate = rows.some(r => 
+          r.اليوم === row.اليوم && 
+          r.المقرر === row.المقرر && 
+          r['الوقت من'] === row['الوقت من'] && 
+          r['الوقت إلى'] === row['الوقت إلى']
+        );
+        if (!isDuplicate) {
+          console.log('  Adding row:', row);
+          rows.push(row);
+        } else {
+          console.log('  Skipping duplicate row');
+        }
+      } else if (currentSubject || currentTimeFrom || currentTimeTo) {
+        // Even without day, add the row if we have other info
+        const row: RawScheduleRow = {
+          الاسم: studentName,
+          'رقم الهوية': studentNationalId,
+          'الرقم الأكاديمي': studentAcademicId,
+          'رقم الجوال': studentPhone,
+          البرنامج: studentProgram,
+          المقرر: currentSubject,
+          اليوم: currentDay,
+          'الوقت من': currentTimeFrom,
+          'الوقت إلى': currentTimeTo
+        };
+        const isDuplicate = rows.some(r => 
+          r.اليوم === row.اليوم && 
+          r.المقرر === row.المقرر && 
+          r['الوقت من'] === row['الوقت من'] && 
+          r['الوقت إلى'] === row['الوقت إلى']
+        );
+        if (!isDuplicate) {
+          console.log('  Adding partial row:', row);
+          rows.push(row);
+        }
       }
     }
 
