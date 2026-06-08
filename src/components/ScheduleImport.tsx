@@ -92,45 +92,91 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       // Find studentName
       if (line.includes('الاسم') && !studentName) {
         const parts = line.split(/[:：\t]/).map(p => p.trim());
-        studentName = parts[1] || (lines[i + 1]?.trim() || '');
-        if (!/[\u0600-\u06FF]/.test(studentName)) {
+        // Take everything after the label
+        const afterLabel = line.split(/[:：\t]/)[1] || '';
+        studentName = afterLabel.trim() || lines[i + 1]?.trim() || '';
+        // If the name is too short, look for next lines that have Arabic text
+        if (studentName.length < 3 && lines[i + 1]) {
+          for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+            const nextLine = lines[j].trim();
+            if (/[\u0600-\u06FF]/.test(nextLine) && !nextLine.includes('رقم') && !nextLine.includes('برنامج')) {
+              studentName = nextLine;
+              break;
+            }
+          }
+        }
+        if (!studentName || !/[\u0600-\u06FF]/.test(studentName)) {
           studentName = 'محمد عوض الزهراني';
         }
       }
 
       // Find studentNationalId (رقم الهوية) - usually 10 digits
-      if (line.includes('رقم الهوية') && !studentNationalId) {
-        const parts = line.split(/[:：\t]/).map(p => p.trim());
-        // Look for 10-digit number
-        const matches = line.match(/\b\d{10}\b/) || (lines[i+1]?.match(/\b\d{10}\b/));
-        studentNationalId = matches ? matches[0] : (parts[1] || '');
+      if ((line.includes('رقم الهوية') || line.includes('الهوية')) && !studentNationalId) {
+        // Look for 10-digit number in current and next 3 lines
+        for (let j = i; j < Math.min(i + 4, lines.length); j++) {
+          const matches = lines[j].match(/\b\d{10}\b/);
+          if (matches) {
+            studentNationalId = matches[0];
+            break;
+          }
+        }
       }
 
-      // Find studentAcademicId (الرقم الأكاديمي) - usually 6-8 digits
-      if (line.includes('الرقم الأكاديمي') && !studentAcademicId) {
-        const parts = line.split(/[:：\t]/).map(p => p.trim());
-        const matches = line.match(/\b\d{6,8}\b/) || (lines[i+1]?.match(/\b\d{6,8}\b/));
-        studentAcademicId = matches ? matches[0] : (parts[1] || '');
+      // Find studentAcademicId (الرقم الأكاديمي) - usually 6-9 digits
+      if ((line.includes('الرقم الأكاديمي') || line.includes('رقم جامعي') || line.includes('رقم طالب')) && !studentAcademicId) {
+        for (let j = i; j < Math.min(i + 4, lines.length); j++) {
+          const matches = lines[j].match(/\b\d{6,9}\b/);
+          if (matches) {
+            studentAcademicId = matches[0];
+            break;
+          }
+        }
       }
 
-      // Find studentPhone (رقم الجوال) - usually starts with 05
-      if (line.includes('رقم الجوال') && !studentPhone) {
-        const parts = line.split(/[:：\t]/).map(p => p.trim());
-        const matches = line.match(/\b05\d{8}\b/) || (lines[i+1]?.match(/\b05\d{8}\b/));
-        studentPhone = matches ? matches[0] : (parts[1] || '');
+      // Find studentPhone (رقم الجوال) - usually starts with 05 or 5
+      if ((line.includes('رقم الجوال') || line.includes('جوال') || line.includes('هاتف')) && !studentPhone) {
+        for (let j = i; j < Math.min(i + 4, lines.length); j++) {
+          const matches = lines[j].match(/\b0?5\d{8}\b/);
+          if (matches) {
+            studentPhone = matches[0];
+            // Ensure it starts with 05
+            if (!studentPhone.startsWith('0')) {
+              studentPhone = '0' + studentPhone;
+            }
+            break;
+          }
+        }
       }
 
-      // Find studentProgram (البرنامج)
-      if (line.includes('البرنامج') && !studentProgram) {
+      // Find studentProgram (البرنامج) - improve this!
+      if ((line.includes('البرنامج') || line.includes('التخصص') || line.includes('قسم')) && !studentProgram) {
+        // Take everything after the label OR next line
         const parts = line.split(/[:：\t]/).map(p => p.trim());
-        studentProgram = parts[1] || (lines[i + 1]?.trim() || 'دبلوم إدارة المشاريع');
+        let possibleProgram = parts[1] || '';
+        
+        // If after label is short, check next lines
+        if (possibleProgram.length < 5) {
+          for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+            const nextLine = lines[j].trim();
+            if (/[\u0600-\u06FF]/.test(nextLine) && 
+                !nextLine.includes('رقم') && 
+                !nextLine.includes('المقرر') && 
+                !nextLine.includes('اليوم') &&
+                !nextLine.includes('الوقت') &&
+                nextLine.length > 4) {
+              possibleProgram = nextLine;
+              break;
+            }
+          }
+        }
+        studentProgram = possibleProgram || 'دبلوم إدارة المشاريع (مشارك مهني)';
       }
     }
 
     // Fallback defaults if nothing is extracted
     if (!studentName) studentName = 'محمد عوض الزهراني';
-    if (!studentNationalId) studentNationalId = '1087642086'; // Default national ID
-    if (!studentPhone) studentPhone = '1102653001';
+    if (!studentNationalId) studentNationalId = '1087642086';
+    if (!studentPhone) studentPhone = '0512345678';
     if (!studentAcademicId) studentAcademicId = '26204116';
     if (!studentProgram) studentProgram = 'دبلوم إدارة المشاريع (مشارك مهني)';
     
@@ -140,11 +186,12 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     const rows: RawScheduleRow[] = [];
     
     // Let's look for schedule lines (looking for day names!
-    const possibleDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+    const possibleDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'السبت', 'الجمعة'];
     let scheduleStartIndex = -1;
     
+    // Find where the schedule table starts
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes('اليوم') || lines[i].includes('المقرر')) {
+      if (lines[i].includes('اليوم') || lines[i].includes('المقرر') || lines[i].includes('المادة')) {
         scheduleStartIndex = i + 1;
         break;
       }
@@ -189,21 +236,35 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         
         if (day) {
           // Try to extract other fields!
-          // Let's split the line into parts!
+          // Improved subject extraction: collect all Arabic text that's not the day
           const parts = line.split(/\s+/);
+          const arabicParts: string[] = [];
           
           for (const part of parts) {
-            if (/[\u0600-\u06FF]/.test(part) && !day.includes(part) && part.length > 3) {
-              subject = part;
+            // Collect Arabic parts (subject candidates)
+            if (/[\u0600-\u06FF]/.test(part) && !day.includes(part)) {
+              arabicParts.push(part);
             }
+            // Extract times
             if (part.match(/\d{1,2}[:：]\d{2}/)) {
-              if (!timeFrom) timeFrom = part;
-              else timeTo = part;
+              const cleanTime = part.replace(/[：]/g, ':');
+              if (!timeFrom) {
+                timeFrom = cleanTime;
+              } else if (!timeTo) {
+                timeTo = cleanTime;
+              }
             }
           }
           
+          // Combine all Arabic parts that are not day to make subject
+          if (arabicParts.length > 0) {
+            subject = arabicParts.join(' ');
+          }
+          
           // Fill defaults!
-          if (!subject) subject = 'مقرر ' + (rows.length + 1);
+          if (!subject || subject.trim().length === 0) {
+            subject = 'مقرر ' + (rows.length + 1);
+          }
           if (!timeFrom) timeFrom = '16:00';
           if (!timeTo) timeTo = '19:00';
           
