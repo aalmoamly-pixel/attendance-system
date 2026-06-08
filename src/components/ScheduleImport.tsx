@@ -1,16 +1,18 @@
 import { useState, useRef } from 'react';
-import { 
-  UploadCloud, 
-  FileSpreadsheet, 
-  CheckCircle2, 
-  Users, 
-  BookOpen, 
-  Calendar, 
+import {
+  UploadCloud,
+  FileSpreadsheet,
+  CheckCircle2,
+  Users,
+  BookOpen,
+  Calendar,
   RefreshCw,
   Check,
   XCircle,
   X,
-  Sparkles
+  Sparkles,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Tesseract from 'tesseract.js';
@@ -30,23 +32,33 @@ interface RawScheduleRow {
   'الوقت إلى'?: string;
 }
 
+interface ParsedStudent {
+  full_name: string;
+  phone: string | null;
+  academic_id: string;
+  national_id: string;
+  password: string;
+  department_name: string;
+  isNew?: boolean; // Flag if student is new or existing
+}
+
+interface ParsedSubject {
+  subject_name: string;
+  department_name: string;
+}
+
+interface ParsedSchedule {
+  student_academic_id: string;
+  subject_name: string;
+  weekday_name: string;
+  start_time: string;
+  end_time: string;
+}
+
 interface ParsedData {
-  students: Array<{
-    full_name: string;
-    phone: string | null;
-    academic_id: string;
-    national_id: string;
-    password: string;
-    department_name: string;
-  }>;
-  subjects: Array<{ subject_name: string; department_name: string }>;
-  schedules: Array<{
-    student_academic_id: string;
-    subject_name: string;
-    weekday_name: string;
-    start_time: string;
-    end_time: string;
-  }>;
+  students: ParsedStudent[];
+  subjects: ParsedSubject[];
+  schedules: ParsedSchedule[];
 }
 
 export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: () => void }) {
@@ -172,9 +184,13 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         jsonData = XLSX.utils.sheet_to_json<RawScheduleRow>(worksheet);
       }
 
-      const students: ParsedData['students'] = [];
-      const subjects: ParsedData['subjects'] = [];
-      const schedules: ParsedData['schedules'] = [];
+      // First get existing students to check if they exist
+      const existingStudents = await db.getStudents();
+      const existingAcademicIds = new Set(existingStudents.map(s => s.academic_id));
+
+      const students: ParsedStudent[] = [];
+      const subjects: ParsedSubject[] = [];
+      const schedules: ParsedSchedule[] = [];
       const seenStudents = new Set<string>();
       const seenSubjects = new Set<string>();
 
@@ -196,7 +212,8 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
             academic_id: academicId,
             national_id: phone || `9${Math.floor(Math.random() * 900000000 + 100000000)}`,
             password: 'Aa123456',
-            department_name: departmentName
+            department_name: departmentName,
+            isNew: !existingAcademicIds.has(academicId)
           });
         }
 
@@ -225,6 +242,49 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     } finally {
       setProcessing(false);
     }
+  };
+
+  // Function to update a student in parsed data
+  const updateStudent = (index: number, field: keyof ParsedStudent, value: any) => {
+    if (!parsedData) return;
+    const updatedStudents = [...parsedData.students];
+    updatedStudents[index] = { ...updatedStudents[index], [field]: value };
+    setParsedData({ ...parsedData, students: updatedStudents });
+  };
+
+  // Function to add a student
+  const addStudent = () => {
+    if (!parsedData) return;
+    const newStudent: ParsedStudent = {
+      full_name: 'طالب جديد',
+      phone: null,
+      academic_id: `NEW_${Date.now()}`,
+      national_id: `9${Math.floor(Math.random() * 900000000 + 100000000)}`,
+      password: 'Aa123456',
+      department_name: 'عام',
+      isNew: true
+    };
+    setParsedData({ ...parsedData, students: [...parsedData.students, newStudent] });
+  };
+
+  // Function to remove a student
+  const removeStudent = (index: number) => {
+    if (!parsedData) return;
+    const studentToRemove = parsedData.students[index];
+    const updatedStudents = parsedData.students.filter((_, i) => i !== index);
+    // Also remove schedules for this student
+    const updatedSchedules = parsedData.schedules.filter(
+      s => s.student_academic_id !== studentToRemove.academic_id
+    );
+    setParsedData({ ...parsedData, students: updatedStudents, schedules: updatedSchedules });
+  };
+
+  // Function to update a schedule
+  const updateSchedule = (index: number, field: keyof ParsedSchedule, value: any) => {
+    if (!parsedData) return;
+    const updatedSchedules = [...parsedData.schedules];
+    updatedSchedules[index] = { ...updatedSchedules[index], [field]: value };
+    setParsedData({ ...parsedData, schedules: updatedSchedules });
   };
 
   const handleConfirmImport = async () => {
@@ -388,13 +448,13 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           </div>
         )}
 
-        {/* Parsed Data Preview */}
+        {/* Parsed Data Preview & Edit */}
         {parsedData && !success && (
           <div className="space-y-6">
             <div className="glass-card p-6">
               <h3 className="font-extrabold text-lg text-white mb-6 flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-brand-success" />
-                📊 ملخص البيانات المستخرجة
+                📊 معاينة و تعديل البيانات
               </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -435,34 +495,154 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
                 </div>
               </div>
 
-              {/* Sample Preview */}
-              {parsedData.students.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-sm font-bold text-white mb-3">عينة من الطلاب:</h4>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-dark-border">
-                          <th className="text-right py-2 px-2 text-dark-muted">#</th>
-                          <th className="text-right py-2 px-2 text-dark-muted">الاسم</th>
-                          <th className="text-right py-2 px-2 text-dark-muted">الرقم الأكاديمي</th>
-                          <th className="text-right py-2 px-2 text-dark-muted">التخصص</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {parsedData.students.slice(0, 5).map((student, i) => (
-                          <tr key={i} className="border-b border-dark-border/30 hover:bg-dark-bg/40">
-                            <td className="py-2 px-2 text-white">{i + 1}</td>
-                            <td className="py-2 px-2 text-white">{student.full_name}</td>
-                            <td className="py-2 px-2 text-dark-muted">{student.academic_id}</td>
-                            <td className="py-2 px-2 text-dark-muted">{student.department_name}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              {/* Students Table (Editable) */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-white">الطلاب:</h4>
+                  <button
+                    type="button"
+                    onClick={addStudent}
+                    className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-2"
+                  >
+                    <Plus className="w-3 h-3" />
+                    إضافة طالب
+                  </button>
                 </div>
-              )}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-dark-border">
+                        <th className="text-right py-2 px-2 text-dark-muted">#</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">الاسم</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">الرقم الأكاديمي</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">رقم الهوية</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">التخصص</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">حالة</th>
+                        <th className="text-center py-2 px-2 text-dark-muted">إجراء</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedData.students.map((student, i) => (
+                        <tr key={i} className="border-b border-dark-border/30 hover:bg-dark-bg/40">
+                          <td className="py-2 px-2 text-white">{i + 1}</td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={student.full_name}
+                              onChange={(e) => updateStudent(i, 'full_name', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={student.academic_id}
+                              onChange={(e) => updateStudent(i, 'academic_id', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={student.national_id}
+                              onChange={(e) => updateStudent(i, 'national_id', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={student.department_name}
+                              onChange={(e) => updateStudent(i, 'department_name', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${student.isNew ? 'bg-brand-primary/20 text-brand-primary' : 'bg-brand-success/20 text-brand-success'}`}>
+                              {student.isNew ? 'جديد' : 'موجود'}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => removeStudent(i)}
+                              className="p-1.5 rounded hover:bg-brand-danger/10 text-brand-danger"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Schedules Table (Editable) */}
+              <div className="mb-6">
+                <h4 className="text-sm font-bold text-white mb-3">الجداول الدراسية:</h4>
+                <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-dark-bg/95">
+                      <tr className="border-b border-dark-border">
+                        <th className="text-right py-2 px-2 text-dark-muted">#</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">الرقم الأكاديمي</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">المقرر</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">اليوم</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">الوقت من</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">الوقت إلى</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedData.schedules.map((schedule, i) => (
+                        <tr key={i} className="border-b border-dark-border/30 hover:bg-dark-bg/40">
+                          <td className="py-2 px-2 text-white">{i + 1}</td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={schedule.student_academic_id}
+                              onChange={(e) => updateSchedule(i, 'student_academic_id', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={schedule.subject_name}
+                              onChange={(e) => updateSchedule(i, 'subject_name', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={schedule.weekday_name}
+                              onChange={(e) => updateSchedule(i, 'weekday_name', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={schedule.start_time}
+                              onChange={(e) => updateSchedule(i, 'start_time', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={schedule.end_time}
+                              onChange={(e) => updateSchedule(i, 'end_time', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
               {/* Action Buttons */}
               <div className="flex gap-4">
