@@ -572,48 +572,27 @@ export const db = {
 
   async importDepartments(depts: Omit<Department, 'department_id'>[]): Promise<Map<string, number>> {
     const mapping = new Map<string, number>();
-    try {
-      if (supabase) {
-        // First get all existing departments
-        const { data: existingDepts, error: fetchError } = await supabase.from('departments').select('*');
-        if (fetchError) {
-          console.error('[Departments] Fetch existing error:', fetchError);
-          return mapping;
-        }
-        const existingMap = new Map(existingDepts?.map(d => [d.department_name, d.department_id]) || []);
-        
-        // Separate new and existing departments
-        const newDepts = depts.filter(d => !existingMap.has(d.department_name));
-        
-        // Insert new departments
-        if (newDepts.length > 0) {
-          const { data: insertedDepts, error: insertError } = await supabase.from('departments').insert(newDepts).select('*');
-          if (insertError) {
-            console.error('[Departments] Insert new error:', insertError);
-          } else {
-            (insertedDepts || []).forEach(d => existingMap.set(d.department_name, d.department_id));
-          }
-        }
-        
-        // Populate the final mapping
-        existingMap.forEach((id, name) => mapping.set(name, id));
-      } else {
-        const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.DEPARTMENTS) || '[]');
-        let nextId = existing.length > 0 ? Math.max(...existing.map((d: any) => d.department_id)) + 1 : 1;
-        depts.forEach(dept => {
-          const found = existing.find((d: any) => d.department_name === dept.department_name);
-          if (found) {
-            mapping.set(dept.department_name, found.department_id);
-          } else {
-            const newDept = { ...dept, department_id: nextId++ };
-            existing.push(newDept);
-            mapping.set(dept.department_name, newDept.department_id);
-          }
-        });
-        localStorage.setItem(LOCAL_KEYS.DEPARTMENTS, JSON.stringify(existing));
+    if (supabase) {
+      const { data, error } = await supabase.from('departments').insert(depts).select('*');
+      if (error) {
+        console.error('[Departments] Import error:', error);
+        throw error;
       }
-    } catch (globalErr) {
-      console.error('[importDepartments] Global error:', globalErr);
+      (data || []).forEach(d => mapping.set(d.department_name, d.department_id));
+    } else {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.DEPARTMENTS) || '[]');
+      let nextId = existing.length > 0 ? Math.max(...existing.map((d: any) => d.department_id)) + 1 : 1;
+      depts.forEach(dept => {
+        const found = existing.find((d: any) => d.department_name === dept.department_name);
+        if (found) {
+          mapping.set(dept.department_name, found.department_id);
+        } else {
+          const newDept = { ...dept, department_id: nextId++ };
+          existing.push(newDept);
+          mapping.set(dept.department_name, newDept.department_id);
+        }
+      });
+      localStorage.setItem(LOCAL_KEYS.DEPARTMENTS, JSON.stringify(existing));
     }
     return mapping;
   },
@@ -748,110 +727,107 @@ export const db = {
     const mapping = new Map<string, number>();
     const { hashPassword } = await import('./auth');
     
-    try {
-      if (supabase) {
-        const existingStudents = await this.getStudents();
-        const existingByNationalId = new Map(existingStudents.map(s => [s.national_id, s]));
-        
-        for (const stu of students) {
-          console.log('[importStudents] Processing student:', stu);
-          const existing = existingByNationalId.get(stu.national_id);
-          if (existing) {
-            console.log('[importStudents] Found existing student:', existing);
-            // Update existing student, but don't overwrite academic_id if not needed!
-            const updateData: any = {
-              full_name: stu.full_name,
-              phone: stu.phone,
-              department_id: stu.department_id
-              // Don't update academic_id unless we have to!
-            };
-            if (stu.password) {
-              updateData.password = stu.password;
-              updateData.password_hash = await hashPassword(stu.password);
-            }
-            const { error } = await supabase
+    if (supabase) {
+      const existingStudents = await this.getStudents();
+      const existingByNationalId = new Map(existingStudents.map(s => [s.national_id, s]));
+      
+      for (const stu of students) {
+        console.log('[importStudents] Processing student:', stu);
+        const existing = existingByNationalId.get(stu.national_id);
+        if (existing) {
+          console.log('[importStudents] Found existing student:', existing);
+          // Update existing student, but don't overwrite academic_id if not needed!
+          const updateData: any = {
+            full_name: stu.full_name,
+            phone: stu.phone,
+            department_id: stu.department_id
+            // Don't update academic_id unless we have to!
+          };
+          if (stu.password) {
+            updateData.password = stu.password;
+            updateData.password_hash = await hashPassword(stu.password);
+          }
+          const { error } = await supabase
+            .from('students')
+            .update(updateData)
+            .eq('student_id', existing.student_id);
+          if (error) {
+            console.warn('[importStudents] Update failed, but continuing:', error);
+          }
+          mapping.set(stu.national_id, existing.student_id); // Use existing student_id no matter what!
+        } else {
+          // Insert new student
+          console.log('[importStudents] Inserting new student');
+          try {
+            const { data, error } = await supabase
               .from('students')
-              .update(updateData)
-              .eq('student_id', existing.student_id);
+              .insert({
+                full_name: stu.full_name,
+                phone: stu.phone,
+                academic_id: stu.academic_id,
+                national_id: stu.national_id,
+                password: stu.password,
+                password_hash: await hashPassword(stu.password),
+                role: 'student' as const,
+                department_id: stu.department_id
+              })
+              .select('*')
+              .single();
             if (error) {
-              console.warn('[importStudents] Update failed, but continuing:', error);
-            }
-            mapping.set(stu.national_id, existing.student_id); // Use existing student_id no matter what!
-          } else {
-            // Insert new student
-            console.log('[importStudents] Inserting new student');
-            try {
-              const { data, error } = await supabase
-                .from('students')
-                .insert({
-                  full_name: stu.full_name,
-                  phone: stu.phone,
-                  academic_id: stu.academic_id,
-                  national_id: stu.national_id,
-                  password: stu.password,
-                  password_hash: await hashPassword(stu.password),
-                  role: 'student' as const,
-                  department_id: stu.department_id
-                })
-                .select('*')
-                .single();
-              if (error) {
-                console.error('[importStudents] Insert error, trying to find by academic_id:', error);
-                // If insert fails (duplicate academic_id), find existing by academic_id!
-                const existingByAcademic = existingStudents.find(s => s.academic_id === stu.academic_id);
-                if (existingByAcademic) {
-                  console.log('[importStudents] Found student by academic_id:', existingByAcademic);
-                  mapping.set(stu.national_id, existingByAcademic.student_id);
-                }
+              console.error('[importStudents] Insert error, trying to find by academic_id:', error);
+              // If insert fails (duplicate academic_id), find existing by academic_id!
+              const existingByAcademic = existingStudents.find(s => s.academic_id === stu.academic_id);
+              if (existingByAcademic) {
+                console.log('[importStudents] Found student by academic_id:', existingByAcademic);
+                mapping.set(stu.national_id, existingByAcademic.student_id);
               } else {
-                mapping.set(stu.national_id, data.student_id);
+                throw error;
               }
-            } catch (err) {
-              console.error('[importStudents] Final error inserting student:', err);
+            } else {
+              mapping.set(stu.national_id, data.student_id);
             }
+          } catch (err) {
+            console.error('[importStudents] Final error inserting student:', err);
           }
         }
-      } else {
-        const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
-        let nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.student_id)) + 1 : 1;
-        
-        for (const stu of students) {
-          const foundIndex = existing.findIndex((s: any) => s.national_id === stu.national_id);
-          if (foundIndex !== -1) {
-            // Update existing in localStorage
-            existing[foundIndex] = {
-              ...existing[foundIndex],
-              full_name: stu.full_name,
-              phone: stu.phone,
-              academic_id: stu.academic_id,
-              department_id: stu.department_id,
-              password: stu.password,
-              password_hash: await hashPassword(stu.password)
-            };
-            mapping.set(stu.national_id, existing[foundIndex].student_id); // KEY IS NATIONAL_ID now!
-          } else {
-            // Insert new in localStorage
-            const newStu = {
-              student_id: nextId++,
-              full_name: stu.full_name,
-              phone: stu.phone,
-              academic_id: stu.academic_id,
-              national_id: stu.national_id,
-              password: stu.password,
-              password_hash: await hashPassword(stu.password),
-              role: 'student' as const,
-              department_id: stu.department_id
-            };
-            existing.push(newStu);
-            mapping.set(stu.national_id, newStu.student_id); // KEY IS NATIONAL_ID now!
-          }
-        }
-        localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existing));
       }
-    } catch (globalErr) {
-      console.error('[importStudents] Global error:', globalErr);
+    } else {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
+      let nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.student_id)) + 1 : 1;
+      
+      for (const stu of students) {
+        const foundIndex = existing.findIndex((s: any) => s.national_id === stu.national_id);
+        if (foundIndex !== -1) {
+          // Update existing in localStorage
+          existing[foundIndex] = {
+            ...existing[foundIndex],
+            full_name: stu.full_name,
+            phone: stu.phone,
+            academic_id: stu.academic_id,
+            department_id: stu.department_id,
+            password: stu.password,
+            password_hash: await hashPassword(stu.password)
+          };
+          mapping.set(stu.national_id, existing[foundIndex].student_id); // KEY IS NATIONAL_ID now!
+        } else {
+          // Insert new in localStorage
+          const newStu = {
+            student_id: nextId++,
+            full_name: stu.full_name,
+            phone: stu.phone,
+            academic_id: stu.academic_id,
+            national_id: stu.national_id,
+            password: stu.password,
+            password_hash: await hashPassword(stu.password),
+            role: 'student' as const,
+            department_id: stu.department_id
+          };
+          existing.push(newStu);
+          mapping.set(stu.national_id, newStu.student_id); // KEY IS NATIONAL_ID now!
+        }
+      }
+      localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existing));
     }
-    
     console.log('[importStudents] Final mapping:', Object.fromEntries(mapping));
     return mapping;
   },
@@ -947,48 +923,27 @@ export const db = {
 
   async importSubjects(subjects: Omit<Subject, 'subject_id' | 'created_at'>[]): Promise<Map<string, number>> {
     const mapping = new Map<string, number>();
-    try {
-      if (supabase) {
-        // First get all existing subjects
-        const { data: existingSubjects, error: fetchError } = await supabase.from('subjects').select('*');
-        if (fetchError) {
-          console.error('[Subjects] Fetch existing error:', fetchError);
-          return mapping;
-        }
-        const existingMap = new Map(existingSubjects?.map(s => [s.subject_name, s.subject_id]) || []);
-        
-        // Separate new and existing subjects
-        const newSubjects = subjects.filter(s => !existingMap.has(s.subject_name));
-        
-        // Insert new subjects
-        if (newSubjects.length > 0) {
-          const { data: insertedSubjects, error: insertError } = await supabase.from('subjects').insert(newSubjects).select('*');
-          if (insertError) {
-            console.error('[Subjects] Insert new error:', insertError);
-          } else {
-            (insertedSubjects || []).forEach(s => existingMap.set(s.subject_name, s.subject_id));
-          }
-        }
-        
-        // Populate the final mapping
-        existingMap.forEach((id, name) => mapping.set(name, id));
-      } else {
-        const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]');
-        let nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.subject_id)) + 1 : 1;
-        subjects.forEach(sub => {
-          const found = existing.find((s: any) => s.subject_name === sub.subject_name);
-          if (found) {
-            mapping.set(sub.subject_name, found.subject_id);
-          } else {
-            const newSub = { ...sub, subject_id: nextId++ };
-            existing.push(newSub);
-            mapping.set(sub.subject_name, newSub.subject_id);
-          }
-        });
-        localStorage.setItem(LOCAL_KEYS.SUBJECTS, JSON.stringify(existing));
+    if (supabase) {
+      const { data, error } = await supabase.from('subjects').insert(subjects).select('*');
+      if (error) {
+        console.error('[Subjects] Import error:', error);
+        throw error;
       }
-    } catch (globalErr) {
-      console.error('[importSubjects] Global error:', globalErr);
+      (data || []).forEach(s => mapping.set(s.subject_name, s.subject_id));
+    } else {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]');
+      let nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.subject_id)) + 1 : 1;
+      subjects.forEach(sub => {
+        const found = existing.find((s: any) => s.subject_name === sub.subject_name);
+        if (found) {
+          mapping.set(sub.subject_name, found.subject_id);
+        } else {
+          const newSub = { ...sub, subject_id: nextId++ };
+          existing.push(newSub);
+          mapping.set(sub.subject_name, newSub.subject_id);
+        }
+      });
+      localStorage.setItem(LOCAL_KEYS.SUBJECTS, JSON.stringify(existing));
     }
     return mapping;
   },
@@ -1073,81 +1028,42 @@ export const db = {
   async importSchedule(schedules: Omit<StudentSchedule, 'schedule_id' | 'created_at'>[]): Promise<void> {
     if (schedules.length === 0) return;
     
-    try {
-      if (supabase) {
-        // Get all existing schedules
-        const { data: existingSchedules, error: fetchError } = await supabase
+    if (supabase) {
+      // Get unique student IDs to delete their existing schedules
+      const studentIds = [...new Set(schedules.map(s => s.student_id))];
+      
+      // Delete existing schedules for these students
+      if (studentIds.length > 0) {
+        const { error: deleteError } = await supabase
           .from('student_schedule')
-          .select('*');
-        if (fetchError) {
-          console.error('[Schedules] Fetch existing schedules error:', fetchError);
-          return;
+          .delete()
+          .in('student_id', studentIds);
+        if (deleteError) {
+          console.error('[Schedules] Delete old schedules error:', deleteError);
+          throw deleteError;
         }
-        
-        // Create a map to check for existing schedules
-        const existingMap = new Map<string, number>();
-        existingSchedules?.forEach(s => {
-          const key = `${s.student_id}-${s.subject_id}-${s.weekday_id}-${s.slot_id}`;
-          existingMap.set(key, s.schedule_id);
-        });
-        
-        // Split into updates and inserts
-        for (const schedule of schedules) {
-          const key = `${schedule.student_id}-${schedule.subject_id}-${schedule.weekday_id}-${schedule.slot_id}`;
-          const existingId = existingMap.get(key);
-          
-          if (existingId) {
-            // Update existing schedule
-            const { error: updateError } = await supabase
-              .from('student_schedule')
-              .update(schedule)
-              .eq('schedule_id', existingId);
-            if (updateError) {
-              console.warn('[Schedules] Update schedule warning:', updateError);
-            }
-          } else {
-            // Insert new schedule
-            const { error: insertError } = await supabase
-              .from('student_schedule')
-              .insert(schedule);
-            if (insertError) {
-              console.warn('[Schedules] Insert schedule warning:', insertError);
-            }
-          }
-        }
-      } else {
-        const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
-        
-        // Create a map to check for existing schedules
-        const existingMap = new Map<string, number>();
-        existing.forEach((s: any) => {
-          const key = `${s.student_id}-${s.subject_id}-${s.weekday_id}-${s.slot_id}`;
-          existingMap.set(key, s.schedule_id);
-        });
-        
-        let nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.schedule_id)) + 1 : 1;
-        
-        // Process each schedule
-        for (const schedule of schedules) {
-          const key = `${schedule.student_id}-${schedule.subject_id}-${schedule.weekday_id}-${schedule.slot_id}`;
-          const existingId = existingMap.get(key);
-          
-          if (existingId) {
-            // Update existing schedule
-            const index = existing.findIndex((s: any) => s.schedule_id === existingId);
-            if (index !== -1) {
-              existing[index] = { ...existing[index], ...schedule };
-            }
-          } else {
-            // Insert new schedule
-            existing.push({ ...schedule, schedule_id: nextId++ });
-          }
-        }
-        
-        localStorage.setItem(LOCAL_KEYS.SCHEDULES, JSON.stringify(existing));
       }
-    } catch (globalErr) {
-      console.error('[importSchedule] Global error:', globalErr);
+      
+      // Insert new schedules
+      const { error } = await supabase.from('student_schedule').insert(schedules);
+      if (error) {
+        console.error('[Schedules] Insert new schedules error:', error);
+        throw error;
+      }
+    } else {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
+      const studentIds = [...new Set(schedules.map(s => s.student_id))];
+      
+      // Remove existing schedules for these students
+      const filtered = existing.filter((s: any) => !studentIds.includes(s.student_id));
+      
+      let nextId = filtered.length > 0 ? Math.max(...filtered.map((s: any) => s.schedule_id)) + 1 : 1;
+      
+      // Add new schedules
+      schedules.forEach(sch => {
+        filtered.push({ ...sch, schedule_id: nextId++ });
+      });
+      localStorage.setItem(LOCAL_KEYS.SCHEDULES, JSON.stringify(filtered));
     }
   },
 
@@ -1994,19 +1910,29 @@ export async function migrateLocalToSupabase() {
   }
 
   try {
-    // First check if there's already data in Supabase to avoid overwriting
-    const { data: existingStudents, error: checkError } = await supabase.from('students').select('student_id').limit(1);
+    // First, check if we already have ANY data in Supabase to prevent conflicts
+    const { data: existingStudentsCheck, error: checkError } = await supabase
+      .from('students')
+      .select('student_id')
+      .limit(1);
+
     if (checkError) {
-      console.warn('[Migration] Could not check existing data, skipping migration');
-      return { success: true, message: 'تم تخطي الهجرة - لم نتمكن من التحقق من البيانات الموجودة' };
-    }
-    
-    // If there's already data in Supabase, skip migration to prevent issues
-    if (existingStudents && existingStudents.length > 0) {
-      console.log('[Migration] Supabase already has data, skipping migration');
-      return { success: true, message: 'تم تخطي الهجرة - البيانات موجودة بالفعل في Supabase' };
+      console.warn('[Migration] Check error, skipping:', checkError);
+      return {
+        success: true,
+        message: 'تم تخطي الهجرة - لم نتمكن من التحقق من البيانات'
+      };
     }
 
+    if (existingStudentsCheck && existingStudentsCheck.length > 0) {
+      console.log('[Migration] Supabase already has data, skipping migration entirely');
+      return {
+        success: true,
+        message: 'تم تخطي الهجرة - البيانات موجودة بالفعل في Supabase'
+      };
+    }
+
+    // Only proceed if Supabase is completely empty
     const departments = JSON.parse(localStorage.getItem(LOCAL_KEYS.DEPARTMENTS) || '[]').map((d: any) => {
       const { organization_id, ...cleaned } = d;
       return cleaned;
@@ -2043,39 +1969,39 @@ export async function migrateLocalToSupabase() {
 
     if (departments.length > 0) {
       const { error } = await supabase.from('departments').upsert(departments, { onConflict: 'department_id' });
-      if (error) console.warn('[Migration] Departments upsert warning:', error);
+      if (error) console.warn('[Migration] Departments warning:', error);
     }
     if (students.length > 0) {
       const { error } = await supabase.from('students').upsert(students, { onConflict: 'academic_id' });
-      if (error) console.warn('[Migration] Students upsert warning:', error);
+      if (error) console.warn('[Migration] Students warning:', error);
     }
     if (subjects.length > 0) {
       const { error } = await supabase.from('subjects').upsert(subjects, { onConflict: 'subject_id' });
-      if (error) console.warn('[Migration] Subjects upsert warning:', error);
+      if (error) console.warn('[Migration] Subjects warning:', error);
     }
     if (schedules.length > 0) {
       const { error } = await supabase.from('student_schedule').upsert(schedules, { onConflict: 'schedule_id' });
-      if (error) console.warn('[Migration] Schedules upsert warning:', error);
+      if (error) console.warn('[Migration] Schedules warning:', error);
     }
     if (attendanceLogs.length > 0) {
       const { error } = await supabase.from('attendance_log').upsert(attendanceLogs, { onConflict: 'log_id' });
-      if (error) console.warn('[Migration] Attendance logs upsert warning:', error);
+      if (error) console.warn('[Migration] Attendance warning:', error);
     }
     if (notifications.length > 0) {
       const { error } = await supabase.from('notifications').upsert(notifications, { onConflict: 'notification_id' });
-      if (error) console.warn('[Migration] Notifications upsert warning:', error);
+      if (error) console.warn('[Migration] Notifications warning:', error);
     }
     if (personalNotes.length > 0) {
       const { error } = await supabase.from('personal_notes').upsert(personalNotes, { onConflict: 'note_id' });
-      if (error) console.warn('[Migration] Personal notes upsert warning:', error);
+      if (error) console.warn('[Migration] Personal notes warning:', error);
     }
     if (payments.length > 0) {
       const { error } = await supabase.from('payments').upsert(payments, { onConflict: 'id' });
-      if (error) console.warn('[Migration] Payments upsert warning:', error);
+      if (error) console.warn('[Migration] Payments warning:', error);
     }
     if (paymentSettings.length > 0) {
       const { error } = await supabase.from('payment_settings').upsert(paymentSettings);
-      if (error) console.warn('[Migration] Payment settings upsert warning:', error);
+      if (error) console.warn('[Migration] Payment settings warning:', error);
     }
 
     return {
@@ -2083,10 +2009,10 @@ export async function migrateLocalToSupabase() {
       message: `✅ تم استيراد البيانات بنجاح: ${departments.length} تخصص، ${students.length} طالب، ${subjects.length} مادة، ${schedules.length} جدول، ${attendanceLogs.length} سجل حضور، ${notifications.length} إشعار، ${payments.length} دفعة`
     };
   } catch (err: any) {
-    console.warn('[Migration] Warning:', err);
+    console.warn('[Migration] Skipping due to error:', err);
     return {
-      success: true, // Still return true to not break the app
-      message: `⚠️ تم تخطي الهجرة بسبب خطأ: ${err.message}`
+      success: true,
+      message: `⚠️ تم تخطي الهجرة: ${err.message}`
     };
   }
 }
