@@ -755,7 +755,7 @@ export const db = {
             console.error('[Students] Update existing error:', error);
             throw error;
           }
-          mapping.set(data.academic_id, data.student_id);
+          mapping.set(stu.national_id, data.student_id); // KEY IS NATIONAL_ID now!
         } else {
           // Insert new student
           const { data, error } = await supabase
@@ -776,7 +776,7 @@ export const db = {
             console.error('[Students] Insert new error:', error);
             throw error;
           }
-          mapping.set(data.academic_id, data.student_id);
+          mapping.set(stu.national_id, data.student_id); // KEY IS NATIONAL_ID now!
         }
       }
     } else {
@@ -796,7 +796,7 @@ export const db = {
             password: stu.password,
             password_hash: await hashPassword(stu.password)
           };
-          mapping.set(stu.academic_id, existing[foundIndex].student_id);
+          mapping.set(stu.national_id, existing[foundIndex].student_id); // KEY IS NATIONAL_ID now!
         } else {
           // Insert new in localStorage
           const newStu = {
@@ -811,7 +811,7 @@ export const db = {
             department_id: stu.department_id
           };
           existing.push(newStu);
-          mapping.set(stu.academic_id, newStu.student_id);
+          mapping.set(stu.national_id, newStu.student_id); // KEY IS NATIONAL_ID now!
         }
       }
       localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existing));

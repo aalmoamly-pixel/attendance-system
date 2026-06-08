@@ -306,6 +306,12 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         }))
       );
 
+      // First: make a map to link schedule's student academic id with national id (from parsedData.students)
+      const studentNationalIdMap = new Map();
+      parsedData.students.forEach(student => {
+        studentNationalIdMap.set(student.academic_id, student.national_id);
+      });
+
       const studentMap = await db.importStudents(
         parsedData.students.map(student => ({
           full_name: student.full_name,
@@ -322,7 +328,8 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       const schedulesToImport = [];
 
       for (const schedule of parsedData.schedules) {
-        const studentId = studentMap.get(schedule.student_academic_id);
+        const nationalId = studentNationalIdMap.get(schedule.student_academic_id); // First get national id from schedule's academic id
+        const studentId = studentMap.get(nationalId); // Now use national id to get student id
         const subjectId = subjectMap.get(schedule.subject_name);
         const weekday = weekdays.find(w => w.weekday_name_ar === schedule.weekday_name);
         
