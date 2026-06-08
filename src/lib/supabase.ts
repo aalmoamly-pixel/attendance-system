@@ -735,7 +735,8 @@ export const db = {
         console.log('[importStudents] Processing student:', stu);
         const existing = existingByNationalId.get(stu.national_id);
         if (existing) {
-          console.log('[importStudents] Found existing student:', existing);
+          const existingStudent = existing as Student;
+          console.log('[importStudents] Found existing student:', existingStudent);
           // Update existing student, but don't overwrite academic_id if not needed!
           const updateData: any = {
             full_name: stu.full_name,
@@ -750,11 +751,11 @@ export const db = {
           const { error } = await supabase
             .from('students')
             .update(updateData)
-            .eq('student_id', existing.student_id);
+            .eq('student_id', existingStudent.student_id);
           if (error) {
             console.warn('[importStudents] Update failed, but continuing:', error);
           }
-          mapping.set(stu.national_id, existing.student_id); // Use existing student_id no matter what!
+          mapping.set(stu.national_id, existingStudent.student_id); // Use existing student_id no matter what!
         } else {
           // Insert new student
           console.log('[importStudents] Inserting new student');
