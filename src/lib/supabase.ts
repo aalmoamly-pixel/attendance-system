@@ -28,6 +28,7 @@ const isSupabaseConfigured =
   SUPABASE_URL.includes('supabase.co');
 
 console.log(`[Database System] Mode: ${isSupabaseConfigured ? '⚡ Supabase Cloud' : '💾 Local Storage (Fallback)'}`);
+console.log(`[Database System] SUPABASE_URL (first 20 chars): ${SUPABASE_URL.substring(0, 20)}...`);
 
 export const supabase = isSupabaseConfigured 
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
