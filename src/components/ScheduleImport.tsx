@@ -79,39 +79,34 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     console.log('========== EXTRACTING FROM UPLOADED IMAGE ==========');
     console.log('Raw OCR Text:', text);
     
-    const cleanedText = text.replace(/\s+/g, ' ').trim();
-    
-    // Extract student info from OCR only, NO HARDCODED DATA!
+    // Extract student info first
     let studentName = '';
     let studentNationalId = '';
     let studentAcademicId = '';
     let studentProgram = '';
     
-    // Extract National ID (10-digit number)
-    const nationalIdMatch = cleanedText.match(/\b(\d{10})\b/);
+    // National ID: 10-digit number
+    const nationalIdMatch = text.match(/\b(\d{10})\b/);
     if (nationalIdMatch) {
       studentNationalId = nationalIdMatch[1];
     }
     
-    // Extract Academic ID (7-10 digit number, not national ID)
-    const allNumberMatches = cleanedText.match(/\b(\d{7,10})\b/g);
-    if (allNumberMatches) {
-      for (const num of allNumberMatches) {
-        if (num !== studentNationalId) {
-          studentAcademicId = num;
-          break;
-        }
+    // Academic ID: 7-10-digit number, not national ID
+    const allNumbers = text.match(/\b(\d{7,10})\b/g) || [];
+    for (const num of allNumbers) {
+      if (num !== studentNationalId) {
+        studentAcademicId = num;
+        break;
       }
     }
     
-    // Extract Student Name
+    // Student Name: look for pattern or multiple arabic words
     const namePatterns = [
       /الاسم\s*[:\-]?\s*([\u0600-\u06FF\s]{4,40})/i,
       /([\u0600-\u06FF]{3,}\s+[\u0600-\u06FF]{3,}\s+[\u0600-\u06FF]{3,})/i
     ];
-    
     for (const pattern of namePatterns) {
-      const match = cleanedText.match(pattern);
+      const match = text.match(pattern);
       if (match && match[1]) {
         const candidate = match[1].trim();
         if (candidate.length > 5 && !candidate.includes('دبلوم') && !candidate.includes('مقرر')) {
@@ -121,76 +116,98 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       }
     }
     
-    // Extract Program
+    // Program
     const programPatterns = [
       /البرنامج\s*[:\-]?\s*([^\n]{5,80})/i,
       /(دبلوم|بكالوريوس)\s+[\u0600-\u06FF\s]+?(?=\s*\d|\s*رقم|\s*الاسم)/i
     ];
-    
     for (const pattern of programPatterns) {
-      const match = cleanedText.match(pattern);
+      const match = text.match(pattern);
       if (match) {
         studentProgram = (match[1] || match[0]).trim();
         break;
       }
     }
     
-    // Extract schedule from OCR text
+    // Extract schedule by splitting text into lines first
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     const daysOfWeek = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    const headerWords = ['الاسم', 'رقم', 'الهوية', 'الأكاديمي', 'البرنامج', 'المقرر', 'رمز', 'شعبة', 'اليوم', 'وقت', 'بداية', 'نهاية', 'المدرب', 'العدد', 'الحالة', 'فعال', 'التاريخ', 'جامعة', 'الأمير'];
+    const headerWords = ['الاسم', 'رقم', 'الهوية', 'الأكاديمي', 'البرنامج', 'المقرر', 'رمز', 'شعبة', 'اليوم', 'وقت', 'بداية', 'نهاية', 'المدرب', 'العدد', 'الحالة', 'فعال', 'التاريخ', 'جامعة', 'الأمير', 'الوقت من', 'الوقت إلى'];
     
-    // Extract subjects
-    const arabicPhrases = cleanedText.match(/[\u0600-\u06FF\s\(\)]{5,50}/g) || [];
+    // First collect all possible subjects, days, times
     const subjects: string[] = [];
-    for (const phrase of arabicPhrases) {
-      const trimmed = phrase.trim();
-      if (trimmed.length < 5) continue;
+    const dayOccurrences: {day: string, lineIndex: number}[] = [];
+    const timeMatches: {start: string, end: string, lineIndex: number}[] = [];
+    
+    // Scan each line for days, times, and subjects
+    lines.forEach((line, index) => {
+      // Check for day in this line
+      for (const day of daysOfWeek) {
+        if (line.includes(day)) {
+          dayOccurrences.push({day, lineIndex: index});
+        }
+      }
       
-      const isHeader = headerWords.some(h => trimmed.includes(h));
-      const isDay = daysOfWeek.some(d => trimmed.includes(d));
-      const isName = studentName && trimmed.includes(studentName.split(' ')[0]);
+      // Check for time patterns in this line
+      const timesInLine = line.match(/(\d{1,2}):(\d{2})/g) || [];
+      if (timesInLine.length >= 2) {
+        for (let i = 0; i < timesInLine.length; i += 2) {
+          if (timesInLine[i + 1]) {
+            // Normalize times
+            const start = timesInLine[i].split(':').map(x => x.padStart(2, '0')).join(':');
+            const end = timesInLine[i + 1].split(':').map(x => x.padStart(2, '0')).join(':');
+            timeMatches.push({start, end, lineIndex: index});
+          }
+        }
+      }
       
-      if (!isHeader && !isDay && !isName && !subjects.includes(trimmed)) {
-        subjects.push(trimmed);
+      // Check for subject (arabic text not header/day/name)
+      const arabicParts = line.match(/[\u0600-\u06FF\s\(\)]{5,}/g) || [];
+      for (const part of arabicParts) {
+        const trimmed = part.trim();
+        if (trimmed.length < 5) continue;
+        
+        const isHeader = headerWords.some(h => trimmed.includes(h));
+        const isDay = daysOfWeek.some(d => trimmed.includes(d));
+        const isName = studentName && trimmed.includes(studentName.split(' ')[0]);
+        
+        if (!isHeader && !isDay && !isName && !subjects.includes(trimmed)) {
+          subjects.push(trimmed);
+        }
       }
-    }
+    });
     
-    // Extract days
-    const dayMatches: {day: string, index: number}[] = [];
-    for (const day of daysOfWeek) {
-      let lastIdx = 0;
-      while (lastIdx < cleanedText.length) {
-        const idx = cleanedText.indexOf(day, lastIdx);
-        if (idx === -1) break;
-        dayMatches.push({day, index: idx});
-        lastIdx = idx + day.length;
-      }
-    }
-    dayMatches.sort((a, b) => a.index - b.index);
-    
-    // Extract times
-    const timePattern = /(\d{1,2}):(\d{2})/g;
-    const times: string[] = [];
-    let timeMatch;
-    while ((timeMatch = timePattern.exec(cleanedText)) !== null) {
-      const h = parseInt(timeMatch[1]).toString().padStart(2, '0');
-      const m = parseInt(timeMatch[2]).toString().padStart(2, '0');
-      times.push(`${h}:${m}`);
-    }
-    const timePairs: {start: string, end: string}[] = [];
-    for (let i = 0; i < times.length; i += 2) {
-      if (times[i + 1]) {
-        timePairs.push({start: times[i], end: times[i + 1]});
-      }
-    }
-    
-    // Build rows
+    // Now build schedule rows by matching subjects, days, and times
     const rows: RawScheduleRow[] = [];
-    const maxEntries = Math.max(subjects.length, dayMatches.length, 1);
+    const maxEntries = Math.max(subjects.length, dayOccurrences.length, 1);
+    
     for (let i = 0; i < maxEntries; i++) {
       const subject = subjects[i] || `مادة ${i + 1}`;
-      const day = dayMatches[i % dayMatches.length]?.day || 'الأحد';
-      const time = timePairs[i % timePairs.length] || {start: '18:30', end: '22:30'};
+      
+      // Use day from the same approximate line, or cycle through
+      let day = 'الأحد';
+      if (dayOccurrences.length > 0) {
+        // Find closest day occurrence
+        let closestDay = dayOccurrences[0];
+        for (const d of dayOccurrences) {
+          if (Math.abs(d.lineIndex - i) < Math.abs(closestDay.lineIndex - i)) {
+            closestDay = d;
+          }
+        }
+        day = closestDay.day;
+      }
+      
+      // Use time from same approximate line, or cycle through
+      let time = {start: '04:00', end: '07:00'};
+      if (timeMatches.length > 0) {
+        let closestTime = timeMatches[0];
+        for (const t of timeMatches) {
+          if (Math.abs(t.lineIndex - i) < Math.abs(closestTime.lineIndex - i)) {
+            closestTime = t;
+          }
+        }
+        time = closestTime;
+      }
       
       rows.push({
         الاسم: studentName || 'طالب جديد',
@@ -206,7 +223,11 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     }
     
     console.log('EXTRACTED STUDENT:', {studentName, studentAcademicId, studentNationalId, studentProgram});
-    console.log('EXTRACTED SCHEDULE ROWS:', rows);
+    console.log('EXTRACTED SUBJECTS:', subjects);
+    console.log('EXTRACTED DAY OCCURRENCES:', dayOccurrences);
+    console.log('EXTRACTED TIMES:', timeMatches);
+    console.log('FINAL SCHEDULE ROWS:', rows);
+    
     return rows;
   };
 
@@ -344,6 +365,27 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       s => s.student_academic_id !== studentToRemove.academic_id
     );
     setParsedData({ ...parsedData, students: updatedStudents, schedules: updatedSchedules });
+  };
+
+  // Function to add a new schedule entry
+  const addSchedule = () => {
+    if (!parsedData) return;
+    const studentAcademicId = parsedData.students[0]?.academic_id || '0000000';
+    const newSchedule = {
+      student_academic_id: studentAcademicId,
+      subject_name: 'مادة جديدة',
+      weekday_name: 'الأحد',
+      start_time: '04:00',
+      end_time: '07:00'
+    };
+    setParsedData({ ...parsedData, schedules: [...parsedData.schedules, newSchedule] });
+  };
+
+  // Function to remove a schedule entry
+  const removeSchedule = (index: number) => {
+    if (!parsedData) return;
+    const updatedSchedules = parsedData.schedules.filter((_, i) => i !== index);
+    setParsedData({ ...parsedData, schedules: updatedSchedules });
   };
 
   // Function to update a schedule
@@ -725,7 +767,17 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
               {/* Schedules Table (Editable) */}
               <div className="mb-6">
-                <h4 className="text-sm font-bold text-white mb-3">الجداول الدراسية:</h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-white">الجداول الدراسية:</h4>
+                  <button
+                    type="button"
+                    onClick={addSchedule}
+                    className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-2"
+                  >
+                    <Plus className="w-3 h-3" />
+                    إضافة مادة
+                  </button>
+                </div>
                 <div className="overflow-x-auto max-h-64 overflow-y-auto">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-dark-bg/95">
@@ -736,6 +788,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
                         <th className="text-right py-2 px-2 text-dark-muted">اليوم</th>
                         <th className="text-right py-2 px-2 text-dark-muted">الوقت من</th>
                         <th className="text-right py-2 px-2 text-dark-muted">الوقت إلى</th>
+                        <th className="text-center py-2 px-2 text-dark-muted">إجراء</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -781,6 +834,15 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
                               onChange={(e) => updateSchedule(i, 'end_time', e.target.value)}
                               className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
                             />
+                          </td>
+                          <td className="py-2 px-2 flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => removeSchedule(i)}
+                              className="p-1.5 rounded hover:bg-brand-danger/10 text-brand-danger"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </td>
                         </tr>
                       ))}
