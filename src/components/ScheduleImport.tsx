@@ -20,15 +20,15 @@ import { db } from '../lib/supabase';
 import confetti from 'canvas-confetti';
 
 interface RawScheduleRow {
+  الاسم?: string;
+  'رقم الهوية'?: string;
   'الرقم الأكاديمي'?: string;
+  'رقم الجوال'?: string;
+  البرنامج?: string;
   المقرر?: string;
-  'عدد ساعات المقرر'?: string | number;
-  'رمز الشعبة'?: string;
-  'اسم المحاضر'?: string;
   اليوم?: string;
-  'وقت البداية'?: string;
-  'وقت النهاية'?: string;
-  'مدة المحاضرة'?: string;
+  'الوقت من'?: string;
+  'الوقت إلى'?: string;
 }
 
 interface ParsedStudent {
@@ -49,13 +49,9 @@ interface ParsedSubject {
 interface ParsedSchedule {
   student_academic_id: string;
   subject_name: string;
-  hours?: string | number;
-  section_code?: string;
-  instructor_name?: string;
   weekday_name: string;
   start_time: string;
   end_time: string;
-  duration?: string;
 }
 
 interface ParsedData {
@@ -82,42 +78,71 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     console.log('========== EXTRACTING FROM UPLOADED IMAGE ==========');
     console.log('Raw OCR Text:', text);
     
-    // Extract student academic ID from the OCR text (only what's actually there)
+    // Extract student info from OCR only, NO HARDCODED DATA!
+    let studentName = '';
+    let studentNationalId = '';
     let studentAcademicId = '';
-    const academicIdMatch = text.match(/\b(\d{7,10})\b/);
-    if (academicIdMatch) {
-      studentAcademicId = academicIdMatch[1];
+    let studentProgram = '';
+    
+    // 1. Extract national ID (10-digit number)
+    const nationalIdMatch = text.match(/\b(\d{10})\b/);
+    if (nationalIdMatch) {
+      studentNationalId = nationalIdMatch[1];
+    }
+    
+    // 2. Extract academic ID (7-10-digit number not equal to national ID)
+    const allNumbers = text.match(/\b(\d{7,10})\b/g) || [];
+    for (const num of allNumbers) {
+      if (num !== studentNationalId) {
+        studentAcademicId = num;
+        break;
+      }
+    }
+    
+    // 3. Extract student name
+    const namePatterns = [
+      /الاسم\s*[:\-]?\s*([\u0600-\u06FF\s]{5,50})/i,
+      /([\u0600-\u06FF]{3,}\s+[\u0600-\u06FF]{3,}\s+[\u0600-\u06FF]{3,})/i
+    ];
+    for (const pattern of namePatterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        const candidate = match[1].trim();
+        if (candidate.length > 5 && !candidate.includes('دبلوم') && !candidate.includes('مقرر')) {
+          studentName = candidate;
+          break;
+        }
+      }
+    }
+    
+    // 4. Extract program/department
+    const programPatterns = [
+      /البرنامج\s*[:\-]?\s*([^\n]{5,80})/i,
+      /(دبلوم|بكالوريوس)\s+[\u0600-\u06FF\s]+?(?=\s*\d|\s*رقم|\s*الاسم)/i
+    ];
+    for (const pattern of programPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        studentProgram = (match[1] || match[0]).trim();
+        break;
+      }
     }
 
-    // Split text into lines to analyze
+    // Now extract schedule by splitting into lines
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     const daysOfWeek = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     
     // Header words to ignore
-    const headerWords = [
-      'الاسم', 'رقم', 'الهوية', 'الأكاديمي', 'البرنامج', 'المقرر', 'رمز',
-      'شعبة', 'اليوم', 'وقت', 'بداية', 'نهاية', 'المدرب', 'العدد', 'الحالة',
-      'فعال', 'التاريخ', 'جامعة', 'الأمير', 'الوقت من', 'الوقت إلى', 'المدة',
-      'المنصة', 'تسجيل', 'تخصص', 'كما', 'إشعارات', 'اللغة', 'الإنجليزية'
-    ];
+    const headerWords = ['الاسم', 'رقم', 'الهوية', 'الأكاديمي', 'البرنامج', 'المقرر', 'اليوم', 'وقت', 'بداية', 'نهاية', 'الحالة', 'فعال', 'التاريخ', 'جامعة', 'الأمير'];
 
-    // We'll build schedule rows by grouping lines into entries
     const rows: RawScheduleRow[] = [];
-
     let currentDay = '';
     let currentSubject = '';
-    let currentStart = '';
-    let currentEnd = '';
-    let currentHours = '';
-    let currentSection = '';
-    let currentInstructor = '';
-    let currentDuration = '';
 
-    // Scan each line
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       
-      // Check if this line is a day of the week
+      // Check if line is a day
       let foundDay = '';
       for (const day of daysOfWeek) {
         if (line.includes(day)) {
@@ -127,130 +152,57 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       }
 
       if (foundDay) {
-        // Save previous entry if we had one
-        if (currentSubject) {
-          rows.push({
-            'الرقم الأكاديمي': studentAcademicId,
-            المقرر: currentSubject,
-            'عدد ساعات المقرر': currentHours,
-            'رمز الشعبة': currentSection,
-            'اسم المحاضر': currentInstructor,
-            اليوم: currentDay,
-            'وقت البداية': currentStart,
-            'وقت النهاية': currentEnd,
-            'مدة المحاضرة': currentDuration
-          });
-        }
-        // Start new day
         currentDay = foundDay;
-        currentSubject = '';
-        currentStart = '';
-        currentEnd = '';
-        currentHours = '';
-        currentSection = '';
-        currentInstructor = '';
-        currentDuration = '';
         continue;
       }
 
-      // Skip header lines
+      // Skip headers
       const isHeader = headerWords.some(h => line.toLowerCase().includes(h.toLowerCase()));
       if (isHeader) continue;
 
-      // Check if this line has time patterns
+      // Look for time patterns (two times on the line)
       const timeMatches = line.match(/(\d{1,2}):(\d{2})/g) || [];
+      
       if (timeMatches.length >= 2) {
-        // This is a time line
-        const start = timeMatches[0].split(':').map(x => x.padStart(2, '0')).join(':');
-        const end = timeMatches[1].split(':').map(x => x.padStart(2, '0')).join(':');
-        currentStart = start;
-        currentEnd = end;
+        const startTime = timeMatches[0].split(':').map(x => x.padStart(2, '0')).join(':');
+        const endTime = timeMatches[1].split(':').map(x => x.padStart(2, '0')).join(':');
         
-        // Calculate duration (simple version)
-        try {
-          const [h1, m1] = start.split(':').map(Number);
-          const [h2, m2] = end.split(':').map(Number);
-          let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
-          if (diff < 0) diff += 12 * 60; // Handle PM crossing
-          const durHours = Math.floor(diff / 60);
-          const durMins = diff % 60;
-          currentDuration = `${durHours}:${durMins.toString().padStart(2, '0')}`;
-        } catch (e) {
-          currentDuration = '';
-        }
-
-        // If we already have a subject, save this entry
+        // If we have a subject and day, create a row
         if (currentSubject && currentDay) {
           rows.push({
+            الاسم: studentName,
+            'رقم الهوية': studentNationalId,
             'الرقم الأكاديمي': studentAcademicId,
+            البرنامج: studentProgram,
             المقرر: currentSubject,
-            'عدد ساعات المقرر': currentHours,
-            'رمز الشعبة': currentSection,
-            'اسم المحاضر': currentInstructor,
             اليوم: currentDay,
-            'وقت البداية': currentStart,
-            'وقت النهاية': currentEnd,
-            'مدة المحاضرة': currentDuration
+            'الوقت من': startTime,
+            'الوقت إلى': endTime
           });
-          // Reset for possible next subject in same day
-          currentSubject = '';
-          currentHours = '';
-          currentSection = '';
-          currentInstructor = '';
+          currentSubject = ''; // Reset for next subject
         }
         continue;
       }
 
-      // Check if this line looks like a subject (arabic text not header)
-      const arabicWords = line.match(/[\u0600-\u06FF\s\(\)]{5,}/g);
-      if (arabicWords) {
-        for (const part of arabicWords) {
+      // Look for subject (arabic text 5+ chars)
+      const arabicParts = line.match(/[\u0600-\u06FF\s\(\)]{5,}/g);
+      if (arabicParts) {
+        for (const part of arabicParts) {
           const trimmed = part.trim();
           const isBad = headerWords.some(h => trimmed.toLowerCase().includes(h.toLowerCase()));
           const isDay = daysOfWeek.some(d => trimmed.includes(d));
-          if (!isBad && !isDay && trimmed.length >= 5) {
-            if (currentSubject) {
-              // If we already have a subject but no time yet, this might be instructor?
-              if (!currentInstructor) {
-                currentInstructor = trimmed;
-              } else if (!currentHours) {
-                // Or maybe hours?
-                currentHours = trimmed;
-              }
-            } else {
+          const isName = studentName && trimmed.includes(studentName.split(' ')[0]);
+          
+          if (!isBad && !isDay && !isName && trimmed.length >= 5) {
+            if (!currentSubject) {
               currentSubject = trimmed;
             }
           }
         }
       }
-
-      // Check if this line has numbers that might be section code or hours
-      const numberMatches = line.match(/\b(\d{1,3})\b/g) || [];
-      for (const num of numberMatches) {
-        if (!currentSection) {
-          currentSection = num;
-        } else if (!currentHours) {
-          currentHours = num;
-        }
-      }
     }
 
-    // After loop ends, save any remaining entry
-    if (currentSubject && currentDay && currentStart) {
-      rows.push({
-        'الرقم الأكاديمي': studentAcademicId,
-        المقرر: currentSubject,
-        'عدد ساعات المقرر': currentHours,
-        'رمز الشعبة': currentSection,
-        'اسم المحاضر': currentInstructor,
-        اليوم: currentDay,
-        'وقت البداية': currentStart,
-        'وقت النهاية': currentEnd,
-        'مدة المحاضرة': currentDuration
-      });
-    }
-
-    console.log('FINAL EXTRACTED SCHEDULE ROWS (ONLY REAL DATA):', rows);
+    console.log('FINAL EXTRACTED SCHEDULE ROWS:', rows);
     return rows;
   };
 
@@ -285,59 +237,63 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
       console.log('JSON Data after parse:', jsonData);
 
-      // First get existing students
+      // First get existing students to check if they exist
       const existingStudents = await db.getStudents();
+      const existingByNationalId = new Map(existingStudents.map(s => [s.national_id, s]));
       const existingByAcademicId = new Map(existingStudents.map(s => [s.academic_id, s]));
 
       const students: ParsedStudent[] = [];
       const subjects: ParsedSubject[] = [];
       const schedules: ParsedSchedule[] = [];
-      const seenAcademicIds = new Set<string>();
-      const seenSubjectNames = new Set<string>();
+      const seenStudents = new Set<string>(); // Track by national_id
+      const seenSubjects = new Set<string>();
 
       for (const row of jsonData) {
+        const studentName = row['الاسم'] || '';
         const academicId = row['الرقم الأكاديمي'] || '';
+        const nationalId = row['رقم الهوية'] || '';
+        const phone = row['رقم الجوال'] || '';
+        const departmentName = row['البرنامج'] || '';
         const subjectName = row['المقرر'] || '';
         const dayName = row['اليوم'] || '';
-        const startTime = row['وقت البداية'] || '';
-        const endTime = row['وقت النهاية'] || '';
+        const startTime = row['الوقت من'] || '';
+        const endTime = row['الوقت إلى'] || '';
 
-        // Add student (only once per academic ID)
-        if (academicId && !seenAcademicIds.has(academicId)) {
-          seenAcademicIds.add(academicId);
-          const existing = existingByAcademicId.get(academicId);
+        if (nationalId && !seenStudents.has(nationalId)) {
+          seenStudents.add(nationalId);
+          
+          // Check if student exists by national_id or academic_id
+          let existing = existingByNationalId.get(nationalId);
+          if (!existing && academicId) {
+            existing = existingByAcademicId.get(academicId);
+          }
+          
           students.push({
-            full_name: 'طالب ' + academicId, // Just a placeholder - can edit later
-            phone: null,
+            full_name: studentName || 'طالب ' + nationalId,
+            phone: phone || null,
             academic_id: academicId,
-            national_id: '',
+            national_id: nationalId,
             password: 'Aa123456',
-            department_name: '',
+            department_name: departmentName,
             isNew: !existing
           });
         }
 
-        // Add subject (only once per subject name)
-        if (subjectName && !seenSubjectNames.has(subjectName)) {
-          seenSubjectNames.add(subjectName);
+        if (subjectName && !seenSubjects.has(subjectName)) {
+          seenSubjects.add(subjectName);
           subjects.push({
             subject_name: subjectName,
-            department_name: ''
+            department_name: departmentName
           });
         }
 
-        // Add schedule entry - but only if we have the required fields
-        if (academicId) {
+        if (academicId && (subjectName || dayName)) {
           schedules.push({
             student_academic_id: academicId,
             subject_name: subjectName,
-            hours: row['عدد ساعات المقرر'],
-            section_code: row['رمز الشعبة'],
-            instructor_name: row['اسم المحاضر'],
             weekday_name: dayName,
             start_time: startTime,
-            end_time: endTime,
-            duration: row['مدة المحاضرة']
+            end_time: endTime
           });
         }
       }
@@ -417,29 +373,6 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
   const handleConfirmImport = async () => {
     if (!parsedData) return;
-
-    // VALIDATION FIRST
-    const errors: string[] = [];
-    parsedData.schedules.forEach((schedule, index) => {
-      if (!schedule.subject_name || schedule.subject_name.trim() === '') {
-        errors.push(`مادة #${index + 1}: اسم المقرر مطلوب`);
-      }
-      if (!schedule.weekday_name || schedule.weekday_name.trim() === '') {
-        errors.push(`مادة #${index + 1}: اليوم مطلوب`);
-      }
-      if (!schedule.start_time || schedule.start_time.trim() === '') {
-        errors.push(`مادة #${index + 1}: وقت البداية مطلوب`);
-      }
-      if (!schedule.end_time || schedule.end_time.trim() === '') {
-        errors.push(`مادة #${index + 1}: وقت النهاية مطلوب`);
-      }
-    });
-
-    setValidationErrors(errors);
-    if (errors.length > 0) {
-      return; // Don't save if errors
-    }
-
     setSaving(true);
 
     try {
@@ -807,138 +740,67 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
                 </div>
               </div>
 
-              {/* Validation Errors */}
-              {validationErrors.length > 0 && (
-                <div className="glass-card p-4 mb-6 bg-brand-danger/10 border border-brand-danger/30">
-                  <h4 className="text-sm font-bold text-brand-danger mb-2">⚠️ الأخطاء المتبقية:</h4>
-                  <ul className="text-xs text-dark-muted list-disc list-inside space-y-1">
-                    {validationErrors.map((error, i) => (
-                      <li key={i}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
               {/* Schedules Table (Editable) */}
               <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-white">الجداول الدراسية:</h4>
-                  <button
-                    type="button"
-                    onClick={addSchedule}
-                    className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-2"
-                  >
-                    <Plus className="w-3 h-3" />
-                    إضافة مادة
-                  </button>
-                </div>
-                <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <h4 className="text-sm font-bold text-white mb-3">الجداول الدراسية:</h4>
+                <div className="overflow-x-auto max-h-64 overflow-y-auto">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-dark-bg/95">
                       <tr className="border-b border-dark-border">
                         <th className="text-right py-2 px-2 text-dark-muted">#</th>
                         <th className="text-right py-2 px-2 text-dark-muted">الرقم الأكاديمي</th>
                         <th className="text-right py-2 px-2 text-dark-muted">المقرر</th>
-                        <th className="text-right py-2 px-2 text-dark-muted">عدد الساعات</th>
-                        <th className="text-right py-2 px-2 text-dark-muted">رمز الشعبة</th>
-                        <th className="text-right py-2 px-2 text-dark-muted">اسم المحاضر</th>
                         <th className="text-right py-2 px-2 text-dark-muted">اليوم</th>
-                        <th className="text-right py-2 px-2 text-dark-muted">وقت البداية</th>
-                        <th className="text-right py-2 px-2 text-dark-muted">وقت النهاية</th>
-                        <th className="text-right py-2 px-2 text-dark-muted">مدة المحاضرة</th>
-                        <th className="text-center py-2 px-2 text-dark-muted">إجراء</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">الوقت من</th>
+                        <th className="text-right py-2 px-2 text-dark-muted">الوقت إلى</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {parsedData.schedules.map((schedule, i) => {
-                        const hasErrors = !schedule.subject_name || !schedule.weekday_name || !schedule.start_time || !schedule.end_time;
-                        return (
-                          <tr key={i} className={`border-b border-dark-border/30 hover:bg-dark-bg/40 ${hasErrors ? 'bg-brand-danger/5' : ''}`}>
-                            <td className="py-2 px-2 text-white">{i + 1}</td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={schedule.student_academic_id}
-                                onChange={(e) => updateSchedule(i, 'student_academic_id', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={schedule.subject_name}
-                                onChange={(e) => updateSchedule(i, 'subject_name', e.target.value)}
-                                className={`w-full bg-dark-bg border rounded px-2 py-1 text-white text-xs focus:outline-none ${!schedule.subject_name ? 'border-brand-danger' : 'border-dark-border focus:border-brand-primary'}`}
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={schedule.hours || ''}
-                                onChange={(e) => updateSchedule(i, 'hours', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={schedule.section_code || ''}
-                                onChange={(e) => updateSchedule(i, 'section_code', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={schedule.instructor_name || ''}
-                                onChange={(e) => updateSchedule(i, 'instructor_name', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={schedule.weekday_name}
-                                onChange={(e) => updateSchedule(i, 'weekday_name', e.target.value)}
-                                className={`w-full bg-dark-bg border rounded px-2 py-1 text-white text-xs focus:outline-none ${!schedule.weekday_name ? 'border-brand-danger' : 'border-dark-border focus:border-brand-primary'}`}
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={schedule.start_time}
-                                onChange={(e) => updateSchedule(i, 'start_time', e.target.value)}
-                                className={`w-full bg-dark-bg border rounded px-2 py-1 text-white text-xs focus:outline-none ${!schedule.start_time ? 'border-brand-danger' : 'border-dark-border focus:border-brand-primary'}`}
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={schedule.end_time}
-                                onChange={(e) => updateSchedule(i, 'end_time', e.target.value)}
-                                className={`w-full bg-dark-bg border rounded px-2 py-1 text-white text-xs focus:outline-none ${!schedule.end_time ? 'border-brand-danger' : 'border-dark-border focus:border-brand-primary'}`}
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="text"
-                                value={schedule.duration || ''}
-                                onChange={(e) => updateSchedule(i, 'duration', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
-                              />
-                            </td>
-                            <td className="py-2 px-2 flex justify-center">
-                              <button
-                                type="button"
-                                onClick={() => removeSchedule(i)}
-                                className="p-1.5 rounded hover:bg-brand-danger/10 text-brand-danger"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {parsedData.schedules.map((schedule, i) => (
+                        <tr key={i} className="border-b border-dark-border/30 hover:bg-dark-bg/40">
+                          <td className="py-2 px-2 text-white">{i + 1}</td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={schedule.student_academic_id}
+                              onChange={(e) => updateSchedule(i, 'student_academic_id', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={schedule.subject_name}
+                              onChange={(e) => updateSchedule(i, 'subject_name', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={schedule.weekday_name}
+                              onChange={(e) => updateSchedule(i, 'weekday_name', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={schedule.start_time}
+                              onChange={(e) => updateSchedule(i, 'start_time', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="text"
+                              value={schedule.end_time}
+                              onChange={(e) => updateSchedule(i, 'end_time', e.target.value)}
+                              className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
+                            />
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
