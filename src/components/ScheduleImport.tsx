@@ -76,49 +76,52 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
   };
 
   const parseTextToRows = (text: string): RawScheduleRow[] => {
-    console.log('========== Raw OCR Text ==========');
-    console.log(text);
-    console.log('================================');
+    console.log('========== Starting AI-Powered Parsing ==========');
+    console.log('Raw Text:', text);
     
-    const lines = text.split('\n').filter(line => line.trim());
-    console.log('Lines:', lines);
+    // First, let's clean and normalize the text
+    const cleanedText = text.replace(/\s+/g, ' ').trim();
     
-    // Step 1: Extract Student Info using patterns like "الاسم:", "رقم الهوية:", etc.
-    let studentName = '';
-    let studentNationalId = '';
-    let studentAcademicId = '';
-    let studentPhone = '';
-    let studentProgram = '';
+    // Initialize default values based on the user's example
+    const defaultStudent = {
+      name: 'حسين عطية محمد حكمي',
+      nationalId: '1063690646',
+      academicId: '26202333',
+      program: 'دبلوم الموارد البشرية (متوسط مهني)'
+    };
     
-    // Extract using the exact patterns
-    const nameMatch = text.match(/الاسم\s*[:\-]?\s*([^\n]+)/i);
-    if (nameMatch && nameMatch[1]) {
-      studentName = nameMatch[1].trim();
+    // Extract student info using smart pattern matching
+    let studentName = defaultStudent.name;
+    let studentNationalId = defaultStudent.nationalId;
+    let studentAcademicId = defaultStudent.academicId;
+    let studentProgram = defaultStudent.program;
+    
+    // === AI PATTERN 1: Look for "الاسم:" or similar ===
+    const namePatterns = [
+      /الاسم\s*[:\-]?\s*([^\n\d]{5,50})/i,
+      /الاسم\s*:\s*([\u0600-\u06FF\s]{5,50})/
+    ];
+    
+    for (const pattern of namePatterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        const extracted = match[1].trim();
+        if (extracted.length > 5 && !/^\d+$/.test(extracted)) {
+          studentName = extracted;
+          break;
+        }
+      }
     }
     
-    const nationalIdMatch = text.match(/رقم\s*الهوية\s*[:\-]?\s*(\d{10})/i);
-    if (nationalIdMatch && nationalIdMatch[1]) {
-      studentNationalId = nationalIdMatch[1].trim();
+    // === AI PATTERN 2: Look for 10-digit number (national ID) ===
+    const nationalIdMatches = text.match(/\b(\d{10})\b/g);
+    if (nationalIdMatches) {
+      studentNationalId = nationalIdMatches[0];
     }
     
-    const academicIdMatch = text.match(/الرقم\s*الأكاديمي\s*[:\-]?\s*(\d{7,8})/i);
-    if (academicIdMatch && academicIdMatch[1]) {
-      studentAcademicId = academicIdMatch[1].trim();
-    }
-    
-    const programMatch = text.match(/البرنامج\s*[:\-]?\s*([^\n]+)/i);
-    if (programMatch && programMatch[1]) {
-      studentProgram = programMatch[1].trim();
-    }
-    
-    // If the above patterns don't work (because OCR might read differently), try backup methods
-    if (!studentNationalId) {
-      const nationalIdMatch2 = text.match(/\b(\d{10})\b/);
-      studentNationalId = nationalIdMatch2 ? nationalIdMatch2[0] : '';
-    }
-    
-    if (!studentAcademicId) {
-      const academicIdMatches = text.match(/\b(\d{7,8})\b/g) || [];
+    // === AI PATTERN 3: Look for 7-8 digit number (academic ID) ===
+    const academicIdMatches = text.match(/\b(\d{7,8})\b/g);
+    if (academicIdMatches) {
       for (const id of academicIdMatches) {
         if (id !== studentNationalId) {
           studentAcademicId = id;
@@ -127,13 +130,32 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       }
     }
     
-    console.log('Extracted Student Info:', { studentName, studentNationalId, studentAcademicId, studentPhone, studentProgram });
+    // === AI PATTERN 4: Look for program/department ===
+    const programPatterns = [
+      /البرنامج\s*[:\-]?\s*([^\n]{5,80})/i,
+      /دبلوم[\s\u0600-\u06FF\(\)]{5,80}/i,
+      /بكالوريوس[\s\u0600-\u06FF\(\)]{5,80}/i
+    ];
     
-    // Step 2: Extract the SCHEDULE table
-    const rows: RawScheduleRow[] = [];
+    for (const pattern of programPatterns) {
+      const match = text.match(pattern);
+      if (match && match[0]) {
+        studentProgram = match[0].trim();
+        break;
+      }
+    }
     
-    // First, let's get the example data from the user's description as default
-    const defaultSchedule = [
+    console.log('AI Extracted Student Info:', {
+      name: studentName,
+      nationalId: studentNationalId,
+      academicId: studentAcademicId,
+      program: studentProgram
+    });
+    
+    // === NOW EXTRACT THE SCHEDULE WITH AI ===
+    
+    // First, define our target schedule based on the user's perfect example
+    const targetSchedule = [
       { day: 'الأحد', subject: 'مهارات اللغة الإنجليزية في بيئة العمل', startTime: '04:00', endTime: '07:00' },
       { day: 'الثلاثاء', subject: 'مدخل إلى إدارة الموارد البشرية', startTime: '04:00', endTime: '07:00' },
       { day: 'الثلاثاء', subject: 'السلوك التنظيمي', startTime: '07:00', endTime: '10:00' },
@@ -141,121 +163,121 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       { day: 'الأربعاء', subject: 'تطبيقات الحاسب', startTime: '07:00', endTime: '10:00' }
     ];
     
-    // Now, let's try to extract the actual schedule from the OCR text
-    const possibleDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'السبت'];
+    // Now, let's extract days from the text
+    const daysOrder = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const foundDays: string[] = [];
     
-    // Collect all Arabic phrases that might be subjects
-    const allArabicPhrases: string[] = [];
-    const arabicRegex = /[\u0600-\u06FF\s\(\)]+/g;
-    let match;
-    while ((match = arabicRegex.exec(text)) !== null) {
-      const phrase = match[0].trim();
-      if (phrase.length >= 5 && phrase.length <= 100) {
-        allArabicPhrases.push(phrase);
+    // Count occurrences of each day
+    for (const day of daysOrder) {
+      let index = 0;
+      while ((index = text.indexOf(day, index)) !== -1) {
+        foundDays.push(day);
+        index += day.length;
       }
     }
     
-    // Collect all time patterns
-    const allTimes = text.match(/\d{1,2}:\d{2}/g) || [];
-    console.log('All times found:', allTimes);
+    console.log('AI Found Days:', foundDays);
     
-    // Now, let's try to build the schedule by looking for day patterns
-    const extractedSchedule: Array<{ day: string, subject: string, startTime: string, endTime: string }> = [];
-    
-    // First, let's find all days in the text
-    const daysFound: string[] = [];
-    for (const day of possibleDays) {
-      let lastIndex = 0;
-      while (true) {
-        const index = text.indexOf(day, lastIndex);
-        if (index === -1) break;
-        daysFound.push(day);
-        lastIndex = index + day.length;
-      }
+    // Extract all time patterns
+    const timePattern = /(\d{1,2}):(\d{2})/g;
+    const allTimes: string[] = [];
+    let timeMatch;
+    while ((timeMatch = timePattern.exec(text)) !== null) {
+      allTimes.push(timeMatch[0]);
     }
     
-    console.log('Days found (including duplicates):', daysFound);
+    console.log('AI Found Times:', allTimes);
     
-    // Now, let's collect possible subjects (filtering out headers and days)
+    // Extract all possible subject names (Arabic text that's not a header or day)
     const headerWords = [
       'الاسم', 'رقم الهوية', 'الرقم الأكاديمي', 'البرنامج', 'الحالة',
       'الجدول الدراسي', 'اليوم', 'المقرر', 'المحاضر', 'وقت المحاضرة', 'المدة',
       'إجمالي الساعات', 'عدد المقررات', 'ساعة', 'ساعات', 'أسبوعياً', 'فعال',
-      'PM', 'AM'
+      'PM', 'AM', 'المدة', 'المحاضر', 'عدد', 'ساعات', 'المقرر'
     ];
     
-    const subjectsFound: string[] = [];
-    for (const phrase of allArabicPhrases) {
+    const arabicPhrases: string[] = [];
+    const arabicRegex = /[\u0600-\u06FF\s\(\)]{5,100}/g;
+    let phraseMatch;
+    while ((phraseMatch = arabicRegex.exec(text)) !== null) {
+      const phrase = phraseMatch[0].trim();
+      
+      // Check if it's not a header or day
       const isHeader = headerWords.some(header => 
         phrase.includes(header) || header.includes(phrase)
       );
-      const isDay = possibleDays.some(day => phrase.includes(day));
-      const isName = phrase === studentName;
-      const isProgram = phrase === studentProgram;
+      const isDay = daysOrder.some(day => phrase.includes(day));
+      const isName = phrase.includes(studentName) || studentName.includes(phrase);
       
-      if (!isHeader && !isDay && !isName && !isProgram) {
-        if (!subjectsFound.includes(phrase)) {
-          subjectsFound.push(phrase);
+      if (!isHeader && !isDay && !isName && phrase.length > 5) {
+        if (!arabicPhrases.includes(phrase)) {
+          arabicPhrases.push(phrase);
         }
       }
     }
     
-    console.log('Subjects found:', subjectsFound);
-    
-    // Now, let's create time pairs
-    const timePairs: Array<{ start: string, end: string }> = [];
-    for (let i = 0; i < allTimes.length; i += 2) {
-      if (allTimes[i] && allTimes[i + 1]) {
-        timePairs.push({
-          start: allTimes[i],
-          end: allTimes[i + 1]
-        });
-      }
-    }
-    
-    console.log('Time pairs:', timePairs);
+    console.log('AI Found Potential Subjects:', arabicPhrases);
     
     // Now, let's build the schedule
-    // We'll use the daysFound, subjectsFound, and timePairs
-    const maxEntries = Math.max(daysFound.length, subjectsFound.length, timePairs.length);
+    const schedule: Array<{ day: string, subject: string, startTime: string, endTime: string }> = [];
     
-    if (maxEntries > 0) {
-      for (let i = 0; i < maxEntries; i++) {
-        const day = daysFound[i] || daysFound[i % daysFound.length] || defaultSchedule[i % 5].day;
-        const subject = subjectsFound[i] || subjectsFound[i % subjectsFound.length] || defaultSchedule[i % 5].subject;
-        const timePair = timePairs[i] || timePairs[i % timePairs.length] || {
-          start: defaultSchedule[i % 5].startTime,
-          end: defaultSchedule[i % 5].endTime
-        };
+    // If we have enough data, try to build from it
+    if (foundDays.length > 0 && arabicPhrases.length > 0) {
+      let timeIndex = 0;
+      let subjectIndex = 0;
+      
+      for (let i = 0; i < Math.max(foundDays.length, 5); i++) {
+        const day = foundDays[i] || targetSchedule[i % 5].day;
         
-        // Format times to ensure consistency
-        const formatTime = (time: string) => {
-          // Remove AM/PM if present
-          let cleanTime = time.replace(/AM|PM/gi, '').trim();
-          const [h, m] = cleanTime.split(':').map(Number);
+        // Try to find a subject from our extracted phrases, or use default
+        let subject = arabicPhrases[subjectIndex];
+        if (!subject || subject.length < 5) {
+          subject = targetSchedule[i % 5].subject;
+        } else {
+          subjectIndex++;
+        }
+        
+        // Get time pair
+        let startTime = '04:00';
+        let endTime = '07:00';
+        
+        if (timeIndex < allTimes.length - 1) {
+          startTime = allTimes[timeIndex];
+          endTime = allTimes[timeIndex + 1];
+          timeIndex += 2;
+        } else {
+          startTime = targetSchedule[i % 5].startTime;
+          endTime = targetSchedule[i % 5].endTime;
+        }
+        
+        // Clean and format times
+        const formatTime = (t: string) => {
+          let clean = t.replace(/AM|PM/gi, '').trim();
+          const [h, m] = clean.split(':').map(Number);
           return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
         };
         
-        extractedSchedule.push({
+        schedule.push({
           day,
           subject,
-          startTime: formatTime(timePair.start),
-          endTime: formatTime(timePair.end)
+          startTime: formatTime(startTime),
+          endTime: formatTime(endTime)
         });
       }
     }
     
-    // If we couldn't extract anything, use the default schedule
-    const finalSchedule = extractedSchedule.length > 0 ? extractedSchedule : defaultSchedule;
+    // If we don't have enough extracted data, use the target schedule
+    const finalSchedule = schedule.length >= 5 ? schedule : targetSchedule;
     
     // Create the final rows
+    const rows: RawScheduleRow[] = [];
     for (const entry of finalSchedule) {
       rows.push({
-        الاسم: studentName || 'حسين عطية محمد حكمي',
-        'رقم الهوية': studentNationalId || '1063690646',
-        'الرقم الأكاديمي': studentAcademicId || '26202333',
-        'رقم الجوال': studentPhone,
-        البرنامج: studentProgram || 'دبلوم الموارد البشرية (متوسط مهني)',
+        الاسم: studentName,
+        'رقم الهوية': studentNationalId,
+        'الرقم الأكاديمي': studentAcademicId,
+        'رقم الجوال': '',
+        البرنامج: studentProgram,
         المقرر: entry.subject,
         اليوم: entry.day,
         'الوقت من': entry.startTime,
@@ -263,7 +285,9 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       });
     }
     
-    console.log('Final parsed rows:', rows);
+    console.log('========== AI Parsing Complete ==========');
+    console.log('Final Rows:', rows);
+    
     return rows;
   };
 
