@@ -350,7 +350,8 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         jsonData = XLSX.utils.sheet_to_json<RawScheduleRow>(worksheet);
       }
 
-      console.log('JSON Data after parse:', jsonData);
+      console.log('🔍 DEBUG: JSON Data after parse (length):', jsonData.length);
+      console.log('🔍 DEBUG: JSON Data full:', jsonData);
 
       // First get existing students to check if they exist
       const existingStudents = await db.getStudents();
@@ -360,7 +361,8 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       const students: ParsedStudent[] = [];
       const subjects: ParsedSubject[] = [];
       const schedules: ParsedSchedule[] = [];
-      const seenStudents = new Set<string>(); // Track by national_id
+      const seenStudentsByNational = new Set<string>();
+      const seenStudentsByAcademic = new Set<string>();
       const seenSubjects = new Set<string>();
 
       for (const row of jsonData) {
@@ -374,17 +376,20 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         const startTime = row['الوقت من'] || '';
         const endTime = row['الوقت إلى'] || '';
 
-        if (nationalId && !seenStudents.has(nationalId)) {
-          seenStudents.add(nationalId);
+        // Add student if we have either nationalId OR academicId!
+        if ((nationalId && !seenStudentsByNational.has(nationalId)) || 
+            (academicId && !seenStudentsByAcademic.has(academicId))) {
+          
+          if (nationalId) seenStudentsByNational.add(nationalId);
+          if (academicId) seenStudentsByAcademic.add(academicId);
           
           // Check if student exists by national_id or academic_id
-          let existing = existingByNationalId.get(nationalId);
-          if (!existing && academicId) {
-            existing = existingByAcademicId.get(academicId);
-          }
+          let existing = null;
+          if (nationalId) existing = existingByNationalId.get(nationalId);
+          if (!existing && academicId) existing = existingByAcademicId.get(academicId);
           
           students.push({
-            full_name: studentName || 'طالب ' + nationalId,
+            full_name: studentName || 'طالب جديد',
             phone: phone || null,
             academic_id: academicId,
             national_id: nationalId,
@@ -392,6 +397,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
             department_name: departmentName,
             isNew: !existing
           });
+          console.log('🔍 DEBUG: Added student:', { full_name: studentName, academic_id: academicId, national_id: nationalId });
         }
 
         if (subjectName && !seenSubjects.has(subjectName)) {
@@ -400,9 +406,10 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
             subject_name: subjectName,
             department_name: departmentName
           });
+          console.log('🔍 DEBUG: Added subject:', subjectName);
         }
 
-        if (academicId && (subjectName || dayName)) {
+        if (academicId && subjectName) { // Only require academicId + subjectName!
           schedules.push({
             student_academic_id: academicId,
             subject_name: subjectName,
@@ -410,13 +417,43 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
             start_time: startTime,
             end_time: endTime
           });
+          console.log('🔍 DEBUG: Added schedule:', { subject_name: subjectName, student_academic_id: academicId, weekday_name: dayName });
         }
       }
 
-      console.log('Final parsed data:', { students, subjects, schedules });
+      console.log('🔍 DEBUG: Final parsed data:');
+      console.log('  • students.length', students.length);
+      console.log('  • subjects.length', subjects.length);
+      console.log('  • schedules.length', schedules.length);
+      console.log('  • students:', students);
+      console.log('  • subjects:', subjects);
+      console.log('  • schedules:', schedules);
+
+      // Also add a debug entry in parsing log
+      if (debugInfo) {
+        setDebugInfo({
+          ...debugInfo,
+          parsingLog: [
+            ...debugInfo.parsingLog,
+            '',
+            '========== 📦 STEP 3: PROCESSING FOR UI ==========',
+            `Students parsed: ${students.length}`,
+            `Subjects parsed: ${subjects.length}`,
+            `Schedules parsed: ${schedules.length}`
+          ]
+        });
+      }
+
       setParsedData({ students, subjects, schedules });
+      
+      // Debug after setState (check via setTimeout because setState is async)
+      setTimeout(() => {
+        console.log('🔍 DEBUG: After setParsedData (async check):');
+        // We can't access the new state directly, but we can log that we called it
+        console.log('  • Called setParsedData with', { students, subjects, schedules });
+      }, 50);
     } catch (err) {
-      console.error('Error parsing file:', err);
+      console.error('❌ Error parsing file:', err);
     } finally {
       setProcessing(false);
     }
@@ -822,6 +859,39 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
                   <p className="text-brand-danger text-sm">⚠️ لم يتم استخراج أي مواد!</p>
                 )}
               </div>
+
+              {/* Parsed Data State (for debugging) */}
+              {parsedData && (
+                <div className="p-4 bg-dark-bg/60 rounded-xl border border-dark-border">
+                  <h4 className="text-sm font-bold text-white mb-3">
+                    📦 State: parsedData (جاهز للمعاينة)
+                  </h4>
+                  <div className="grid grid-cols-1 gap-2 text-xs">
+                    <div>
+                      <span className="text-brand-secondary font-bold">parsedData.students.length: </span>
+                      <span className={parsedData.students.length > 0 ? "text-brand-success" : "text-brand-danger"}>
+                        {parsedData.students.length}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-brand-secondary font-bold">parsedData.subjects.length: </span>
+                      <span className={parsedData.subjects.length > 0 ? "text-brand-success" : "text-brand-danger"}>
+                        {parsedData.subjects.length}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-brand-secondary font-bold">parsedData.schedules.length: </span>
+                      <span className={parsedData.schedules.length > 0 ? "text-brand-success" : "text-brand-danger"}>
+                        {parsedData.schedules.length}
+                      </span>
+                    </div>
+                    <div className="mt-2 p-2 bg-dark-bg/80 rounded max-h-48 overflow-auto font-mono">
+                      <div className="text-dark-muted">parsedData.schedules:</div>
+                      {JSON.stringify(parsedData.schedules, null, 2)}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
