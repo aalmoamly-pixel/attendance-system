@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Users, 
   BookOpen, 
@@ -165,7 +165,6 @@ export default function AttendancePage() {
     return 'bg-brand-danger/10';
   };
 
-  const studentSubjects = getStudentSubjects();
   const overallStats = selectedStudent ? getOverallAttendanceStats(selectedStudent) : null;
 
   const weeks = Array.from({ length: 15 }, (_, i) => i + 1);
@@ -206,7 +205,7 @@ export default function AttendancePage() {
               value={selectedStudentId}
               onChange={async (e) => {
                 setSelectedStudentId(e.target.value);
-                setSelectedSubjectId('');
+                setSelectedScheduleId('');
                 setAttendanceRates(null);
                 if (e.target.value) {
                   const rates = await db.calculateAttendanceRates(parseInt(e.target.value));
