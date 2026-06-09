@@ -920,12 +920,42 @@ export const db = {
   async importSubjects(subjects: Omit<Subject, 'subject_id' | 'created_at'>[]): Promise<Map<string, number>> {
     const mapping = new Map<string, number>();
     if (supabase) {
-      const { data, error } = await supabase.from('subjects').insert(subjects).select('*');
-      if (error) {
-        console.error('[Subjects] Import error:', error);
-        throw error;
+      for (const subj of subjects) {
+        // Check if subject exists
+        const { data: existing } = await supabase
+          .from('subjects')
+          .select('*')
+          .eq('subject_name', subj.subject_name)
+          .eq('department_id', subj.department_id)
+          .maybeSingle();
+        
+        if (existing) {
+          // Update existing
+          const { data, error } = await supabase
+            .from('subjects')
+            .update(subj)
+            .eq('subject_id', existing.subject_id)
+            .select('*')
+            .single();
+          if (error) {
+            console.error('[Subjects] Update existing error:', error);
+          } else {
+            mapping.set(data.subject_name, data.subject_id);
+          }
+        } else {
+          // Insert new
+          const { data, error } = await supabase
+            .from('subjects')
+            .insert(subj)
+            .select('*')
+            .single();
+          if (error) {
+            console.error('[Subjects] Insert new error:', error);
+          } else {
+            mapping.set(data.subject_name, data.subject_id);
+          }
+        }
       }
-      (data || []).forEach(s => mapping.set(s.subject_name, s.subject_id));
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]');
       let nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.subject_id)) + 1 : 1;
