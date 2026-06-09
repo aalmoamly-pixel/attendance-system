@@ -3,6 +3,7 @@ import {
   Plus, 
   Search, 
   Edit3, 
+  Trash2, 
   X, 
   Check, 
   GraduationCap, 
@@ -10,8 +11,7 @@ import {
   AlertCircle,
   Building2,
   BookOpen,
-  StickyNote,
-  Trash2
+  StickyNote
 } from 'lucide-react';
 import { db } from '../lib/supabase';
 import type { Student, Department, Subject, Weekday, TimeSlot, PersonalNote } from '../types/database';
@@ -107,66 +107,54 @@ export default function Students() {
   };
 
   const handleOpenEdit = async (student: Student) => {
-    // Fetch FRESH student data directly from the database
-    const allStudents = await db.getStudents();
-    const freshStudent = allStudents.find(s => s.student_id === student.student_id);
+    setEditingStudent(student);
     
-    if (freshStudent) {
-      setEditingStudent(freshStudent);
+    const department = departments.find(d => d.department_id === student.department_id);
+    
+    setFormData({
+      full_name: student.full_name,
+      phone: student.phone || '',
+      academic_id: student.academic_id,
+      national_id: student.national_id,
+      password: '',
+      department_name: department?.department_name || ''
+    });
+    
+    try {
+      const studentSchedule = await db.getStudentSchedule(student.student_id);
       
-      const department = departments.find(d => d.department_id === freshStudent.department_id);
-      
-      setFormData({
-        full_name: freshStudent.full_name || '',
-        phone: freshStudent.phone || '',
-        academic_id: freshStudent.academic_id || '',
-        national_id: freshStudent.national_id || '',
-        password: '', // Leave empty for edit unless changed
-        department_name: department?.department_name || ''
-      });
-      
-      try {
-        const studentSchedule = await db.getStudentSchedule(freshStudent.student_id);
-        
-        if (studentSchedule.length > 0) {
-          setStudentSubjects(
-            studentSchedule.map(s => ({
-              subject_name: s.subjects?.subject_name || '',
-              weekday_id: s.weekday_id,
-              slot_id: s.slot_id
-            }))
-          );
-        } else {
-          setStudentSubjects([
-            { subject_name: '', weekday_id: 1, slot_id: timeSlots[0]?.slot_id || 1 }
-          ]);
-        }
-      } catch (err) {
-        console.error('[Students] Error loading schedule:', err);
+      if (studentSchedule.length > 0) {
+        setStudentSubjects(
+          studentSchedule.map(s => ({
+            subject_name: s.subjects?.subject_name || '',
+            weekday_id: s.weekday_id,
+            slot_id: s.slot_id
+          }))
+        );
+      } else {
         setStudentSubjects([
           { subject_name: '', weekday_id: 1, slot_id: timeSlots[0]?.slot_id || 1 }
         ]);
       }
-      
-      setFormError(null);
-      setIsModalOpen(true);
+    } catch (err) {
+      console.error('[Students] Error loading schedule:', err);
+      setStudentSubjects([
+        { subject_name: '', weekday_id: 1, slot_id: timeSlots[0]?.slot_id || 1 }
+      ]);
     }
+    
+    setFormError(null);
+    setIsModalOpen(true);
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا الطالب؟\n\nملاحظة: لا يمكن حذف طالب لديه إشعارات أو سجلات مرتبطة به.')) {
+    if (window.confirm('هل أنت متأكد من حذف هذا الطالب؟')) {
       try {
         await db.deleteStudent(id);
         showToast('تم حذف الطالب بنجاح');
         fetchData();
       } catch (err: any) {
-        console.error('[Students] Delete error:', err);
-        const errorMsg = err?.message || 'فشل حذف الطالب (قد يكون لديه سجلات مرتبطة به)';
-        if (errorMsg.includes('notifications') || errorMsg.includes('foreign')) {
-          setFormError('لا يمكن حذف هذا الطالب لأنه يحتوي على سجلات مرتبطة به (إشعارات، جداول، إلخ)');
-        } else {
-          setFormError(errorMsg);
-        }
+        setFormError('فشل حذف الطالب');
       }
     }
   };
@@ -261,7 +249,16 @@ export default function Students() {
         console.log('[Students handleSubmit] updateData:', updateData);
         await db.updateStudent(editingStudent.student_id, updateData);
         
-        const schedulesToImport: any[] = [];
+        const oldSchedule = await db.getStudentSchedule(editingStudent.student_id);
+        
+        for (const scheduleEntry of oldSchedule) {
+          try {
+            await db.deleteSchedule(scheduleEntry.schedule_id);
+          } catch (e) {
+            console.log('[Students] Error deleting schedule:', e);
+          }
+        }
+        
         for (const subj of studentSubjects) {
           if (subj.subject_name) {
             let subjectId = subjects.find(s => 
@@ -276,18 +273,13 @@ export default function Students() {
               subjectId = newSubject.subject_id;
             }
             
-            schedulesToImport.push({
+            await db.createSchedule({
               student_id: editingStudent.student_id,
               subject_id: subjectId,
               weekday_id: subj.weekday_id,
               slot_id: subj.slot_id
             });
           }
-        }
-        
-        // Use importSchedule to update existing schedules and add new ones
-        if (schedulesToImport.length > 0) {
-          await db.importSchedule(schedulesToImport);
         }
         
         showToast('تم تحديث الطالب والمواد بنجاح');
