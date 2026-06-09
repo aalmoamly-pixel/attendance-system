@@ -730,9 +730,14 @@ export const db = {
     if (supabase) {
       const existingStudents = await this.getStudents();
       const existingByNationalId = new Map(existingStudents.map(s => [s.national_id, s]));
+      const existingByAcademicId = new Map(existingStudents.map(s => [s.academic_id, s]));
       
       for (const stu of students) {
-        const existing = existingByNationalId.get(stu.national_id);
+        let existing = existingByNationalId.get(stu.national_id);
+        if (!existing) {
+          existing = existingByAcademicId.get(stu.academic_id);
+        }
+        
         if (existing) {
           // Update existing student
           const updateData: any = {
@@ -784,7 +789,11 @@ export const db = {
       let nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.student_id)) + 1 : 1;
       
       for (const stu of students) {
-        const foundIndex = existing.findIndex((s: any) => s.national_id === stu.national_id);
+        let foundIndex = existing.findIndex((s: any) => s.national_id === stu.national_id);
+        if (foundIndex === -1) {
+          foundIndex = existing.findIndex((s: any) => s.academic_id === stu.academic_id);
+        }
+        
         if (foundIndex !== -1) {
           // Update existing in localStorage
           existing[foundIndex] = {
@@ -1113,15 +1122,26 @@ export const db = {
     };
     
     if (supabase) {
-      const { error } = await supabase.from('attendance_log').upsert(log);
+      const { error } = await supabase
+        .from('attendance_log')
+        .upsert(log, { onConflict: 'schedule_id,attendance_date' });
       if (error) {
         console.error('[Attendance] Mark error:', error);
         throw error;
       }
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.ATTENDANCE_LOGS) || '[]');
-      const nextId = existing.length > 0 ? Math.max(...existing.map((l: any) => l.log_id)) + 1 : 1;
-      existing.push({ ...log, log_id: nextId });
+      const existingIndex = existing.findIndex((l: any) => 
+        l.schedule_id === log.schedule_id && l.attendance_date === log.attendance_date
+      );
+      
+      if (existingIndex !== -1) {
+        existing[existingIndex] = { ...existing[existingIndex], ...log };
+      } else {
+        const nextId = existing.length > 0 ? Math.max(...existing.map((l: any) => l.log_id)) + 1 : 1;
+        existing.push({ ...log, log_id: nextId });
+      }
+      
       localStorage.setItem(LOCAL_KEYS.ATTENDANCE_LOGS, JSON.stringify(existing));
     }
   },
@@ -1902,7 +1922,7 @@ export async function migrateLocalToSupabase() {
       return cleaned;
     });
     const students = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]').map((s: any) => {
-      const { organization_id, ...cleaned } = s;
+      const { organization_id, personal_note, subscription_amount, due_date, subscription_status, financial_notes, ...cleaned } = s;
       return cleaned;
     });
     const subjects = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]').map((s: any) => {
