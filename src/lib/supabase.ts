@@ -732,63 +732,51 @@ export const db = {
       const existingByNationalId = new Map(existingStudents.map(s => [s.national_id, s]));
       
       for (const stu of students) {
-        console.log('[importStudents] Processing student:', stu);
         const existing = existingByNationalId.get(stu.national_id);
         if (existing) {
-          console.log('[importStudents] Found existing student:', existing);
-          // Update existing student, but don't overwrite academic_id if not needed!
+          // Update existing student
           const updateData: any = {
             full_name: stu.full_name,
             phone: stu.phone,
+            academic_id: stu.academic_id,
             department_id: stu.department_id
-            // Don't update academic_id unless we have to!
           };
           if (stu.password) {
             updateData.password = stu.password;
             updateData.password_hash = await hashPassword(stu.password);
           }
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('students')
             .update(updateData)
-            .eq('student_id', existing.student_id);
+            .eq('student_id', existing.student_id)
+            .select('*')
+            .single();
           if (error) {
-            console.warn('[importStudents] Update failed, but continuing:', error);
+            console.error('[Students] Update existing error:', error);
+            throw error;
           }
-          mapping.set(stu.national_id, existing.student_id); // Use existing student_id no matter what!
+          mapping.set(data.academic_id, data.student_id);
         } else {
           // Insert new student
-          console.log('[importStudents] Inserting new student');
-          try {
-            const { data, error } = await supabase
-              .from('students')
-              .insert({
-                full_name: stu.full_name,
-                phone: stu.phone,
-                academic_id: stu.academic_id,
-                national_id: stu.national_id,
-                password: stu.password,
-                password_hash: await hashPassword(stu.password),
-                role: 'student' as const,
-                department_id: stu.department_id
-              })
-              .select('*')
-              .single();
-            if (error) {
-              console.error('[importStudents] Insert error, trying to find by academic_id:', error);
-              // If insert fails (duplicate academic_id), find existing by academic_id!
-              const existingByAcademic = existingStudents.find(s => s.academic_id === stu.academic_id);
-              if (existingByAcademic) {
-                console.log('[importStudents] Found student by academic_id:', existingByAcademic);
-                mapping.set(stu.national_id, existingByAcademic.student_id);
-              } else {
-                throw error;
-              }
-            } else {
-              mapping.set(stu.national_id, data.student_id);
-            }
-          } catch (err) {
-            console.error('[importStudents] Final error inserting student:', err);
+          const { data, error } = await supabase
+            .from('students')
+            .insert({
+              full_name: stu.full_name,
+              phone: stu.phone,
+              academic_id: stu.academic_id,
+              national_id: stu.national_id,
+              password: stu.password,
+              password_hash: await hashPassword(stu.password),
+              role: 'student' as const,
+              department_id: stu.department_id
+            })
+            .select('*')
+            .single();
+          if (error) {
+            console.error('[Students] Insert new error:', error);
+            throw error;
           }
+          mapping.set(data.academic_id, data.student_id);
         }
       }
     } else {
@@ -808,7 +796,7 @@ export const db = {
             password: stu.password,
             password_hash: await hashPassword(stu.password)
           };
-          mapping.set(stu.national_id, existing[foundIndex].student_id); // KEY IS NATIONAL_ID now!
+          mapping.set(stu.academic_id, existing[foundIndex].student_id);
         } else {
           // Insert new in localStorage
           const newStu = {
@@ -823,12 +811,11 @@ export const db = {
             department_id: stu.department_id
           };
           existing.push(newStu);
-          mapping.set(stu.national_id, newStu.student_id); // KEY IS NATIONAL_ID now!
+          mapping.set(stu.academic_id, newStu.student_id);
         }
       }
       localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existing));
     }
-    console.log('[importStudents] Final mapping:', Object.fromEntries(mapping));
     return mapping;
   },
 
@@ -1915,7 +1902,7 @@ export async function migrateLocalToSupabase() {
       return cleaned;
     });
     const students = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]').map((s: any) => {
-      const { organization_id, personal_note, ...cleaned } = s; // Remove columns not in students table
+      const { organization_id, ...cleaned } = s;
       return cleaned;
     });
     const subjects = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]').map((s: any) => {

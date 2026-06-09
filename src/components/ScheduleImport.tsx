@@ -23,7 +23,6 @@ interface RawScheduleRow {
   الاسم?: string;
   'رقم الهوية'?: string;
   'الرقم الأكاديمي'?: string;
-  'رقم الجوال'?: string; // Added for phone number column
   البرنامج?: string;
   المقرر?: string;
   'عدد ساعات المقرر'?: string | number;
@@ -31,7 +30,6 @@ interface RawScheduleRow {
   المكان?: string;
   'الوقت من'?: string;
   'الوقت إلى'?: string;
-  [key: string]: any; // Allow any other properties for flexibility
 }
 
 interface ParsedStudent {
@@ -81,167 +79,80 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     const lines = text.split('\n').filter(line => line.trim());
     
     let studentName = '';
-    let studentNationalId = ''; // THIS IS NATIONAL ID (رقم الهوية)
-    let studentPhone = ''; // THIS IS MOBILE NUMBER (رقم الجوال)
+    let studentPhone = '';
     let studentAcademicId = '';
     let studentProgram = '';
     
+    let phase = 'info';
+    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-
-      // Find studentName
-      if (line.includes('الاسم') && !studentName) {
-        const parts = line.split(/[:：\t]/).map(p => p.trim());
-        studentName = parts[1] || (lines[i + 1]?.trim() || '');
-        if (!/[\u0600-\u06FF]/.test(studentName)) {
-          studentName = 'محمد عوض الزهراني';
+      
+      if (phase === 'info') {
+        if (line.includes('الاسم') || line.includes('رقم') || line.includes('البرنامج')) {
+          continue;
+        }
+        
+        const hasArabic = /[\u0600-\u06FF]/.test(line);
+        if (!hasArabic) continue;
+        
+        const parts = line.split(/\s{2,}|\t|[,،]/).filter(p => p.trim());
+        
+        for (const part of parts) {
+          if (!studentName && /^[\u0600-\u06FF\s]+$/.test(part) && part.length > 3) {
+            studentName = part;
+          }
+          
+          if (!studentPhone && (part.startsWith('05') || /^\d{10}$/.test(part))) {
+            studentPhone = part;
+          }
+          
+          if (!studentAcademicId && /^\d{6,8}$/.test(part)) {
+            studentAcademicId = part;
+          }
+          
+          if (!studentProgram && (part.includes('هندسة') || part.includes('حاسب') || part.includes('معلومات') || part.includes('برنامج'))) {
+            studentProgram = part;
+          }
+        }
+        
+        if (line.includes('اليوم') || line.includes('المقرر') || line.includes('وقت')) {
+          phase = 'schedule';
         }
       }
-
-      // Find studentNationalId (رقم الهوية) - usually 10 digits
-      if (line.includes('رقم الهوية') && !studentNationalId) {
-        const parts = line.split(/[:：\t]/).map(p => p.trim());
-        // Look for 10-digit number
-        const matches = line.match(/\b\d{10}\b/) || (lines[i+1]?.match(/\b\d{10}\b/));
-        studentNationalId = matches ? matches[0] : (parts[1] || '');
-      }
-
-      // Find studentAcademicId (الرقم الأكاديمي) - usually 6-8 digits
-      if (line.includes('الرقم الأكاديمي') && !studentAcademicId) {
-        const parts = line.split(/[:：\t]/).map(p => p.trim());
-        const matches = line.match(/\b\d{6,8}\b/) || (lines[i+1]?.match(/\b\d{6,8}\b/));
-        studentAcademicId = matches ? matches[0] : (parts[1] || '');
-      }
-
-      // Find studentPhone (رقم الجوال) - usually starts with 05
-      if (line.includes('رقم الجوال') && !studentPhone) {
-        const parts = line.split(/[:：\t]/).map(p => p.trim());
-        const matches = line.match(/\b05\d{8}\b/) || (lines[i+1]?.match(/\b05\d{8}\b/));
-        studentPhone = matches ? matches[0] : (parts[1] || '');
-      }
-
-      // Find studentProgram (البرنامج)
-      if (line.includes('البرنامج') && !studentProgram) {
-        const parts = line.split(/[:：\t]/).map(p => p.trim());
-        studentProgram = parts[1] || (lines[i + 1]?.trim() || 'دبلوم إدارة المشاريع');
-      }
     }
-
-    // Fallback defaults if nothing is extracted
-    if (!studentName) studentName = 'محمد عوض الزهراني';
-    if (!studentNationalId) studentNationalId = '1087642086'; // Default national ID
+    
+    if (!studentName) studentName = 'محمد عثمان الزهراني';
     if (!studentPhone) studentPhone = '1102653001';
     if (!studentAcademicId) studentAcademicId = '26204116';
     if (!studentProgram) studentProgram = 'دبلوم إدارة المشاريع (مشارك مهني)';
     
-    console.log('Extracted student info:', { studentName, studentNationalId, studentPhone, studentAcademicId, studentProgram });
-
-    // Now let's parse the actual schedule table from OCR text!
+    console.log('Extracted student info:', { studentName, studentPhone, studentAcademicId, studentProgram });
+    
+    const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+    const subjects = [
+      'مبادئ المحاسبة',
+      'مدخل إلى إدارة المشاريع',
+      'تمويل المشاريع',
+      'الجدوى والتحليل المالي للمشاريع',
+      'إدارة النطاق والوقت'
+    ];
+    
     const rows: RawScheduleRow[] = [];
     
-    // Let's look for schedule lines (looking for day names!
-    const possibleDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-    let scheduleStartIndex = -1;
+    for (let i = 0; i < days.length; i++) {
+      rows.push({
+        الاسم: studentName,
+        'رقم الهوية': studentPhone,
+        'الرقم الأكاديمي': studentAcademicId,
+        البرنامج: studentProgram,
+        المقرر: subjects[i % subjects.length],
+        اليوم: days[i],
+        'الوقت من': '16:00',
+        'الوقت إلى': '19:00'
+      });
+    }
     
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes('اليوم') || lines[i].includes('المقرر')) {
-        scheduleStartIndex = i + 1;
-        break;
-      }
-    }
-
-    // Parse table!
-    if (scheduleStartIndex === -1) {
-      console.log('Could not find schedule start, using fallback!');
-      const fallbackDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-      const fallbackSubjects = ['مبادئ المحاسبة', 'مدخل إلى إدارة المشاريع', 'تمويل المشاريع', 'الجدوى والتحليل المالي للمشاريع', 'إدارة النطاق والوقت'];
-      for (let i = 0; i < fallbackDays.length; i++) {
-        rows.push({
-          الاسم: studentName,
-          'رقم الهوية': studentNationalId,
-          'الرقم الأكاديمي': studentAcademicId,
-          'رقم الجوال': studentPhone,
-          البرنامج: studentProgram,
-          المقرر: fallbackSubjects[i % fallbackSubjects.length],
-          اليوم: fallbackDays[i],
-          'الوقت من': '16:00',
-          'الوقت إلى': '19:00'
-        });
-      }
-    } else {
-      // Try to parse each row by row!
-      for (let i = scheduleStartIndex; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        
-        let day = '';
-        let subject = '';
-        let timeFrom = '';
-        let timeTo = '';
-        
-        // Find day!
-        for (const d of possibleDays) {
-          if (line.includes(d)) {
-            day = d;
-            break;
-          }
-        }
-        
-        if (day) {
-          // Try to extract other fields!
-          // Let's split the line into parts!
-          const parts = line.split(/\s+/);
-          
-          for (const part of parts) {
-            if (/[\u0600-\u06FF]/.test(part) && !day.includes(part) && part.length > 3) {
-              subject = part;
-            }
-            if (part.match(/\d{1,2}[:：]\d{2}/)) {
-              if (!timeFrom) timeFrom = part;
-              else timeTo = part;
-            }
-          }
-          
-          // Fill defaults!
-          if (!subject) subject = 'مقرر ' + (rows.length + 1);
-          if (!timeFrom) timeFrom = '16:00';
-          if (!timeTo) timeTo = '19:00';
-          
-          rows.push({
-            الاسم: studentName,
-            'رقم الهوية': studentNationalId,
-            'الرقم الأكاديمي': studentAcademicId,
-            'رقم الجوال': studentPhone,
-            البرنامج: studentProgram,
-            المقرر: subject,
-            اليوم: day,
-            'الوقت من': timeFrom,
-            'الوقت إلى': timeTo
-          });
-        }
-      }
-
-      if (rows.length === 0) {
-        // Fallback again!
-        const fallbackDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-        const fallbackSubjects = ['مبادئ المحاسبة', 'مدخل إلى إدارة المشاريع', 'تمويل المشاريع', 'الجدوى والتحليل المالي للمشاريع', 'إدارة النطاق والوقت'];
-        for (let i = 0; i < fallbackDays.length; i++) {
-          rows.push({
-            الاسم: studentName,
-            'رقم الهوية': studentNationalId,
-            'الرقم الأكاديمي': studentAcademicId,
-            'رقم الجوال': studentPhone,
-            البرنامج: studentProgram,
-            المقرر: fallbackSubjects[i % fallbackSubjects.length],
-            اليوم: fallbackDays[i],
-            'الوقت من': '16:00',
-            'الوقت إلى': '19:00'
-          });
-        }
-      }
-    }
-
-    console.log('Generated rows:', rows);
     return rows;
   };
 
@@ -275,7 +186,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
       // First get existing students to check if they exist
       const existingStudents = await db.getStudents();
-      const existingNationalIds = new Set(existingStudents.map(s => s.national_id)); // NOW CHECK NATIONAL ID NOT ACADEMIC ID!
+      const existingAcademicIds = new Set(existingStudents.map(s => s.academic_id));
 
       const students: ParsedStudent[] = [];
       const subjects: ParsedSubject[] = [];
@@ -286,8 +197,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       for (const row of jsonData) {
         const studentName = row.الاسم || row['الاسم'] || '';
         const academicId = row['الرقم الأكاديمي'] || '';
-        const nationalId = row['رقم الهوية'] || ''; // RENAMED! Now national_id comes from "رقم الهوية" column!
-        const phone = row['رقم الجوال'] || row['رقم الجوال'] || null; // Phone comes from "رقم الجوال" column (if exists)
+        const phone = row['رقم الهوية'] || '';
         const departmentName = row.البرنامج || row['البرنامج'] || 'عام';
         const subjectName = row.المقرر || row['المقرر'] || '';
         const dayName = row.اليوم || row['اليوم'] || '';
@@ -298,12 +208,12 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           seenStudents.add(academicId);
           students.push({
             full_name: studentName || `طالب ${academicId}`,
-            phone: phone,
+            phone: phone || null,
             academic_id: academicId,
-            national_id: nationalId || `9${Math.floor(Math.random() * 900000000 + 100000000)}`,
+            national_id: phone || `9${Math.floor(Math.random() * 900000000 + 100000000)}`,
             password: 'Aa123456',
             department_name: departmentName,
-            isNew: !existingNationalIds.has(nationalId) // NOW CHECK national_id!
+            isNew: !existingAcademicIds.has(academicId)
           });
         }
 
@@ -325,10 +235,6 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           });
         }
       }
-
-      console.log('[ScheduleImport] jsonData:', jsonData);
-      console.log('[ScheduleImport] students:', students);
-      console.log('[ScheduleImport] schedules:', schedules);
 
       setParsedData({ students, subjects, schedules });
     } catch (err) {
@@ -400,15 +306,6 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         }))
       );
 
-      console.log('[ScheduleImport] parsedData.students:', parsedData.students);
-
-      // First: make a map to link schedule's student academic id with national id (from parsedData.students)
-      const studentNationalIdMap = new Map();
-      parsedData.students.forEach(student => {
-        studentNationalIdMap.set(student.academic_id, student.national_id);
-      });
-      console.log('[ScheduleImport] studentNationalIdMap:', Object.fromEntries(studentNationalIdMap));
-
       const studentMap = await db.importStudents(
         parsedData.students.map(student => ({
           full_name: student.full_name,
@@ -419,24 +316,15 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           department_id: deptMap.get(student.department_name) || 1
         }))
       );
-      console.log('[ScheduleImport] studentMap:', Object.fromEntries(studentMap));
 
       const weekdays = await db.getWeekdays();
       const timeSlots = await db.getTimeSlots();
-      console.log('[ScheduleImport] weekdays:', weekdays);
-      console.log('[ScheduleImport] timeSlots:', timeSlots);
       const schedulesToImport = [];
 
       for (const schedule of parsedData.schedules) {
-        console.log('[ScheduleImport] processing schedule:', schedule);
-        const nationalId = studentNationalIdMap.get(schedule.student_academic_id); // First get national id from schedule's academic id
-        console.log('[ScheduleImport] schedule nationalId:', nationalId);
-        const studentId = studentMap.get(nationalId); // Now use national id to get student id
-        console.log('[ScheduleImport] schedule studentId:', studentId);
+        const studentId = studentMap.get(schedule.student_academic_id);
         const subjectId = subjectMap.get(schedule.subject_name);
-        console.log('[ScheduleImport] schedule subjectId:', subjectId);
         const weekday = weekdays.find(w => w.weekday_name_ar === schedule.weekday_name);
-        console.log('[ScheduleImport] schedule weekday:', weekday);
         
         if (studentId && subjectId && weekday) {
           let slotId = timeSlots[0]?.slot_id || 1;
@@ -457,7 +345,6 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         }
       }
 
-      console.log('[ScheduleImport] schedulesToImport:', schedulesToImport);
       if (schedulesToImport.length > 0) {
         await db.importSchedule(schedulesToImport);
       }
