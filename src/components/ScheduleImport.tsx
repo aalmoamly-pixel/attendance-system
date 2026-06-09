@@ -96,101 +96,288 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     // Extract student info
     // Look for 10-digit number for national ID
     const nationalIdCandidates = allNumbers.filter(n => n.length === 10);
-    studentNationalId = nationalIdCandidates[0] || '1063690646';
+    studentNationalId = nationalIdCandidates[0] || '';
     
     // Look for 6-8 digit number for academic ID
     const academicIdCandidates = allNumbers.filter(n => n.length >= 6 && n.length <= 8);
-    studentAcademicId = academicIdCandidates.find(n => n !== studentNationalId) || '26202333';
+    // Find academic ID that's not the national ID
+    studentAcademicId = academicIdCandidates.find(n => n !== studentNationalId) || '';
     
-    // Look for student name - usually longer text at the beginning
-    const allArabicWords = text.match(/[\u0600-\u06FF\s]+/g) || [];
-    for (const phrase of allArabicWords) {
-      const cleanPhrase = phrase.trim();
-      if (cleanPhrase.length >= 10 && 
-          !cleanPhrase.includes('الاسم') && 
-          !cleanPhrase.includes('رقم') &&
-          !cleanPhrase.includes('البرنامج') &&
-          !cleanPhrase.includes('المقرر') &&
-          !cleanPhrase.includes('اليوم') &&
-          !cleanPhrase.includes('الوقت')) {
-        studentName = cleanPhrase;
-        break;
-      }
-    }
-    if (!studentName) studentName = 'حسين عطية محمد حكمي';
-    if (!studentProgram) studentProgram = 'دبلوم الموارد البشرية ( متوسط مهني )';
-    
-    console.log('Student Info:', { studentName, studentNationalId, studentAcademicId, studentPhone, studentProgram });
-    
-    // Step 2: Now extract the TABLE ROWS properly!
-    // The table has: 5 rows with subject, day, time
-    const rows: RawScheduleRow[] = [];
-    const possibleDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'السبت'];
-    
-    // Let's look for sequences that look like table rows
-    // First, let's collect ALL possible subjects from the image
-    const subjects = [];
-    
-    // Look for subject-like phrases - these are usually longer phrases in the middle
-    // Let's split the text and look for patterns
-    const commonSubjects = [
-      'مهارات اللغة الإنجليزية في بيئة العمل',
-      'مدخل إلى إدارة الموارد البشرية',
-      'السلوك التنظيمي',
-      'تقنيات ونظم الموارد البشرية',
-      'تطبيقات الحاسب',
-      'HR Technology'
-    ];
-    
-    // First, try to find these exact subjects (or partial matches)
-    for (const subject of commonSubjects) {
-      if (text.includes(subject) || text.includes(subject.substring(0, 8))) {
-        subjects.push(subject);
-      }
+    // Extract student name - look for names after "الاسم" or just find Arabic names
+    const nameMatch = text.match(/الاسم\s*[:\-]?\s*([\u0600-\u06FF\s]+)/i);
+    if (nameMatch && nameMatch[1]) {
+      studentName = nameMatch[1].trim();
     }
     
-    // If we didn't find them, try to extract using word sequences
-    if (subjects.length === 0) {
-      // Look for longer phrases in the text
-      const phrases = text.split(/\n|\t|\s{4,}/);
-      for (const phrase of phrases) {
+    // If not found, look for Arabic name patterns
+    if (!studentName) {
+      const allArabicWords = text.match(/[\u0600-\u06FF\s]+/g) || [];
+      for (const phrase of allArabicWords) {
         const cleanPhrase = phrase.trim();
+        // Check if it's a name (not containing keywords like "الاسم", "رقم", "البرنامج", etc.)
         if (cleanPhrase.length >= 10 && 
-            !possibleDays.includes(cleanPhrase) &&
-            !cleanPhrase.includes(':') &&
-            !/^\d+$/.test(cleanPhrase) &&
-            cleanPhrase.length <= 50) {
-          subjects.push(cleanPhrase);
+            !cleanPhrase.includes('الاسم') && 
+            !cleanPhrase.includes('رقم') &&
+            !cleanPhrase.includes('البرنامج') &&
+            !cleanPhrase.includes('المقرر') &&
+            !cleanPhrase.includes('اليوم') &&
+            !cleanPhrase.includes('الوقت') &&
+            !cleanPhrase.includes('المحاضرة') &&
+            !cleanPhrase.includes('الشعبة')) {
+          studentName = cleanPhrase;
+          break;
         }
       }
     }
     
-    // Now assign days and times
-    const days = ['الأحد', 'الثلاثاء', 'الأربعاء', 'الأربعاء', 'الأحد'];
-    const startTimes = ['04:00', '04:00', '07:00', '04:00', '07:00'];
-    const endTimes = ['07:00', '07:00', '10:00', '07:00', '10:00'];
-    
-    // Build the 5 rows!
-    for (let i = 0; i < 5; i++) {
-      const subject = subjects[i] || 'مادة ' + (i + 1);
-      const day = days[i];
-      const startTime = startTimes[i];
-      const endTime = endTimes[i];
-      
-      rows.push({
-        الاسم: studentName,
-        'رقم الهوية': studentNationalId,
-        'الرقم الأكاديمي': studentAcademicId,
-        'رقم الجوال': studentPhone,
-        البرنامج: studentProgram,
-        المقرر: subject,
-        اليوم: day,
-        'الوقت من': startTime,
-        'الوقت إلى': endTime
-      });
+    // Extract program/department
+    const programMatch = text.match(/البرنامج\s*[:\-]?\s*([\u0600-\u06FF\s\(\)]+)/i);
+    if (programMatch && programMatch[1]) {
+      studentProgram = programMatch[1].trim();
     }
     
-    console.log('Final rows:', rows);
+    // If not found, look for program patterns
+    if (!studentProgram) {
+      const programKeywords = ['دبلوم', 'بكالوريوس', 'ماجستير', 'موارد بشرية', 'هندسة', 'علوم', 'نظم'];
+      for (const line of lines) {
+        for (const keyword of programKeywords) {
+          if (line.includes(keyword) && line.length > 10) {
+            studentProgram = line.trim();
+            break;
+          }
+        }
+        if (studentProgram) break;
+      }
+    }
+    
+    console.log('Extracted Student Info:', { studentName, studentNationalId, studentAcademicId, studentPhone, studentProgram });
+    
+    // Step 2: Extract the schedule table rows
+    const rows: RawScheduleRow[] = [];
+    
+    // First, let's identify which lines are part of the schedule table
+    // Schedule lines will usually have: day, time, subject
+    const possibleDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'السبت'];
+    const timePattern = /(\d{1,2}):(\d{2})/;
+    const timeRangePattern = /(\d{1,2}):(\d{2})\s*[-–:to]?\s*(\d{1,2}):(\d{2})/i;
+    
+    // Let's find all lines that might be schedule rows
+    const scheduleLines: string[] = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Check if line contains a day name or time
+      const hasDay = possibleDays.some(day => line.includes(day));
+      const hasTime = timePattern.test(line);
+      
+      if (hasDay || hasTime) {
+        scheduleLines.push(line);
+      }
+    }
+    
+    console.log('Potential schedule lines:', scheduleLines);
+    
+    // Now, let's parse these lines more carefully
+    // We need to group: day, subject, start time, end time
+    
+    // First, let's extract all days from the text
+    const daysInText: string[] = [];
+    for (const day of possibleDays) {
+      if (text.includes(day)) {
+        daysInText.push(day);
+      }
+    }
+    
+    // Extract all time ranges
+    const allTimes: string[] = [];
+    const timeMatches = text.match(timePattern);
+    if (timeMatches) {
+      // Look for pairs of times that could be start and end
+      const timeExpressions = text.match(/\d{1,2}:\d{2}/g) || [];
+      for (let i = 0; i < timeExpressions.length - 1; i += 2) {
+        allTimes.push(`${timeExpressions[i]}-${timeExpressions[i+1]}`);
+      }
+    }
+    
+    // Extract all subjects - look for Arabic phrases that are not days/times/headers
+    const subjectsInText: string[] = [];
+    const arabicPhrases = text.match(/[\u0600-\u06FF\s]+/g) || [];
+    
+    for (const phrase of arabicPhrases) {
+      const cleanPhrase = phrase.trim();
+      if (cleanPhrase.length >= 5 && 
+          !possibleDays.includes(cleanPhrase) &&
+          !cleanPhrase.includes('الاسم') &&
+          !cleanPhrase.includes('رقم') &&
+          !cleanPhrase.includes('البرنامج') &&
+          !cleanPhrase.includes('المقرر') &&
+          !cleanPhrase.includes('اليوم') &&
+          !cleanPhrase.includes('الوقت') &&
+          !cleanPhrase.includes('المحاضرة') &&
+          !cleanPhrase.includes('الشعبة') &&
+          !cleanPhrase.includes('عدد') &&
+          !cleanPhrase.includes('ساعات') &&
+          !cleanPhrase.includes('الحالة')) {
+        subjectsInText.push(cleanPhrase);
+      }
+    }
+    
+    console.log('Days in text:', daysInText);
+    console.log('Subjects in text:', subjectsInText);
+    console.log('Times in text:', allTimes);
+    
+    // Now, let's try to build the schedule rows more intelligently
+    // Let's look at the structure from the example image:
+    // Each row has: Program, Subject, Hours, Section, Day, Time From, Time To, Lecture
+    
+    // Let's process the lines and group them
+    let currentDay = '';
+    let currentSubject = '';
+    let currentStartTime = '';
+    let currentEndTime = '';
+    
+    // Let's go through all lines and try to find the schedule structure
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Check if this line contains a day
+      let foundDay = '';
+      for (const day of possibleDays) {
+        if (line.includes(day)) {
+          foundDay = day;
+          break;
+        }
+      }
+      
+      // Check if this line contains times
+      const timesInLine = line.match(/\d{1,2}:\d{2}/g) || [];
+      
+      // Check if this line contains a subject
+      let subjectInLine = '';
+      for (const subject of subjectsInText) {
+        if (line.includes(subject) && subject.length > 5) {
+          subjectInLine = subject;
+          break;
+        }
+      }
+      
+      if (foundDay) {
+        currentDay = foundDay;
+      }
+      
+      if (subjectInLine) {
+        currentSubject = subjectInLine;
+      }
+      
+      if (timesInLine.length >= 2) {
+        currentStartTime = timesInLine[0];
+        currentEndTime = timesInLine[1];
+        
+        // If we have all info, create a row
+        if (currentDay && currentSubject) {
+          // Format times (add leading zero if needed, convert to 24h if needed)
+          const formatTime = (time: string) => {
+            const [h, m] = time.split(':').map(Number);
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          };
+          
+          rows.push({
+            الاسم: studentName,
+            'رقم الهوية': studentNationalId,
+            'الرقم الأكاديمي': studentAcademicId,
+            'رقم الجوال': studentPhone,
+            البرنامج: studentProgram,
+            المقرر: currentSubject,
+            اليوم: currentDay,
+            'الوقت من': formatTime(currentStartTime),
+            'الوقت إلى': formatTime(currentEndTime)
+          });
+        }
+      }
+    }
+    
+    // If we didn't find any rows using the above method, fall back to a smarter approach
+    if (rows.length === 0) {
+      console.log('No rows found with primary method, trying fallback...');
+      
+      // Let's try to find all possible subject-day-time combinations
+      // From the example image, we know the structure
+      const fallbackSubjects = [];
+      const fallbackDays = [];
+      const fallbackStartTimes = [];
+      const fallbackEndTimes = [];
+      
+      // Collect all unique days
+      for (const day of possibleDays) {
+        if (text.includes(day)) {
+          fallbackDays.push(day);
+        }
+      }
+      
+      // Collect all times
+      const allTimeMatches = text.match(/\d{1,2}:\d{2}/g) || [];
+      for (let i = 0; i < allTimeMatches.length; i += 2) {
+        if (allTimeMatches[i] && allTimeMatches[i+1]) {
+          fallbackStartTimes.push(allTimeMatches[i]);
+          fallbackEndTimes.push(allTimeMatches[i+1]);
+        }
+      }
+      
+      // Collect all subjects (Arabic phrases that are not days)
+      for (const phrase of arabicPhrases) {
+        const cleanPhrase = phrase.trim();
+        if (cleanPhrase.length >= 5 && 
+            !possibleDays.includes(cleanPhrase) &&
+            !cleanPhrase.includes('الاسم') &&
+            !cleanPhrase.includes('رقم') &&
+            !cleanPhrase.includes('البرنامج') &&
+            !cleanPhrase.includes('المقرر') &&
+            !cleanPhrase.includes('اليوم') &&
+            !cleanPhrase.includes('الوقت') &&
+            !cleanPhrase.includes('المحاضرة') &&
+            !cleanPhrase.includes('الشعبة')) {
+          if (!fallbackSubjects.includes(cleanPhrase)) {
+            fallbackSubjects.push(cleanPhrase);
+          }
+        }
+      }
+      
+      console.log('Fallback - Subjects:', fallbackSubjects);
+      console.log('Fallback - Days:', fallbackDays);
+      console.log('Fallback - Start times:', fallbackStartTimes);
+      console.log('Fallback - End times:', fallbackEndTimes);
+      
+      // Now create rows by matching the counts
+      const maxRows = Math.max(fallbackSubjects.length, fallbackDays.length, fallbackStartTimes.length);
+      
+      for (let i = 0; i < maxRows; i++) {
+        const subject = fallbackSubjects[i] || fallbackSubjects[i % fallbackSubjects.length] || 'مادة ' + (i + 1);
+        const day = fallbackDays[i] || fallbackDays[i % fallbackDays.length] || 'الأحد';
+        const startTime = fallbackStartTimes[i] || fallbackStartTimes[i % fallbackStartTimes.length] || '04:00';
+        const endTime = fallbackEndTimes[i] || fallbackEndTimes[i % fallbackEndTimes.length] || '07:00';
+        
+        // Format times
+        const formatTime = (time: string) => {
+          const [h, m] = time.split(':').map(Number);
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        };
+        
+        rows.push({
+          الاسم: studentName,
+          'رقم الهوية': studentNationalId,
+          'الرقم الأكاديمي': studentAcademicId,
+          'رقم الجوال': studentPhone,
+          البرنامج: studentProgram,
+          المقرر: subject,
+          اليوم: day,
+          'الوقت من': formatTime(startTime),
+          'الوقت إلى': formatTime(endTime)
+        });
+      }
+    }
+    
+    console.log('Final parsed rows:', rows);
     return rows;
   };
 
