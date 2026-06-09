@@ -59,10 +59,7 @@ export default function AttendancePage() {
   };
 
   const selectedStudent = students.find(s => String(s.student_id) === selectedStudentId);
-  const studentSubjects = getStudentSubjects();
-  const selectedSchedule = studentSubjects.find(s => String(s.schedule_id) === selectedScheduleId);
-  const selectedSubject = selectedSchedule ? allSubjects.find(s => s.subject_id === selectedSchedule.subject_id) : null;
-
+  
   const getStudentSubjects = () => {
     if (!selectedStudent) return [];
     const studentSchedules = schedules.filter(s => s.student_id === selectedStudent.student_id);
@@ -114,6 +111,10 @@ export default function AttendancePage() {
       isWarning: false
     };
   };
+
+  const studentSubjects = getStudentSubjects();
+  const selectedSchedule = studentSubjects.find(s => String(s.schedule_id) === selectedScheduleId);
+  const selectedSubject = selectedSchedule ? allSubjects.find(s => s.subject_id === selectedSchedule.subject_id) : null;
 
   const getOverallAttendanceStats = (_student: Student) => {
     if (attendanceRates) {
