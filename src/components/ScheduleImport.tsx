@@ -60,6 +60,19 @@ interface ParsedData {
   schedules: ParsedSchedule[];
 }
 
+interface DebugInfo {
+  student: {
+    name: string;
+    academicNumber: string;
+    nationalId: string;
+    major: string;
+    status: string;
+  };
+  schedules: Array<{ course: string; day: string; from: string; to: string }>;
+  allLines: Array<{ idx: number; text: string }>;
+  parsingLog: string[];
+}
+
 export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -67,6 +80,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [rawOcrText, setRawOcrText] = useState<string>('');
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,16 +89,13 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
   };
 
   const parseTextToRows = (text: string): RawScheduleRow[] => {
-    console.log('');
-    console.log('========== 🔍 DEBUG: START PARSING ==========');
-    console.log('📜 RAW OCR TEXT (FULL):');
-    console.log(text);
-    console.log('');
+    const parsingLog: string[] = [];
+    parsingLog.push('========== 🔍 DEBUG: START PARSING ==========');
 
     // --------------------------
     // STEP 1: EXTRACT STUDENT DATA
     // --------------------------
-    console.log('========== 🧑‍🎓 STEP 1: EXTRACTING STUDENT DATA ==========');
+    parsingLog.push('========== 🧑‍🎓 STEP 1: EXTRACTING STUDENT DATA ==========');
     
     let name = '';
     let academicNumber = '';
@@ -94,9 +105,8 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
     // Split text into lines for easier processing
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    console.log('📋 ALL LINES:');
-    lines.forEach((line, idx) => console.log(`[${idx}] ${line}`));
-    console.log('');
+    parsingLog.push('📋 ALL LINES:');
+    lines.forEach((line, idx) => parsingLog.push(`[${idx}] ${line}`));
 
     // Extract fields by looking for keywords
     for (const line of lines) {
@@ -105,11 +115,13 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         const match = line.match(/الاسم\s*[:\-]?\s*(.*)/i);
         if (match && match[1]) {
           name = match[1].trim();
+          parsingLog.push(`✅ Found NAME: "${name}"`);
         } else {
           // Try next line if it's just "الاسم"
           const currentIdx = lines.indexOf(line);
           if (lines[currentIdx + 1]) {
             name = lines[currentIdx + 1].trim();
+            parsingLog.push(`✅ Found NAME (next line): "${name}"`);
           }
         }
       }
@@ -117,7 +129,10 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       // Extract NATIONAL ID (10-digit number)
       if (!nationalId) {
         const idMatch = line.match(/\b(\d{10})\b/);
-        if (idMatch) nationalId = idMatch[1];
+        if (idMatch) {
+          nationalId = idMatch[1];
+          parsingLog.push(`✅ Found NATIONAL ID: "${nationalId}"`);
+        }
       }
 
       // Extract ACADEMIC NUMBER (7-9-digit number, not national id)
@@ -126,6 +141,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         for (const num of allNums) {
           if (num !== nationalId) {
             academicNumber = num;
+            parsingLog.push(`✅ Found ACADEMIC NUMBER: "${academicNumber}"`);
             break;
           }
         }
@@ -134,7 +150,10 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           const match = line.match(/الرقم الأكاديمي\s*[:\-]?\s*(.*)/i);
           if (match && match[1]) {
             const numMatch = match[1].match(/\d+/);
-            if (numMatch) academicNumber = numMatch[0];
+            if (numMatch) {
+              academicNumber = numMatch[0];
+              parsingLog.push(`✅ Found ACADEMIC NUMBER (from keyword): "${academicNumber}"`);
+            }
           }
         }
       }
@@ -144,10 +163,12 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         const match = line.match(/(?:البرنامج|التخصص)\s*[:\-]?\s*(.*)/i);
         if (match && match[1]) {
           major = match[1].trim();
+          parsingLog.push(`✅ Found MAJOR: "${major}"`);
         } else {
           const currentIdx = lines.indexOf(line);
           if (lines[currentIdx + 1]) {
             major = lines[currentIdx + 1].trim();
+            parsingLog.push(`✅ Found MAJOR (next line): "${major}"`);
           }
         }
       }
@@ -157,23 +178,22 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         const match = line.match(/الحالة\s*[:\-]?\s*(.*)/i);
         if (match && match[1]) {
           status = match[1].trim();
+          parsingLog.push(`✅ Found STATUS: "${status}"`);
         } else {
           const currentIdx = lines.indexOf(line);
           if (lines[currentIdx + 1]) {
             status = lines[currentIdx + 1].trim();
+            parsingLog.push(`✅ Found STATUS (next line): "${status}"`);
           }
         }
       }
     }
 
-    console.log('✅ EXTRACTED STUDENT DATA:');
-    console.log({ name, academicNumber, nationalId, major, status });
-    console.log('');
-
     // --------------------------
     // STEP 2: EXTRACT SCHEDULE
     // --------------------------
-    console.log('========== 📅 STEP 2: EXTRACTING SCHEDULE ==========');
+    parsingLog.push('');
+    parsingLog.push('========== 📅 STEP 2: EXTRACTING SCHEDULE ==========');
     
     const daysOfWeek = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     const schedules: Array<{ course: string; day: string; from: string; to: string }> = [];
@@ -195,7 +215,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
       if (foundDay) {
         currentDay = foundDay;
-        console.log(`📍 Found day: ${currentDay} at line ${i}`);
+        parsingLog.push(`📍 Found day: ${currentDay} at line ${i}`);
         continue;
       }
 
@@ -247,8 +267,15 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         // If we have course, day, and times, add to schedule
         if (courseName && currentDay) {
           schedules.push({ course: courseName, day: currentDay, from, to });
-          console.log(`✅ Added schedule: Course="${courseName}", Day="${currentDay}", From="${from}", To="${to}"`);
+          parsingLog.push(`✅ Added schedule: Course="${courseName}", Day="${currentDay}", From="${from}", To="${to}"`);
           currentCourse = ''; // Reset
+        } else {
+          let reason = '';
+          if (!courseName) reason += '❌ No course name found. ';
+          if (!currentDay) reason += '❌ No day found. ';
+          if (reason) {
+            parsingLog.push(`⚠️ Skipping schedule entry at line ${i}: ${reason}`);
+          }
         }
         continue;
       }
@@ -262,19 +289,28 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
           const isHeader = /الاسم|رقم|الهوية|الأكاديمي|البرنامج|المقرر|اليوم|بداية|نهاية|الحالة/i.test(trimmed);
           if (!isDay && !isHeader && trimmed.length > 5) {
             currentCourse = trimmed;
-            console.log(`📚 Found potential course: "${currentCourse}" at line ${i}`);
+            parsingLog.push(`📚 Found potential course: "${currentCourse}" at line ${i}`);
             break;
           }
         }
       }
     }
 
-    console.log('');
-    console.log('========== 📊 FINAL EXTRACTION RESULTS ==========');
-    console.log('👤 Number of students detected:', name || academicNumber ? 1 : 0);
-    console.log('📚 Number of courses detected:', schedules.length);
-    console.log('📅 Extracted schedules:', schedules);
-    console.log('');
+    // --------------------------
+    // FINAL RESULTS
+    // --------------------------
+    parsingLog.push('');
+    parsingLog.push('========== 📊 FINAL EXTRACTION RESULTS ==========');
+    parsingLog.push(`👤 Number of students detected: ${name || academicNumber ? 1 : 0}`);
+    parsingLog.push(`📚 Number of courses detected: ${schedules.length}`);
+
+    // Save debug info
+    setDebugInfo({
+      student: { name, academicNumber, nationalId, major, status },
+      schedules,
+      allLines: lines.map((text, idx) => ({ idx, text })),
+      parsingLog
+    });
 
     // --------------------------
     // STEP 3: CONVERT TO RAW ROWS
@@ -289,10 +325,6 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       'الوقت من': schedule.from,
       'الوقت إلى': schedule.to
     }));
-
-    console.log('📝 Final Rows to Process:', rows);
-    console.log('========== 🔚 END PARSING ==========');
-    console.log('');
 
     return rows;
   };
@@ -557,6 +589,9 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     setFile(null);
     setParsedData(null);
     setSuccess(false);
+    setRawOcrText('');
+    setDebugInfo(null);
+    setValidationErrors([]);
   };
 
   return (
@@ -698,6 +733,104 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
             <p className="text-xs text-dark-muted mt-2">
               يمكنك نسخ هذا النص وتحريره يدوياً في ملف Excel ثم رفعه لاستيراد بيانات أكثر دقة
             </p>
+          </div>
+        )}
+
+        {/* Debug Info UI */}
+        {debugInfo && (
+          <div className="glass-card p-6 mb-6">
+            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+              🔍 معلومات تصحيح الأخطاء (Debug)
+            </h3>
+            
+            <div className="space-y-6">
+              {/* Extracted Student Data */}
+              <div className="p-4 bg-dark-bg/60 rounded-xl border border-dark-border">
+                <h4 className="text-sm font-bold text-white mb-3">👤 بيانات الطالب المستخرجة:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-dark-muted">الاسم:</span>
+                    <span className={`${debugInfo.student.name ? 'text-white' : 'text-brand-danger'}`}>{debugInfo.student.name || '❌ غير موجود'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-dark-muted">الرقم الأكاديمي:</span>
+                    <span className={`${debugInfo.student.academicNumber ? 'text-white' : 'text-brand-danger'}`}>{debugInfo.student.academicNumber || '❌ غير موجود'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-dark-muted">رقم الهوية:</span>
+                    <span className={`${debugInfo.student.nationalId ? 'text-white' : 'text-brand-danger'}`}>{debugInfo.student.nationalId || '❌ غير موجود'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-dark-muted">التخصص:</span>
+                    <span className={`${debugInfo.student.major ? 'text-white' : 'text-brand-danger'}`}>{debugInfo.student.major || '❌ غير موجود'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-dark-muted">الحالة:</span>
+                    <span className={`${debugInfo.student.status ? 'text-white' : 'text-brand-danger'}`}>{debugInfo.student.status || '❌ غير موجود'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* All Lines */}
+              <div className="p-4 bg-dark-bg/60 rounded-xl border border-dark-border">
+                <h4 className="text-sm font-bold text-white mb-3">📋 جميع السطر:</h4>
+                <div className="max-h-48 overflow-auto text-xs text-white font-mono bg-dark-bg/80 rounded p-3">
+                  {debugInfo.allLines.map(line => (
+                    <div key={line.idx} className="flex gap-2">
+                      <span className="text-brand-secondary">[{line.idx}]</span>
+                      <span>{line.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Parsing Log */}
+              <div className="p-4 bg-dark-bg/60 rounded-xl border border-dark-border">
+                <h4 className="text-sm font-bold text-white mb-3">📜 سجل التحليل (Parsing Log):</h4>
+                <div className="max-h-64 overflow-auto text-xs text-white font-mono bg-dark-bg/80 rounded p-3">
+                  {debugInfo.parsingLog.map((log, idx) => (
+                    <div key={idx} className={`${log.includes('✅') ? 'text-brand-success' : log.includes('⚠️') ? 'text-brand-warning' : log.includes('❌') ? 'text-brand-danger' : 'text-dark-muted'}`}>
+                      {log}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Extracted Schedules */}
+              <div className="p-4 bg-dark-bg/60 rounded-xl border border-dark-border">
+                <h4 className="text-sm font-bold text-white mb-3">
+                  📚 المواد المستخرجة (عدد: {debugInfo.schedules.length}):
+                </h4>
+                {debugInfo.schedules.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-dark-bg/95">
+                        <tr className="border-b border-dark-border">
+                          <th className="text-right py-2 px-2 text-dark-muted">#</th>
+                          <th className="text-right py-2 px-2 text-dark-muted">المقرر</th>
+                          <th className="text-right py-2 px-2 text-dark-muted">اليوم</th>
+                          <th className="text-right py-2 px-2 text-dark-muted">من</th>
+                          <th className="text-right py-2 px-2 text-dark-muted">إلى</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {debugInfo.schedules.map((schedule, i) => (
+                          <tr key={i} className="border-b border-dark-border/30">
+                            <td className="py-2 px-2 text-white">{i + 1}</td>
+                            <td className="py-2 px-2 text-white">{schedule.course}</td>
+                            <td className="py-2 px-2 text-white">{schedule.day}</td>
+                            <td className="py-2 px-2 text-white">{schedule.from}</td>
+                            <td className="py-2 px-2 text-white">{schedule.to}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-brand-danger text-sm">⚠️ لم يتم استخراج أي مواد!</p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
