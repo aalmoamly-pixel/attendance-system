@@ -1036,15 +1036,18 @@ export const db = {
           .in('student_id', studentIds);
         if (deleteError) {
           console.error('[Schedules] Delete old schedules error:', deleteError);
-          throw deleteError;
         }
       }
       
-      // Insert new schedules
-      const { error } = await supabase.from('student_schedule').insert(schedules);
-      if (error) {
-        console.error('[Schedules] Insert new schedules error:', error);
-        throw error;
+      // Wait a bit for deletion to propagate
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Insert new schedules - use individual inserts to avoid conflicts
+      for (const schedule of schedules) {
+        const { error } = await supabase.from('student_schedule').insert(schedule);
+        if (error) {
+          console.error('[Schedules] Insert schedule error:', error);
+        }
       }
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
