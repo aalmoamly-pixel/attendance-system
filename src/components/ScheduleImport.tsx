@@ -204,7 +204,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       
-      // Check if this line contains a day
+      // 1. Check if this line contains a day
       let foundDay = '';
       for (const day of daysOfWeek) {
         if (line.includes(day)) {
@@ -219,78 +219,41 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
         continue;
       }
 
-      // Look for times in this line
+      // 2. Look for course name first (if we don't have one)
+      if (!currentCourse) {
+        const arabicParts = line.match(/[\u0600-\u06FF\s\(\)]{5,}/g);
+        if (arabicParts) {
+          for (const part of arabicParts) {
+            const trimmed = part.trim();
+            const isDay = daysOfWeek.some(d => trimmed.includes(d));
+            const isHeader = /الاسم|رقم|الهوية|الأكاديمي|البرنامج|المقرر|اليوم|بداية|نهاية|الحالة/i.test(trimmed);
+            if (!isDay && !isHeader && trimmed.length > 5) {
+              currentCourse = trimmed;
+              parsingLog.push(`📚 Found potential course: "${currentCourse}" at line ${i}`);
+              break;
+            }
+          }
+        }
+      }
+
+      // 3. Look for times in this line
       const timeMatches = line.match(/(\d{1,2}):(\d{2})/g) || [];
       
       if (timeMatches.length >= 2) {
         const from = timeMatches[0].split(':').map(x => x.padStart(2, '0')).join(':');
         const to = timeMatches[1].split(':').map(x => x.padStart(2, '0')).join(':');
         
-        // Look for course name in this line or previous lines
-        let courseName = currentCourse;
-        if (!courseName) {
-          // Check previous 2 lines for course name
-          for (let j = Math.max(0, i - 2); j < i; j++) {
-            const prevLine = lines[j];
-            const arabicParts = prevLine.match(/[\u0600-\u06FF\s\(\)]{5,}/g);
-            if (arabicParts) {
-              for (const part of arabicParts) {
-                const trimmed = part.trim();
-                const isDay = daysOfWeek.some(d => trimmed.includes(d));
-                const isHeader = /الاسم|رقم|الهوية|الأكاديمي|البرنامج|المقرر|اليوم|بداية|نهاية|الحالة/i.test(trimmed);
-                if (!isDay && !isHeader && trimmed.length > 5) {
-                  courseName = trimmed;
-                  break;
-                }
-              }
-              if (courseName) break;
-            }
-          }
-        }
-
-        // Also check current line for course name
-        if (!courseName) {
-          const arabicParts = line.match(/[\u0600-\u06FF\s\(\)]{5,}/g);
-          if (arabicParts) {
-            for (const part of arabicParts) {
-              const trimmed = part.trim();
-              const isDay = daysOfWeek.some(d => trimmed.includes(d));
-              const isHeader = /الاسم|رقم|الهوية|الأكاديمي|البرنامج|المقرر|اليوم|بداية|نهاية|الحالة/i.test(trimmed);
-              if (!isDay && !isHeader && trimmed.length > 5) {
-                courseName = trimmed;
-                break;
-              }
-            }
-          }
-        }
-
-        // If we have course, day, and times, add to schedule
-        if (courseName && currentDay) {
-          schedules.push({ course: courseName, day: currentDay, from, to });
-          parsingLog.push(`✅ Added schedule: Course="${courseName}", Day="${currentDay}", From="${from}", To="${to}"`);
-          currentCourse = ''; // Reset
+        // If we have a current course and a current day, add to schedule!
+        if (currentCourse && currentDay) {
+          schedules.push({ course: currentCourse, day: currentDay, from, to });
+          parsingLog.push(`✅ Added schedule: Course="${currentCourse}", Day="${currentDay}", From="${from}", To="${to}"`);
+          currentCourse = ''; // Reset course after using it!
         } else {
           let reason = '';
-          if (!courseName) reason += '❌ No course name found. ';
-          if (!currentDay) reason += '❌ No day found. ';
+          if (!currentCourse) reason += '❌ No course name found. ';
+          if (!currentDay) reason += '❌ No day found (not set yet). ';
           if (reason) {
             parsingLog.push(`⚠️ Skipping schedule entry at line ${i}: ${reason}`);
-          }
-        }
-        continue;
-      }
-
-      // Look for course name (arabic text)
-      const arabicParts = line.match(/[\u0600-\u06FF\s\(\)]{5,}/g);
-      if (arabicParts && !currentCourse) {
-        for (const part of arabicParts) {
-          const trimmed = part.trim();
-          const isDay = daysOfWeek.some(d => trimmed.includes(d));
-          const isHeader = /الاسم|رقم|الهوية|الأكاديمي|البرنامج|المقرر|اليوم|بداية|نهاية|الحالة/i.test(trimmed);
-          if (!isDay && !isHeader && trimmed.length > 5) {
-            currentCourse = trimmed;
-            parsingLog.push(`📚 Found potential course: "${currentCourse}" at line ${i}`);
-            break;
           }
         }
       }
