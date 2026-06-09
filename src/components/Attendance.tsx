@@ -23,7 +23,7 @@ export default function AttendancePage() {
   const [timeSlots, setTimeSlots] = useState<any[]>([]);
   
   const [selectedStudentId, setSelectedStudentId] = useState<string | ''>('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | ''>('');
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | ''>('');
   const [selectedWeek, setSelectedWeek] = useState<string>('1');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [attendanceRates, setAttendanceRates] = useState<any>(null);
@@ -59,24 +59,25 @@ export default function AttendancePage() {
   };
 
   const selectedStudent = students.find(s => String(s.student_id) === selectedStudentId);
-  const selectedSubject = allSubjects.find(s => String(s.subject_id) === selectedSubjectId);
+  const studentSubjects = getStudentSubjects();
+  const selectedSchedule = studentSubjects.find(s => String(s.schedule_id) === selectedScheduleId);
+  const selectedSubject = selectedSchedule ? allSubjects.find(s => s.subject_id === selectedSchedule.subject_id) : null;
 
   const getStudentSubjects = () => {
     if (!selectedStudent) return [];
     const studentSchedules = schedules.filter(s => s.student_id === selectedStudent.student_id);
-    const subjectIds = studentSchedules.map(s => s.subject_id);
-    return allSubjects.filter(sub => subjectIds.includes(sub.subject_id));
+    // Return all schedule entries (including multiple subjects on same day)
+    return studentSchedules.map(schedule => {
+      const subject = allSubjects.find(sub => sub.subject_id === schedule.subject_id);
+      return subject ? { ...subject, schedule_id: schedule.schedule_id, schedule } : null;
+    }).filter(Boolean) as any[];
   };
 
-  const getScheduleInfo = (subject: Subject) => {
-    if (!selectedStudent) return null;
-    const schedule = schedules.find(
-      s => s.student_id === selectedStudent.student_id && s.subject_id === subject.subject_id
-    );
-    if (!schedule) return null;
+  const getScheduleInfo = (subject: any) => {
+    if (!selectedStudent || !subject.schedule) return null;
     
-    const day = weekdays.find(d => d.weekday_id === schedule.weekday_id);
-    const slot = timeSlots.find(s => s.slot_id === schedule.slot_id);
+    const day = weekdays.find(d => d.weekday_id === subject.schedule.weekday_id);
+    const slot = timeSlots.find(s => s.slot_id === subject.schedule.slot_id);
     
     return {
       day: day?.weekday_name_ar || '',
@@ -84,13 +85,10 @@ export default function AttendancePage() {
     };
   };
 
-  const getAttendanceStats = (student: Student, subject: Subject) => {
+  const getAttendanceStats = (student: Student, subject: any) => {
     const subjectRates = attendanceRates?.bySubject?.find((s: any) => s.subject_id === subject.subject_id);
-    const studentSchedules = schedules.filter(
-      s => s.student_id === student.student_id && s.subject_id === subject.subject_id
-    );
     const logs = attendanceLogs.filter(log => 
-      studentSchedules.some(s => s.schedule_id === log.schedule_id)
+      log.schedule_id === subject.schedule_id
     );
     
     const absents = logs.filter(log => log.status === 'غائب').length;
@@ -130,29 +128,19 @@ export default function AttendancePage() {
   };
 
   const getCurrentStatus = () => {
-    if (!selectedStudent || !selectedSubject || !selectedDate) return null;
-    const studentSchedule = schedules.find(
-      s => s.student_id === selectedStudent.student_id && 
-           s.subject_id === selectedSubject.subject_id
-    );
-    if (!studentSchedule) return null;
+    if (!selectedStudent || !selectedSchedule || !selectedDate) return null;
     
     return attendanceLogs.find(
-      log => log.schedule_id === studentSchedule.schedule_id && 
+      log => log.schedule_id === selectedSchedule.schedule_id && 
              log.attendance_date === selectedDate
     );
   };
 
   const markAttendance = async (status: 'حاضر' | 'غائب' | 'متأخر' | 'مستأذن') => {
-    if (!selectedStudent || !selectedSubject || !selectedDate) return;
-    const studentSchedule = schedules.find(
-      s => s.student_id === selectedStudent.student_id && 
-           s.subject_id === selectedSubject.subject_id
-    );
-    if (!studentSchedule) return;
+    if (!selectedStudent || !selectedSchedule || !selectedDate) return;
     
     await db.markAttendance(
-      studentSchedule.schedule_id,
+      selectedSchedule.schedule_id,
       selectedDate,
       status,
       new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
@@ -239,17 +227,20 @@ export default function AttendancePage() {
           <div className="space-y-2">
             <label className="text-sm font-bold text-dark-muted">المادة الدراسية</label>
             <select
-              value={selectedSubjectId}
-              onChange={(e) => setSelectedSubjectId(e.target.value)}
+              value={selectedScheduleId}
+              onChange={(e) => setSelectedScheduleId(e.target.value)}
               disabled={!selectedStudent}
               className="w-full bg-dark-card border border-dark-border rounded-xl p-4 text-white focus:outline-none focus:border-brand-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">اختر المادة</option>
-              {studentSubjects.map(subject => (
-                <option key={subject.subject_id} value={String(subject.subject_id)}>
-                  {subject.subject_name}
+              {studentSubjects.map(subject => {
+                const scheduleInfo = getScheduleInfo(subject);
+                return (
+                  <option key={subject.schedule_id} value={String(subject.schedule_id)}>
+                  {subject.subject_name} - {scheduleInfo?.day} {scheduleInfo?.time ? `(${scheduleInfo.time})` : ''}
                 </option>
-              ))}
+                );
+              })}
             </select>
           </div>
 
@@ -334,12 +325,12 @@ export default function AttendancePage() {
             <div className="space-y-4">
               {studentSubjects.map(subject => {
                 const stats = getAttendanceStats(selectedStudent, subject);
-                const isSelected = selectedSubject?.subject_id === subject.subject_id;
+                const isSelected = selectedSchedule?.schedule_id === subject.schedule_id;
                 const scheduleInfo = getScheduleInfo(subject);
                 
                 return (
                   <div 
-                    key={subject.subject_id}
+                    key={subject.schedule_id}
                     className={`p-4 rounded-xl border transition-all ${
                       isSelected 
                         ? 'border-brand-primary bg-brand-primary/5' 
