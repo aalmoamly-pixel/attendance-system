@@ -198,64 +198,93 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     const daysOfWeek = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     const schedules: Array<{ course: string; day: string; from: string; to: string }> = [];
     
-    let currentDay = '';
-    let currentCourse = '';
+    // First: collect ALL days, courses, and time pairs with their line numbers!
+    const foundDays: Array<{ line: number; day: string }> = [];
+    const foundCourses: Array<{ line: number; name: string }> = [];
+    const foundTimePairs: Array<{ line: number; from: string; to: string }> = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      
-      // 1. Check if this line contains a day
-      let foundDay = '';
+
+      // Collect days
       for (const day of daysOfWeek) {
         if (line.includes(day)) {
-          foundDay = day;
+          foundDays.push({ line: i, day });
+          parsingLog.push(`📍 Found day: "${day}" at line ${i}`);
           break;
         }
       }
 
-      if (foundDay) {
-        currentDay = foundDay;
-        parsingLog.push(`📍 Found day: ${currentDay} at line ${i}`);
-        continue;
-      }
-
-      // 2. Look for course name first (if we don't have one)
-      if (!currentCourse) {
-        const arabicParts = line.match(/[\u0600-\u06FF\s\(\)]{5,}/g);
-        if (arabicParts) {
-          for (const part of arabicParts) {
-            const trimmed = part.trim();
-            const isDay = daysOfWeek.some(d => trimmed.includes(d));
-            const isHeader = /الاسم|رقم|الهوية|الأكاديمي|البرنامج|المقرر|اليوم|بداية|نهاية|الحالة/i.test(trimmed);
-            if (!isDay && !isHeader && trimmed.length > 5) {
-              currentCourse = trimmed;
-              parsingLog.push(`📚 Found potential course: "${currentCourse}" at line ${i}`);
-              break;
-            }
+      // Collect courses
+      const arabicParts = line.match(/[\u0600-\u06FF\s\(\)]{5,}/g);
+      if (arabicParts) {
+        for (const part of arabicParts) {
+          const trimmed = part.trim();
+          const isDay = daysOfWeek.some(d => trimmed.includes(d));
+          const isHeader = /الاسم|رقم|الهوية|الأكاديمي|البرنامج|المقرر|اليوم|بداية|نهاية|الحالة/i.test(trimmed);
+          if (!isDay && !isHeader && trimmed.length > 5) {
+            foundCourses.push({ line: i, name: trimmed });
+            parsingLog.push(`📚 Found course: "${trimmed}" at line ${i}`);
+            break;
           }
         }
       }
 
-      // 3. Look for times in this line
+      // Collect time pairs
       const timeMatches = line.match(/(\d{1,2}):(\d{2})/g) || [];
-      
       if (timeMatches.length >= 2) {
         const from = timeMatches[0].split(':').map(x => x.padStart(2, '0')).join(':');
         const to = timeMatches[1].split(':').map(x => x.padStart(2, '0')).join(':');
-        
-        // If we have a current course and a current day, add to schedule!
-        if (currentCourse && currentDay) {
-          schedules.push({ course: currentCourse, day: currentDay, from, to });
-          parsingLog.push(`✅ Added schedule: Course="${currentCourse}", Day="${currentDay}", From="${from}", To="${to}"`);
-          currentCourse = ''; // Reset course after using it!
-        } else {
-          let reason = '';
-          if (!currentCourse) reason += '❌ No course name found. ';
-          if (!currentDay) reason += '❌ No day found (not set yet). ';
-          if (reason) {
-            parsingLog.push(`⚠️ Skipping schedule entry at line ${i}: ${reason}`);
-          }
+        foundTimePairs.push({ line: i, from, to });
+        parsingLog.push(`⏰ Found time pair: from ${from}, to ${to} at line ${i}`);
+      }
+    }
+
+    parsingLog.push(`📊 Summary: Found ${foundDays.length} days, ${foundCourses.length} courses, ${foundTimePairs.length} time pairs`);
+
+    // Now, for each time pair, find nearest course and nearest day!
+    for (const timePair of foundTimePairs) {
+      // Find nearest course (±10 lines)
+      let nearestCourse: { line: number; name: string } | null = null;
+      let minCourseDistance = Infinity;
+      for (const course of foundCourses) {
+        const distance = Math.abs(course.line - timePair.line);
+        if (distance <= 10 && distance < minCourseDistance) {
+          minCourseDistance = distance;
+          nearestCourse = course;
         }
+      }
+
+      // Find nearest day (±10 lines)
+      let nearestDay: { line: number; day: string } | null = null;
+      let minDayDistance = Infinity;
+      for (const day of foundDays) {
+        const distance = Math.abs(day.line - timePair.line);
+        if (distance <= 10 && distance < minDayDistance) {
+          minDayDistance = distance;
+          nearestDay = day;
+        }
+      }
+
+      // Debug log:
+      parsingLog.push(`🔍 Processing time pair at line ${timePair.line}:`);
+      parsingLog.push(`   - Current Course: ${nearestCourse ? `"${nearestCourse.name}" (distance: ${minCourseDistance})` : '❌ NOT FOUND'}`);
+      parsingLog.push(`   - Nearest Day: ${nearestDay ? `"${nearestDay.day}" (distance: ${minDayDistance})` : '❌ NOT FOUND'}`);
+      parsingLog.push(`   - Nearest Start Time: ${timePair.from}`);
+      parsingLog.push(`   - Nearest End Time: ${timePair.to}`);
+
+      // If we have a course, add schedule (even if day is missing, but prefer day)
+      if (nearestCourse) {
+        const dayToUse = nearestDay ? nearestDay.day : 'الأحد'; // Fallback if no day found
+        schedules.push({
+          course: nearestCourse.name,
+          day: dayToUse,
+          from: timePair.from,
+          to: timePair.to
+        });
+        parsingLog.push(`✅ Added schedule: Course="${nearestCourse.name}", Day="${dayToUse}", From="${timePair.from}", To="${timePair.to}"`);
+      } else {
+        parsingLog.push(`⚠️ Skipping time pair at line ${timePair.line}: NO COURSE FOUND!`);
       }
     }
 
