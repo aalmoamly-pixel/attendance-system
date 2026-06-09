@@ -60,7 +60,7 @@ export default function AttendancePage() {
 
   const selectedStudent = students.find(s => String(s.student_id) === selectedStudentId);
   
-  const getStudentSubjects = () => {
+  const studentSubjects = useMemo(() => {
     if (!selectedStudent) return [];
     const studentSchedules = schedules.filter(s => s.student_id === selectedStudent.student_id);
     // Return all schedule entries (including multiple subjects on same day)
@@ -68,7 +68,7 @@ export default function AttendancePage() {
       const subject = allSubjects.find(sub => sub.subject_id === schedule.subject_id);
       return subject ? { ...subject, schedule_id: schedule.schedule_id, schedule } : null;
     }).filter(Boolean) as any[];
-  };
+  }, [selectedStudent, schedules, allSubjects]);
 
   const getScheduleInfo = (subject: any) => {
     if (!selectedStudent || !subject.schedule) return null;
@@ -112,7 +112,6 @@ export default function AttendancePage() {
     };
   };
 
-  const studentSubjects = getStudentSubjects();
   const selectedSchedule = studentSubjects.find(s => String(s.schedule_id) === selectedScheduleId);
   const selectedSubject = selectedSchedule ? allSubjects.find(s => s.subject_id === selectedSchedule.subject_id) : null;
 
