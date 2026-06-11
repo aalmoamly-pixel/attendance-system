@@ -420,7 +420,7 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
                         <th className="text-right py-3 px-2 text-dark-muted">#</th>
                         <th className="text-right py-3 px-2 text-dark-muted">الاسم</th>
                         <th className="text-right py-3 px-2 text-dark-muted">الرقم الأكاديمي</th>
-                        <th className="text-right py-3 px-2 text-dark-muted">الجوال</th>
+                        <th className="text-right py-3 px-2 text-dark-muted">رقم الهوية</th>
                         <th className="text-right py-3 px-2 text-dark-muted">التخصص</th>
                         <th className="text-right py-3 px-2 text-dark-muted">الحالة</th>
                       </tr>
@@ -429,9 +429,9 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
                       {parseResult.report.processedRows.slice(0, 10).map((row, i) => (
                         <tr key={i} className="border-b border-dark-border/30 hover:bg-dark-bg/40">
                           <td className="py-2 px-2 text-white">{i + 1}</td>
-                          <td className="py-2 px-2 text-white">{row.processed.fullName}</td>
-                          <td className="py-2 px-2 text-dark-muted">{row.processed.academicId}</td>
-                          <td className="py-2 px-2 text-dark-muted">{row.processed.phone}</td>
+                          <td className="py-2 px-2 text-white">{row.processed.full_name}</td>
+                          <td className="py-2 px-2 text-dark-muted">{row.processed.academic_id}</td>
+                          <td className="py-2 px-2 text-dark-muted">{row.processed.national_id}</td>
                           <td className="py-2 px-2 text-dark-muted">{row.processed.department}</td>
                           <td className="py-2 px-2">
                             {row.warnings.length > 0 ? (

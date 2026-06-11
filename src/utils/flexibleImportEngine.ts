@@ -74,7 +74,7 @@ const COLUMN_PATTERNS: Record<string, string[]> = {
   fullName: ['الاسم', 'الاسم الكامل', 'اسم الطالب', 'student name', 'name', 'الإسم', 'الطالب', 'اسم', 'الطلاب'],
   phone: ['الهاتف', 'الجوال', 'رقم الجوال', 'phone', 'mobile', 'tel', 'رقم الهاتف', 'جوال'],
   academicId: ['الرقم الأكاديمي', 'الرقم الجامعي', 'university id', 'academic id', 'student id', 'الرقم', 'id', 'student number', 'الرقم'],
-  nationalId: ['رقم الهوية', 'الهوية', 'national id', 'national-id', 'national_id', 'رقم الهوية الوطنية', 'الهوية الوطنية'],
+  nationalId: ['رقم الهوية', 'الهوية', 'national id', 'national-id', 'national_id', 'رقم الهوية الوطنية', 'الهوية الوطنية', 'رقم الجوال', 'الجوال'],
   password: ['كلمة المرور', 'الرمز', 'password', 'pass', 'باسورد', 'الرمز'],
   department: ['التخصص', 'القسم', 'department', 'section', 'الكلية', 'القسم'],
   subject: ['المادة', 'الدرس', 'subject', 'course', 'المقرر', 'المادة الدراسية', 'المقرر', 'الدرس'],
@@ -396,15 +396,8 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
             
           case 'phone':
             if (!cellValue || cellValue === '') {
-              phone = generatePhone();
-              rowWarnings.push(createWarning(
-                'PHONE_MISSING',
-                'رقم الجوال ناقص، تم إنشاء رقم تلقائي',
-                true,
-                rowIndex,
-                colIndex,
-                originalName
-              ));
+              // Leave phone empty, we'll use nationalId if needed
+              phone = '';
             } else {
               phone = cellValue;
             }
@@ -517,7 +510,8 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
           rowIndex
         ));
       }
-      if (!phone) phone = generatePhone();
+      // If phone is empty, use nationalId as phone
+      if (!phone) phone = nationalId;
       if (!academicId) academicId = generateAcademicId();
       if (!nationalId) nationalId = generateNationalId();
       if (!password) password = 'Aa123456';
