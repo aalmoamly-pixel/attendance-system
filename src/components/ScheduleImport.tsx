@@ -1028,7 +1028,17 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
               {/* Schedules Table (Editable) */}
               <div className="mb-6">
-                <h4 className="text-sm font-bold text-white mb-3">الجداول الدراسية:</h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-white">الجداول الدراسية:</h4>
+                  <button
+                    type="button"
+                    onClick={addSchedule}
+                    className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-2"
+                  >
+                    <Plus className="w-3 h-3" />
+                    إضافة مادة
+                  </button>
+                </div>
                 <div className="overflow-x-auto max-h-64 overflow-y-auto">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-dark-bg/95">
@@ -1039,6 +1049,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
                         <th className="text-right py-2 px-2 text-dark-muted">اليوم</th>
                         <th className="text-right py-2 px-2 text-dark-muted">الوقت من</th>
                         <th className="text-right py-2 px-2 text-dark-muted">الوقت إلى</th>
+                        <th className="text-center py-2 px-2 text-dark-muted">إجراء</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1084,6 +1095,15 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
                               onChange={(e) => updateSchedule(i, 'end_time', e.target.value)}
                               className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-brand-primary"
                             />
+                          </td>
+                          <td className="py-2 px-2 flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => removeSchedule(i)}
+                              className="p-1.5 rounded hover:bg-brand-danger/10 text-brand-danger"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </td>
                         </tr>
                       ))}

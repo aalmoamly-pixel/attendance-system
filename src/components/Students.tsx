@@ -159,6 +159,24 @@ export default function Students() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    console.log('[DeleteAll] Button clicked!');
+    if (window.confirm('⚠️ هل أنت متأكد من حذف جميع الطلاب والجداول؟\n\nهذه العملية لا يمكن التراجع عنها!')) {
+      console.log('[DeleteAll] Confirm accepted!');
+      try {
+        console.log('[DeleteAll] Calling db.deleteAllStudents...');
+        await db.deleteAllStudents();
+        console.log('[DeleteAll] Deleted successfully!');
+        showToast('✅ تم حذف جميع الطلاب بنجاح');
+        console.log('[DeleteAll] Refreshing data...');
+        fetchData();
+      } catch (err: any) {
+        console.error('[DeleteAll] Error:', err);
+        setFormError('❌ فشل حذف جميع الطلاب: ' + (err.message || err));
+      }
+    }
+  };
+
   const handleOpenNote = async (student: Student) => {
     setSelectedStudentForNote(student);
     const note = await db.getPersonalNote(student.student_id);
@@ -360,6 +378,12 @@ export default function Students() {
             className="btn-secondary px-4 py-2 flex items-center gap-2"
           >
             <RefreshCw className="w-4 h-4" /> تحديث
+          </button>
+          <button 
+            onClick={handleDeleteAll}
+            className="px-4 py-2 flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+          >
+            <Trash2 className="w-4 h-4" /> حذف جميع الطلاب
           </button>
           <button 
             onClick={handleOpenAdd}

@@ -712,14 +712,97 @@ export const db = {
 
   async deleteStudent(id: number): Promise<void> {
     if (supabase) {
+      // First delete all related records (in correct order: log -> schedule -> note -> payment -> notification -> student)
+      // 1. Delete attendance logs (attendance_log has schedule_id which links to student_id)
+      // First get all schedule ids for this student
+      const { data: studentSchedules } = await supabase.from('student_schedule').select('schedule_id').eq('student_id', id);
+      if (studentSchedules && studentSchedules.length > 0) {
+        const scheduleIds = studentSchedules.map(s => s.schedule_id);
+        const { error: attError } = await supabase.from('attendance_log').delete().in('schedule_id', scheduleIds);
+        if (attError) console.error('[DeleteStudent] Attendance logs delete error:', attError);
+      }
+      
+      // 2. Delete schedules
+      const { error: scheduleError } = await supabase.from('student_schedule').delete().eq('student_id', id);
+      if (scheduleError) console.error('[DeleteStudent] Schedules delete error:', scheduleError);
+
+      // 3. Delete personal notes
+      const { error: noteError } = await supabase.from('personal_notes').delete().eq('student_id', id);
+      if (noteError) console.error('[DeleteStudent] Personal notes delete error:', noteError);
+
+      // 4. Delete payments
+      const { error: paymentError } = await supabase.from('payments').delete().eq('student_id', id);
+      if (paymentError) console.error('[DeleteStudent] Payments delete error:', paymentError);
+
+      // 5. Delete notifications
+      const { error: notifError } = await supabase.from('notifications').delete().or(`sender_id.eq.${id},student_id.eq.${id}`);
+      if (notifError) console.error('[DeleteStudent] Notifications delete error:', notifError);
+      
+      // Finally delete the student
       const { error } = await supabase.from('students').delete().eq('student_id', id);
       if (error) {
         console.error('[Students] Delete error:', error);
         throw error;
       }
     } else {
-      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
-      localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existing.filter((s: any) => s.student_id !== id)));
+      const existingStudents = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
+      const existingSchedules = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
+      const existingNotifications = JSON.parse(localStorage.getItem(LOCAL_KEYS.NOTIFICATIONS) || '[]');
+      const existingNotes = JSON.parse(localStorage.getItem(LOCAL_KEYS.PERSONAL_NOTES) || '[]');
+      const existingPayments = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENTS) || '[]');
+      const existingAttendance = JSON.parse(localStorage.getItem(LOCAL_KEYS.ATTENDANCE_LOGS) || '[]');
+      
+      // Find all schedule ids for this student first
+      const studentScheduleIds = existingSchedules.filter((s: any) => s.student_id === id).map((s: any) => s.schedule_id);
+      
+      // Remove all related data
+      localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existingStudents.filter((s: any) => s.student_id !== id)));
+      localStorage.setItem(LOCAL_KEYS.SCHEDULES, JSON.stringify(existingSchedules.filter((s: any) => s.student_id !== id)));
+      localStorage.setItem(LOCAL_KEYS.NOTIFICATIONS, JSON.stringify(existingNotifications.filter((n: any) => n.student_id !== id && n.sender_id !== id)));
+      localStorage.setItem(LOCAL_KEYS.PERSONAL_NOTES, JSON.stringify(existingNotes.filter((n: any) => n.student_id !== id)));
+      localStorage.setItem(LOCAL_KEYS.PAYMENTS, JSON.stringify(existingPayments.filter((p: any) => p.student_id !== id)));
+      localStorage.setItem(LOCAL_KEYS.ATTENDANCE_LOGS, JSON.stringify(existingAttendance.filter((a: any) => !studentScheduleIds.includes(a.schedule_id))));
+    }
+  },
+
+  async deleteAllStudents(): Promise<void> {
+    if (supabase) {
+      // First delete all related records (in order of dependencies)
+      // 1. Delete attendance logs
+      const { error: attError } = await supabase.from('attendance_log').delete().neq('log_id', 0);
+      if (attError) console.error('[DeleteAll] Attendance logs delete error:', attError);
+      
+      // 2. Delete all notifications
+      const { error: notifError } = await supabase.from('notifications').delete().neq('notification_id', 0);
+      if (notifError) console.error('[DeleteAll] Notifications delete error:', notifError);
+      
+      // 3. Delete all personal notes
+      const { error: noteError } = await supabase.from('personal_notes').delete().neq('note_id', 0);
+      if (noteError) console.error('[DeleteAll] Personal notes delete error:', noteError);
+      
+      // 4. Delete all payments
+      const { error: paymentError } = await supabase.from('payments').delete().neq('payment_id', 0);
+      if (paymentError) console.error('[DeleteAll] Payments delete error:', paymentError);
+      
+      // 5. Delete all schedules for all students
+      const { error: scheduleError } = await supabase.from('student_schedule').delete().neq('schedule_id', 0);
+      if (scheduleError) console.error('[DeleteAll] Schedules delete error:', scheduleError);
+
+      // Finally delete all students except admin if exists
+      const { error: studentError } = await supabase.from('students').delete().neq('role', 'admin'); // Delete only students, keep admins
+      if (studentError) {
+        console.error('[DeleteAll] Students delete error:', studentError);
+        throw studentError;
+      }
+    } else {
+      // For local storage: clear students (keep admin), and all related data
+      const existingStudents = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
+      localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existingStudents.filter((s: any) => s.role === 'admin')));
+      localStorage.setItem(LOCAL_KEYS.SCHEDULES, JSON.stringify([]));
+      localStorage.setItem(LOCAL_KEYS.NOTIFICATIONS, JSON.stringify([]));
+      localStorage.setItem(LOCAL_KEYS.PERSONAL_NOTES, JSON.stringify([]));
+      localStorage.setItem(LOCAL_KEYS.PAYMENTS, JSON.stringify([]));
+      localStorage.setItem(LOCAL_KEYS.ATTENDANCE_LOGS, JSON.stringify([]));
     }
   },
 
@@ -1984,38 +2067,60 @@ export async function migrateLocalToSupabase() {
     });
     const paymentSettings = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENT_SETTINGS) || '[]');
 
+    // CORRECT ORDER: Insert tables without dependencies first
+    // 1. Departments
     if (departments.length > 0) {
       const { error } = await supabase.from('departments').upsert(departments, { onConflict: 'department_id' });
       if (error) throw error;
     }
-    if (students.length > 0) {
-      const { error } = await supabase.from('students').upsert(students, { onConflict: 'academic_id' });
-      if (error) throw error;
-    }
+    // 2. Subjects (depends on departments)
     if (subjects.length > 0) {
       const { error } = await supabase.from('subjects').upsert(subjects, { onConflict: 'subject_id' });
       if (error) throw error;
     }
-    if (schedules.length > 0) {
-      const { error } = await supabase.from('student_schedule').upsert(schedules, { onConflict: 'schedule_id' });
+    // 3. Weekdays (we need to make sure they exist, get from localStorage)
+    const weekdays = JSON.parse(localStorage.getItem(LOCAL_KEYS.WEEKDAYS) || '[]');
+    if (weekdays.length > 0) {
+      const { error } = await supabase.from('weekdays').upsert(weekdays, { onConflict: 'weekday_id' });
       if (error) throw error;
     }
-    if (attendanceLogs.length > 0) {
-      const { error } = await supabase.from('attendance_log').upsert(attendanceLogs, { onConflict: 'log_id' });
+    //4. Time slots
+    const timeSlots = JSON.parse(localStorage.getItem(LOCAL_KEYS.TIME_SLOTS) || '[]');
+    if (timeSlots.length > 0) {
+      const { error } = await supabase.from('time_slots').upsert(timeSlots, { onConflict: 'slot_id' });
       if (error) throw error;
     }
-    if (notifications.length > 0) {
-      const { error } = await supabase.from('notifications').upsert(notifications, { onConflict: 'notification_id' });
+    //5. Students (depends on departments)
+    if (students.length > 0) {
+      const { error } = await supabase.from('students').upsert(students, { onConflict: 'academic_id' });
       if (error) throw error;
     }
+    //6. Personal notes (depends on students)
     if (personalNotes.length > 0) {
       const { error } = await supabase.from('personal_notes').upsert(personalNotes, { onConflict: 'note_id' });
       if (error) throw error;
     }
+    //7. Notifications (depends on students)
+    if (notifications.length > 0) {
+      const { error } = await supabase.from('notifications').upsert(notifications, { onConflict: 'notification_id' });
+      if (error) throw error;
+    }
+    //8. Payments (depends on students)
     if (payments.length > 0) {
       const { error } = await supabase.from('payments').upsert(payments, { onConflict: 'id' });
       if (error) throw error;
     }
+    //9. Schedules (depends on students, subjects, weekdays, time slots)
+    if (schedules.length > 0) {
+      const { error } = await supabase.from('student_schedule').upsert(schedules, { onConflict: 'schedule_id' });
+      if (error) throw error;
+    }
+    //10. Attendance logs (depends on schedules)
+    if (attendanceLogs.length > 0) {
+      const { error } = await supabase.from('attendance_log').upsert(attendanceLogs, { onConflict: 'log_id' });
+      if (error) throw error;
+    }
+    //11. Payment settings
     if (paymentSettings.length > 0) {
       const { error } = await supabase.from('payment_settings').upsert(paymentSettings);
       if (error) throw error;
