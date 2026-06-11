@@ -67,18 +67,39 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
     setSaving(true);
 
     try {
-      await db.importDepartments(parseResult.departments.map(d => ({
+      // First import departments and get real IDs
+      const deptNameToRealId = await db.importDepartments(parseResult.departments.map(d => ({
         department_name: d.department_name,
         degree_type: d.degree_type
       })));
 
-      await db.importSubjects(parseResult.subjects.map(s => ({
-        subject_name: s.subject_name,
-        department_id: s.department_id
-      })));
+      // Then map temporary subject dept IDs to real dept IDs, import subjects, and get real subject IDs
+      const tempSubjectIdToName = new Map<number, string>();
+      parseResult.subjects.forEach(s => {
+        tempSubjectIdToName.set(s.subject_id, s.subject_name);
+      });
 
-      // Import students
-      const studentIdMapping = await db.importStudents(parseResult.students);
+      // Prepare subjects with real department IDs
+      const subjectsToImport = parseResult.subjects.map(s => ({
+        subject_name: s.subject_name,
+        department_id: deptNameToRealId.get(parseResult.departments.find(d => d.department_id === s.department_id)?.department_name || 'عام')!
+      }));
+
+      // Import subjects and get real subject IDs by name
+      const subjectNameToRealId = await db.importSubjects(subjectsToImport);
+
+      // Now map students' temp dept IDs to real ones, import students
+      const studentsToImport = parseResult.students.map(s => {
+        // Find original dept name by temp ID
+        const deptName = parseResult.departments.find(d => d.department_id === s.department_id)?.department_name || 'عام';
+        return {
+          ...s,
+          department_id: deptNameToRealId.get(deptName)!
+        };
+      });
+
+      // Import students and get real student IDs
+      const studentIdMapping = await db.importStudents(studentsToImport);
       
       // Now process schedules with time slots
       if (parseResult.schedules.length > 0) {
@@ -92,9 +113,15 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
         for (let i = 0; i < parseResult.schedules.length; i++) {
           const schedule = parseResult.schedules[i] as any;
           
-          // Get the real student_id from the mapping using the schedule's academic_id
+          // Get real student ID from the mapping using the schedule's academic_id
           const realStudentId = studentIdMapping.get(schedule.academic_id);
           if (!realStudentId) continue;
+          
+          // Get real subject ID using temp subject id -> name -> real id
+          const subjectName = tempSubjectIdToName.get(schedule.subject_id);
+          if (!subjectName) continue;
+          const realSubjectId = subjectNameToRealId.get(subjectName);
+          if (!realSubjectId) continue;
           
           // Use the parsed start and end times from flexibleImportEngine
           let slotId = schedule.slot_id;
@@ -126,7 +153,7 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
           
           processedSchedules.push({
             student_id: realStudentId,
-            subject_id: schedule.subject_id,
+            subject_id: realSubjectId,
             weekday_id: schedule.weekday_id,
             slot_id: slotId
           });
