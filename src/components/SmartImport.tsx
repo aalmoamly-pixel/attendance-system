@@ -429,9 +429,9 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
                       {parseResult.report.processedRows.slice(0, 10).map((row, i) => (
                         <tr key={i} className="border-b border-dark-border/30 hover:bg-dark-bg/40">
                           <td className="py-2 px-2 text-white">{i + 1}</td>
-                          <td className="py-2 px-2 text-white">{row.processed.full_name}</td>
-                          <td className="py-2 px-2 text-dark-muted">{row.processed.academic_id}</td>
-                          <td className="py-2 px-2 text-dark-muted">{row.processed.national_id}</td>
+                          <td className="py-2 px-2 text-white">{row.processed.fullName}</td>
+                          <td className="py-2 px-2 text-dark-muted">{row.processed.academicId}</td>
+                          <td className="py-2 px-2 text-dark-muted">{row.processed.nationalId}</td>
                           <td className="py-2 px-2 text-dark-muted">{row.processed.department}</td>
                           <td className="py-2 px-2">
                             {row.warnings.length > 0 ? (

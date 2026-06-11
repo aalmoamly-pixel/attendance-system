@@ -89,12 +89,12 @@ const COLUMN_PATTERNS: Record<string, string[]> = {
 // 2. توليد قيمة فريدة
 // ----------------------------------------------------
 let generatedIdCounter = 0;
-let phoneCounter = 1000000;
+// let phoneCounter = 1000000;
 let academicCounter = 26200000;
 let nationalIdCounter = 100000000;
 
 const generateId = () => `warn-${Date.now()}-${generatedIdCounter++}`;
-const generatePhone = () => `05${(phoneCounter++).toString().padStart(8, '0')}`;
+// const generatePhone = () => `05${(phoneCounter++).toString().padStart(8, '0')}`;
 const generateAcademicId = () => (academicCounter++).toString();
 const generateNationalId = () => (nationalIdCounter++).toString();
 
