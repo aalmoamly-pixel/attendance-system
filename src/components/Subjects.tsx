@@ -128,7 +128,7 @@ export default function Subjects() {
 
       <div className="glass-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-muted" />
           <input 
             type="text" 

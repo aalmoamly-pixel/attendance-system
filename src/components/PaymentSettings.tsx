@@ -72,7 +72,7 @@ export default function PaymentSettings() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <Settings className="w-8 h-8 text-brand-primary" />

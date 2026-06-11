@@ -331,7 +331,7 @@ export default function RedesignedScheduleImport({ onImportSuccess }: { onImport
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto py-8">
+    <div className="space-y-6 animate-fade-in w-full py-8">
       {/* Header */}
       <div className="glass-card p-6">
         <h2 className="font-extrabold text-2xl text-white flex items-center gap-2">

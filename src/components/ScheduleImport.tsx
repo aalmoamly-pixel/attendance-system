@@ -623,7 +623,7 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="max-w-5xl mx-auto">
+      <div className="w-full">
         {/* Header */}
         <div className="glass-card p-6 mb-6">
           <h2 className="font-extrabold text-xl text-white flex items-center gap-2">

@@ -446,8 +446,8 @@ export default function Students() {
         </div>
       </div>
 
-      <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="glass-card overflow-hidden w-full min-w-0">
+        <div className="overflow-x-auto w-full min-w-0">
           <table className="w-full">
             <thead className="bg-dark-bg/50">
               <tr>

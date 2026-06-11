@@ -202,7 +202,7 @@ export default function AttendanceReport({ setActivePage: _setActivePage }: { se
           اختيار الطالب
         </h2>
         
-        <div className="max-w-2xl">
+        <div className="w-full">
           <select
             value={selectedStudentId}
             onChange={(e) => loadStudentAttendance(e.target.value)}
