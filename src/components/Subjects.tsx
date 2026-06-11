@@ -40,8 +40,8 @@ export default function Subjects() {
         db.getSubjects(),
         db.getDepartments()
       ]);
-      setSubjects(subs);
-      setDepartments(depts);
+      setSubjects(subs.sort((a, b) => a.subject_name.localeCompare(b.subject_name, 'ar'))); // Sort subjects
+      setDepartments(depts.sort((a, b) => a.department_name.localeCompare(b.department_name, 'ar'))); // Sort departments
       if (depts.length > 0) setFormData(prev => ({ ...prev, department_id: depts[0].department_id }));
     } catch (err: any) {
       console.error(err);
@@ -108,7 +108,7 @@ export default function Subjects() {
 
   const filteredSubjects = subjects.filter(subject => 
     subject.subject_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ).sort((a, b) => a.subject_name.localeCompare(b.subject_name, 'ar')); // Sort alphabetically
 
   const getDeptName = (deptId: number | null) => deptId ? (departments.find(d => d.department_id === deptId)?.department_name || 'عام') : 'عام';
 

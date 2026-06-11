@@ -67,8 +67,8 @@ export default function Students() {
         db.getTimeSlots()
       ]);
       setStudents(stus);
-      setDepartments(depts);
-      setSubjects(subs);
+      setDepartments(depts.sort((a, b) => a.department_name.localeCompare(b.department_name, 'ar'))); // Sort departments
+      setSubjects(subs.sort((a, b) => a.subject_name.localeCompare(b.subject_name, 'ar'))); // Sort subjects
       setWeekdays(days);
       setTimeSlots(slots);
       if (depts.length > 0) setSelectedDeptId(depts[0].department_id);
@@ -356,7 +356,7 @@ export default function Students() {
                          student.academic_id.includes(searchQuery);
     const matchesDept = !selectedDeptId || student.department_id === selectedDeptId;
     return matchesSearch && matchesDept;
-  });
+  }).sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar')); // Sort alphabetically (Arabic)
 
   if (loading) {
     return (

@@ -146,9 +146,9 @@ export default function Dashboard({ setActivePage }: { setActivePage: (p: string
         db.getAttendance()
       ]);
 
-      setStudents(studentsData);
-      setSubjects(subjectsData);
-      setDepartments(deptsData);
+      setStudents(studentsData.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar'))); // Sort students
+      setSubjects(subjectsData.sort((a, b) => a.subject_name.localeCompare(b.subject_name, 'ar'))); // Sort subjects
+      setDepartments(deptsData.sort((a, b) => a.department_name.localeCompare(b.department_name, 'ar'))); // Sort departments
       setSchedules(schedulesData);
       setTimeSlots(slotsData);
       setAttendanceLogs(attendanceData);

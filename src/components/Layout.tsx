@@ -257,7 +257,7 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
   }, [mobileMenuOpen]);
 
   return (
-    <div className="min-h-screen bg-dark-bg text-dark-text font-sans flex flex-row">
+    <div className="min-h-screen w-full bg-dark-bg text-dark-text font-sans flex flex-row">
       {demoMode && (
         <div className="fixed top-0 left-0 right-0 z-[100] bg-gradient-to-r from-brand-warning/20 to-brand-danger/20 border-b border-brand-warning/30 py-3 px-4">
           <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">

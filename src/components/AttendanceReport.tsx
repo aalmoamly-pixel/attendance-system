@@ -52,8 +52,8 @@ export default function AttendanceReport({ setActivePage: _setActivePage }: { se
         db.getWeekdays(),
         db.getTimeSlots()
       ]);
-      setStudents(stus);
-      setSubjects(subs);
+      setStudents(stus.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar'))); // Sort students
+      setSubjects(subs.sort((a, b) => a.subject_name.localeCompare(b.subject_name, 'ar'))); // Sort subjects
       setSchedules(schs);
       setAttendanceLogs(atts);
       setWeekdays(days);
