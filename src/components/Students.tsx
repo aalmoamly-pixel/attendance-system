@@ -19,7 +19,10 @@ import type { Student, Department, Subject, Weekday, TimeSlot, PersonalNote } fr
 interface StudentSubjectForm {
   subject_name: string;
   weekday_id: number;
-  slot_id: number;
+  slot_id: number | null; // null when using manual times
+  use_manual_time: boolean; // true to use manual time entry
+  start_time: string;
+  end_time: string;
 }
 
 export default function Students() {
@@ -100,7 +103,14 @@ export default function Students() {
       department_name: departments[0]?.department_name || 'هندسة البرمجيات'
     });
     setStudentSubjects([
-      { subject_name: '', weekday_id: 1, slot_id: timeSlots[0]?.slot_id || 1 }
+      { 
+        subject_name: '', 
+        weekday_id: 1, 
+        slot_id: timeSlots[0]?.slot_id || 1,
+        use_manual_time: false,
+        start_time: '',
+        end_time: ''
+      }
     ]);
     setFormError(null);
     setIsModalOpen(true);
@@ -128,18 +138,35 @@ export default function Students() {
           studentSchedule.map(s => ({
             subject_name: s.subjects?.subject_name || '',
             weekday_id: s.weekday_id,
-            slot_id: s.slot_id
+            slot_id: s.slot_id,
+            use_manual_time: false,
+            start_time: s.time_slots?.start_time || '',
+            end_time: s.time_slots?.end_time || ''
           }))
         );
       } else {
         setStudentSubjects([
-          { subject_name: '', weekday_id: 1, slot_id: timeSlots[0]?.slot_id || 1 }
+          { 
+            subject_name: '', 
+            weekday_id: 1, 
+            slot_id: timeSlots[0]?.slot_id || 1,
+            use_manual_time: false,
+            start_time: '',
+            end_time: ''
+          }
         ]);
       }
     } catch (err) {
       console.error('[Students] Error loading schedule:', err);
       setStudentSubjects([
-        { subject_name: '', weekday_id: 1, slot_id: timeSlots[0]?.slot_id || 1 }
+        { 
+          subject_name: '', 
+          weekday_id: 1, 
+          slot_id: timeSlots[0]?.slot_id || 1,
+          use_manual_time: false,
+          start_time: '',
+          end_time: ''
+        }
       ]);
     }
     
@@ -206,7 +233,14 @@ export default function Students() {
   const addSubjectRow = () => {
     setStudentSubjects([
       ...studentSubjects,
-      { subject_name: '', weekday_id: 1, slot_id: timeSlots[0]?.slot_id || 1 }
+      { 
+        subject_name: '', 
+        weekday_id: 1, 
+        slot_id: timeSlots[0]?.slot_id || 1,
+        use_manual_time: false,
+        start_time: '',
+        end_time: ''
+      }
     ]);
   };
 
@@ -220,6 +254,21 @@ export default function Students() {
     setStudentSubjects(updated);
   };
 
+  const normalizeTime = (timeStr: string) => {
+    // Normalize time like '16:00' or '4:00 PM' etc.
+    if (!timeStr) return null;
+    
+    let time = timeStr.trim();
+    
+    // If it's in HH:MM format already
+    if (/^\d{1,2}:\d{2}$/.test(time)) {
+      let [h, m] = time.split(':').map(Number);
+      if (h < 10) time = `0${h}:${String(m).padStart(2, '0')}`;
+      return time;
+    }
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -228,6 +277,15 @@ export default function Students() {
     if (!formData.full_name || !formData.academic_id || !formData.national_id || !formData.department_name) {
       setFormError('الرجاء ملء الحقول المطلوبة');
       return;
+    }
+    
+    for (const subj of studentSubjects) {
+      if (subj.subject_name && subj.use_manual_time) {
+        if (!subj.start_time || !subj.end_time) {
+          setFormError('الرجاء إدخال وقت البداية والنهاية للمواد التي تختار إدخال وقت يدوياً');
+          return;
+        }
+      }
     }
     
     if (!editingStudent && !formData.password) {
@@ -252,7 +310,11 @@ export default function Students() {
           degree_type: null
         });
         departmentId = newDept.department_id;
+        setDepartments([...departments, newDept]);
       }
+      
+      // Process time slots first for manual times
+      const currentTimeSlots = [...timeSlots];
       
       if (editingStudent) {
         const updateData: any = {
@@ -290,13 +352,43 @@ export default function Students() {
                 department_id: departmentId
               });
               subjectId = newSubject.subject_id;
+              setSubjects([...subjects, newSubject]);
+            }
+            
+            let finalSlotId: number | null = subj.slot_id;
+            
+            if (subj.use_manual_time) {
+              const start = normalizeTime(subj.start_time);
+              const end = normalizeTime(subj.end_time);
+              
+              let matchingSlot = currentTimeSlots.find(s => 
+                s.start_time === start && s.end_time === end
+              );
+              
+              if (!matchingSlot) {
+                const newSlotName = `فترة ${start}-${end}`;
+                const newSlot = await db.createTimeSlot({
+                  slot_name: newSlotName,
+                  start_time: start!,
+                  end_time: end!
+                });
+                if (newSlot) {
+                  finalSlotId = newSlot.slot_id;
+                  currentTimeSlots.push(newSlot);
+                  setTimeSlots([...timeSlots, newSlot]);
+                } else {
+                  finalSlotId = timeSlots[0]?.slot_id || 1;
+                }
+              } else {
+                finalSlotId = matchingSlot.slot_id;
+              }
             }
             
             await db.createSchedule({
               student_id: editingStudent.student_id,
               subject_id: subjectId,
               weekday_id: subj.weekday_id,
-              slot_id: subj.slot_id
+              slot_id: finalSlotId!
             });
           }
         }
@@ -329,13 +421,43 @@ export default function Students() {
                 department_id: departmentId
               });
               subjectId = newSubject.subject_id;
+              setSubjects([...subjects, newSubject]);
+            }
+            
+            let finalSlotId: number | null = subj.slot_id;
+            
+            if (subj.use_manual_time) {
+              const start = normalizeTime(subj.start_time);
+              const end = normalizeTime(subj.end_time);
+              
+              let matchingSlot = currentTimeSlots.find(s => 
+                s.start_time === start && s.end_time === end
+              );
+              
+              if (!matchingSlot) {
+                const newSlotName = `فترة ${start}-${end}`;
+                const newSlot = await db.createTimeSlot({
+                  slot_name: newSlotName,
+                  start_time: start!,
+                  end_time: end!
+                });
+                if (newSlot) {
+                  finalSlotId = newSlot.slot_id;
+                  currentTimeSlots.push(newSlot);
+                  setTimeSlots([...timeSlots, newSlot]);
+                } else {
+                  finalSlotId = timeSlots[0]?.slot_id || 1;
+                }
+              } else {
+                finalSlotId = matchingSlot.slot_id;
+              }
             }
             
             await db.createSchedule({
               student_id: studentId,
               subject_id: subjectId,
               weekday_id: subj.weekday_id,
-              slot_id: subj.slot_id
+              slot_id: finalSlotId!
             });
           }
         }
@@ -655,7 +777,7 @@ export default function Students() {
                         )}
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="space-y-2">
                           <label className="text-xs font-bold text-dark-muted">اسم المادة</label>
                           <input
@@ -683,18 +805,55 @@ export default function Students() {
                         </div>
                         
                         <div className="space-y-2">
-                          <label className="text-xs font-bold text-dark-muted">الفترة</label>
-                          <select
-                            value={String(subj.slot_id)}
-                            onChange={(e) => updateSubjectRow(index, 'slot_id', Number(e.target.value))}
-                            className="w-full bg-dark-card border border-dark-border rounded-lg p-2.5 text-white text-sm focus:outline-none focus:border-brand-primary"
-                          >
-                            {timeSlots.map(slot => (
-                              <option key={slot.slot_id} value={String(slot.slot_id)}>
-                                {slot.slot_name} - {slot.start_time}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="flex items-center gap-2 mb-2">
+                            <input
+                              type="checkbox"
+                              id={`manual_time_${index}`}
+                              checked={subj.use_manual_time}
+                              onChange={(e) => updateSubjectRow(index, 'use_manual_time', e.target.checked)}
+                              className="w-4 h-4 rounded border-dark-border bg-dark-card text-brand-primary focus:ring-brand-primary"
+                            />
+                            <label htmlFor={`manual_time_${index}`} className="text-xs font-bold text-dark-muted cursor-pointer">
+                              إدخال وقت يدوياً
+                            </label>
+                          </div>
+                          {!subj.use_manual_time ? (
+                            <div>
+                              <label className="text-xs font-bold text-dark-muted">الفترة</label>
+                              <select
+                                value={String(subj.slot_id || 1)}
+                                onChange={(e) => updateSubjectRow(index, 'slot_id', Number(e.target.value))}
+                                className="w-full bg-dark-card border border-dark-border rounded-lg p-2.5 text-white text-sm focus:outline-none focus:border-brand-primary"
+                              >
+                                {timeSlots.map(slot => (
+                                  <option key={slot.slot_id} value={String(slot.slot_id)}>
+                                    {slot.slot_name} - {slot.start_time}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-2">
+                                <label className="text-xs font-bold text-dark-muted">وقت البداية</label>
+                                <input
+                                  type="time"
+                                  value={subj.start_time}
+                                  onChange={(e) => updateSubjectRow(index, 'start_time', e.target.value)}
+                                  className="w-full bg-dark-card border border-dark-border rounded-lg p-2.5 text-white text-sm focus:outline-none focus:border-brand-primary"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-xs font-bold text-dark-muted">وقت النهاية</label>
+                                <input
+                                  type="time"
+                                  value={subj.end_time}
+                                  onChange={(e) => updateSubjectRow(index, 'end_time', e.target.value)}
+                                  className="w-full bg-dark-card border border-dark-border rounded-lg p-2.5 text-white text-sm focus:outline-none focus:border-brand-primary"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
