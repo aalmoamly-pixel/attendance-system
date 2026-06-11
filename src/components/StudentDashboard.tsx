@@ -447,10 +447,9 @@ export default function StudentDashboard({ onLogout }: StudentDashboardProps) {
                           </div>
                           <div className="text-left flex-shrink-0">
                             <p className="font-medium text-white text-sm sm:text-base">
-                              {item.time_slots?.start_time}
-                            </p>
-                            <p className="text-xs text-dark-muted">
-                              {item.time_slots?.end_time}
+                              {item.time_slots?.start_time && item.time_slots?.end_time 
+                                ? `${item.time_slots.start_time} - ${item.time_slots.end_time}`
+                                : item.time_slots?.slot_name || item.time_slots?.start_time}
                             </p>
                           </div>
                         </div>

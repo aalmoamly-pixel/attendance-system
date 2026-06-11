@@ -18,7 +18,7 @@ import Subjects from './components/Subjects';
 import AttendancePage from './components/Attendance';
 import AttendanceReport from './components/AttendanceReport';
 import SmartImport from './components/SmartImport';
-import ScheduleImport from './components/ScheduleImport';
+import RedesignedScheduleImport from './components/RedesignedScheduleImport';
 import StudentDashboard from './components/StudentDashboard';
 import Notifications from './components/Notifications';
 import AdminPayments from './components/AdminPayments';
@@ -97,7 +97,7 @@ function DashboardRoutes({ authState }: { authState: AuthState }) {
       case 'import':
         return <SmartImport onImportSuccess={handleImportSuccess} />;
       case 'schedule-import':
-        return <ScheduleImport onImportSuccess={handleImportSuccess} />;
+        return <RedesignedScheduleImport onImportSuccess={handleImportSuccess} />;
       // CMS Pages
       case 'cms-general':
         return <GeneralSettings />;

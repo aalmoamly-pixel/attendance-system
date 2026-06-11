@@ -69,7 +69,7 @@ export default function StudentFees() {
       await loadData();
       setEditingId(null);
       setNotification({ type: 'success', message: 'تم حفظ الرسوم بنجاح.' });
-      setTimeout(() => setNotification(null), 3000);
+      // لا تختفي تلقائياً
     } catch (error) {
       console.error('[StudentFees] Error updating fees:', error);
       setNotification({ type: 'error', message: `فشل الحفظ: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` });
@@ -95,10 +95,12 @@ export default function StudentFees() {
       </div>
 
       {notification && (
-        <div className={`glass-card p-4 flex items-center gap-3 ${
-          notification.type === 'success' ? 'border border-brand-success/30 bg-brand-success/10' : 
-          'border border-brand-danger/30 bg-brand-danger/10'
-        }`}>
+        <div 
+          onClick={() => setNotification(null)}
+          className={`glass-card p-4 flex items-center gap-3 cursor-pointer hover:opacity-90 transition-all ${
+            notification.type === 'success' ? 'border border-brand-success/30 bg-brand-success/10' : 
+            'border border-brand-danger/30 bg-brand-danger/10'
+          }`}>
           {notification.type === 'success' ? (
             <CheckCircle2 className="w-6 h-6 text-brand-success" />
           ) : (
@@ -109,6 +111,7 @@ export default function StudentFees() {
           }`}>
             {notification.message}
           </span>
+          <span className="text-xs text-dark-muted mr-auto">(انقر للإغلاق)</span>
         </div>
       )}
 

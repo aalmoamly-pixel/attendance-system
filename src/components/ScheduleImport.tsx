@@ -81,7 +81,6 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
   const [success, setSuccess] = useState(false);
   const [rawOcrText, setRawOcrText] = useState<string>('');
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSelectClick = () => {
@@ -233,8 +232,8 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
       // Collect time pairs
       const timeMatches = line.match(/(\d{1,2}):(\d{2})/g) || [];
       if (timeMatches.length >= 2) {
-        const from = timeMatches[0].split(':').map(x => x.padStart(2, '0')).join(':');
-        const to = timeMatches[1].split(':').map(x => x.padStart(2, '0')).join(':');
+        const from = timeMatches[0]!.split(':').map(x => x.padStart(2, '0')).join(':');
+        const to = timeMatches[1]!.split(':').map(x => x.padStart(2, '0')).join(':');
         foundTimePairs.push({ line: i, from, to });
         parsingLog.push(`⏰ Found time pair: from ${from}, to ${to} at line ${i}`);
       }
@@ -620,7 +619,6 @@ export default function ScheduleImport({ onImportSuccess }: { onImportSuccess: (
     setSuccess(false);
     setRawOcrText('');
     setDebugInfo(null);
-    setValidationErrors([]);
   };
 
   return (

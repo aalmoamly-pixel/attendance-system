@@ -57,7 +57,7 @@ export default function Subjects() {
 
   const showToast = (msg: string) => {
     setSuccessMsg(msg);
-    setTimeout(() => setSuccessMsg(null), 3000);
+    // لا تختفي تلقائياً
   };
 
   const handleOpenEdit = (subject: Subject) => {
@@ -116,9 +116,13 @@ export default function Subjects() {
     <div className="space-y-6 animate-fade-in">
       
       {successMsg && (
-        <div className="fixed bottom-5 left-5 bg-brand-success text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 z-[99999] animate-bounce">
+        <div 
+          onClick={() => setSuccessMsg(null)}
+          className="fixed bottom-5 left-5 bg-brand-success text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 z-[99999] animate-bounce cursor-pointer hover:opacity-90 transition-all"
+        >
           <Check className="w-5 h-5" />
           <span className="text-sm font-semibold">{successMsg}</span>
+          <span className="text-xs text-white/70 ml-1">(انقر للإغلاق)</span>
         </div>
       )}
 

@@ -77,10 +77,56 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
         department_id: s.department_id
       })));
 
+      // Import students
       await db.importStudents(parseResult.students);
-
+      
+      // Now process schedules with time slots
       if (parseResult.schedules.length > 0) {
-        await db.importSchedule(parseResult.schedules);
+        // First, we need to handle time ranges properly
+        // Let's get all current time slots
+        let currentTimeSlots = await db.getTimeSlots();
+        
+        // Process each schedule item to get proper slot IDs
+        const processedSchedules = [];
+        
+        for (const schedule of parseResult.schedules as any[]) {
+          // Use the parsed start and end times from flexibleImportEngine
+          let slotId = schedule.slot_id;
+          
+          if (schedule.startTime && schedule.endTime && schedule.startTime !== '00:00') {
+            // Find exact match for both start and end time
+            const matchingSlot = currentTimeSlots.find(
+              slot => slot.start_time === schedule.startTime && slot.end_time === schedule.endTime
+            );
+            
+            if (matchingSlot) {
+              slotId = matchingSlot.slot_id;
+            } else {
+              // Create new time slot
+              const newSlotName = `${schedule.startTime} - ${schedule.endTime}`;
+              const newSlot = await db.createTimeSlot({
+                slot_name: newSlotName,
+                start_time: schedule.startTime,
+                end_time: schedule.endTime
+              });
+              
+              if (newSlot) {
+                slotId = newSlot.slot_id;
+                // Refresh time slots list
+                currentTimeSlots = await db.getTimeSlots();
+              }
+            }
+          }
+          
+          processedSchedules.push({
+            student_id: schedule.student_id,
+            subject_id: schedule.subject_id,
+            weekday_id: schedule.weekday_id,
+            slot_id: slotId
+          });
+        }
+        
+        await db.importSchedule(processedSchedules);
       }
 
       confetti({
@@ -90,10 +136,6 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
       });
 
       setSuccess(true);
-
-      setTimeout(() => {
-        onImportSuccess();
-      }, 2500);
 
     } catch (err: any) {
       console.error(err);
@@ -421,7 +463,14 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
                   <Check className="w-10 h-10 animate-bounce" />
                 </div>
                 <h3 className="text-2xl font-black text-white mb-2">تم الاستيراد بنجاح! 🎉</h3>
-                <p className="text-sm text-dark-muted">جاري تحديث لوحة التحكم...</p>
+                <p className="text-sm text-dark-muted mb-6">اضغط على "موافق" للعودة إلى لوحة التحكم</p>
+                <button
+                  onClick={onImportSuccess}
+                  className="btn-primary flex items-center justify-center gap-2 mx-auto"
+                >
+                  <Check className="w-5 h-5" />
+                  موافق
+                </button>
               </div>
             )}
           </div>

@@ -9,6 +9,65 @@ import type {
 } from './flexibleImportTypes';
 
 // ----------------------------------------------------
+// مساعدات لتحليل الوقت
+// ----------------------------------------------------
+function parseTimeRange(timeRangeStr: string): { startTime: string, endTime: string } {
+  const cleaned = timeRangeStr.trim();
+  if (!cleaned) return { startTime: '00:00', endTime: '00:00' };
+
+  if (cleaned.includes('-')) {
+    const parts = cleaned.split('-').map(p => p.trim());
+    return {
+      startTime: normalizeTime(parts[0]),
+      endTime: parts.length > 1 ? normalizeTime(parts[1]) : '00:00'
+    };
+  }
+
+  return {
+    startTime: normalizeTime(cleaned),
+    endTime: '00:00'
+  };
+}
+
+function normalizeTime(timeStr: string): string {
+  if (!timeStr || timeStr.trim() === '') return '00:00';
+  
+  let clean = timeStr.trim();
+  let isPM = clean.toLowerCase().includes('pm');
+  let isAM = clean.toLowerCase().includes('am');
+  
+  clean = clean.replace(/am|pm|صباحا|مساءً/gi, '').trim();
+  
+  const timePattern = /(\d{1,2})[:\.]?(\d{0,2})?/;
+  const match = clean.match(timePattern);
+  
+  if (match) {
+    let hour = parseInt(match[1], 10);
+    let minute = parseInt(match[2] || '0', 10);
+    
+    if (isPM && hour < 12) hour += 12;
+    if (isAM && hour === 12) hour = 0;
+    
+    const hourStr = hour.toString().padStart(2, '0');
+    const minuteStr = minute.toString().padStart(2, '0');
+    
+    return `${hourStr}:${minuteStr}`;
+  }
+  
+  return '00:00';
+}
+
+const DAY_MAP: Record<string, number> = {
+  'الأحد': 1, 'احد': 1, 'sunday': 1, 'sun': 1,
+  'الإثنين': 2, 'اثنين': 2, 'الاثنين': 2, 'monday': 2, 'mon': 2,
+  'الثلاثاء': 3, 'ثلاثاء': 3, 'tuesday': 3, 'tue': 3,
+  'الأربعاء': 4, 'اربعاء': 4, 'الاربعاء': 4, 'wednesday': 4, 'wed': 4,
+  'الخميس': 5, 'خميس': 5, 'thursday': 5, 'thu': 5,
+  'الجمعة': 6, 'جمعة': 6, 'friday': 6, 'fri': 6,
+  'السبت': 7, 'سبت': 7, 'saturday': 7, 'sat': 7
+};
+
+// ----------------------------------------------------
 // 1. أنماط مطابقة الأعمدة (أكثر شمولاً)
 // ----------------------------------------------------
 const COLUMN_PATTERNS: Record<string, string[]> = {
@@ -544,7 +603,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
         
         let weekdayId = 1; // القيمة الافتراضية
         if (subjData.weekdayName) {
-          for (const [key, val] of Object.entries(WEEKDAY_MAP)) {
+          for (const [key, val] of Object.entries(DAY_MAP)) {
             if (subjData.weekdayName.toLowerCase().includes(key.toLowerCase())) {
               weekdayId = val;
               break;
@@ -552,17 +611,20 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
           }
         }
         
+        // Parse time range if available
+        let startTime = '00:00';
+        let endTime = '00:00';
+        if (subjData.timeRange) {
+          const parsedTime = parseTimeRange(subjData.timeRange);
+          startTime = parsedTime.startTime;
+          endTime = parsedTime.endTime;
+        }
+        
+        // We'll handle slotId in SmartImport.tsx, but for now let's keep the original logic
         let slotId = 1; // القيمة الافتراضية
         if (subjData.slotName) {
           for (const [key, val] of Object.entries(SLOT_MAP)) {
             if (subjData.slotName.toLowerCase().includes(key.toLowerCase())) {
-              slotId = val;
-              break;
-            }
-          }
-        } else if (subjData.timeRange) {
-          for (const [key, val] of Object.entries(SLOT_MAP)) {
-            if (subjData.timeRange.toLowerCase().includes(key.toLowerCase())) {
               slotId = val;
               break;
             }
@@ -573,7 +635,10 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
           student_id: i + 1,
           subject_id: subjectId,
           weekday_id: weekdayId,
-          slot_id: slotId
+          slot_id: slotId,
+          // Add these for SmartImport.tsx to use
+          startTime,
+          endTime
         });
       }
     }

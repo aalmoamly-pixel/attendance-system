@@ -86,7 +86,7 @@ export default function Students() {
 
   const showToast = (msg: string) => {
     setSuccessMsg(msg);
-    setTimeout(() => setSuccessMsg(null), 3000);
+    // لا تختفي تلقائياً - تختفي فقط عند النقر عليها
   };
 
   const handleOpenAdd = () => {
@@ -161,6 +161,7 @@ export default function Students() {
 
   const handleDeleteAll = async () => {
     console.log('[DeleteAll] Button clicked!');
+    console.log('[DeleteAll] Current students in state:', students);
     if (window.confirm('⚠️ هل أنت متأكد من حذف جميع الطلاب والجداول؟\n\nهذه العملية لا يمكن التراجع عنها!')) {
       console.log('[DeleteAll] Confirm accepted!');
       try {
@@ -169,7 +170,7 @@ export default function Students() {
         console.log('[DeleteAll] Deleted successfully!');
         showToast('✅ تم حذف جميع الطلاب بنجاح');
         console.log('[DeleteAll] Refreshing data...');
-        fetchData();
+        await fetchData();
       } catch (err: any) {
         console.error('[DeleteAll] Error:', err);
         setFormError('❌ فشل حذف جميع الطلاب: ' + (err.message || err));
@@ -395,9 +396,13 @@ export default function Students() {
       </div>
 
       {successMsg && (
-        <div className="fixed top-4 right-4 z-[99999] bg-brand-success/20 border border-brand-success/30 text-brand-success px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg animate-slide-up">
+        <div 
+          onClick={() => setSuccessMsg(null)}
+          className="fixed top-4 right-4 z-[99999] bg-brand-success/20 border border-brand-success/30 text-brand-success px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg animate-slide-up cursor-pointer hover:bg-brand-success/30 transition-all"
+        >
           <Check className="w-5 h-5" />
           {successMsg}
+          <span className="text-xs text-dark-muted ml-2">(انقر للإغلاق)</span>
         </div>
       )}
 

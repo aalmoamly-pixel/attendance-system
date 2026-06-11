@@ -82,7 +82,7 @@ export default function AttendancePage() {
     };
   };
 
-  const getAttendanceStats = (student: Student, subject: any) => {
+  const getAttendanceStats = (_student: Student, subject: any) => {
     const subjectRates = attendanceRates?.bySubject?.find((s: any) => s.subject_id === subject.subject_id);
     const logs = attendanceLogs.filter(log => 
       log.schedule_id === subject.schedule_id
@@ -113,7 +113,6 @@ export default function AttendancePage() {
   };
 
   const selectedSchedule = studentSubjects.find(s => String(s.schedule_id) === selectedScheduleId);
-  const selectedSubject = selectedSchedule ? allSubjects.find(s => s.subject_id === selectedSchedule.subject_id) : null;
 
   const getOverallAttendanceStats = (_student: Student) => {
     if (attendanceRates) {
