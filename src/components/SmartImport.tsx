@@ -78,7 +78,7 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
       })));
 
       // Import students
-      await db.importStudents(parseResult.students);
+      const studentIdMapping = await db.importStudents(parseResult.students);
       
       // Now process schedules with time slots
       if (parseResult.schedules.length > 0) {
@@ -89,7 +89,13 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
         // Process each schedule item to get proper slot IDs
         const processedSchedules = [];
         
-        for (const schedule of parseResult.schedules as any[]) {
+        for (let i = 0; i < parseResult.schedules.length; i++) {
+          const schedule = parseResult.schedules[i] as any;
+          
+          // Get the real student_id from the mapping using the schedule's academic_id
+          const realStudentId = studentIdMapping.get(schedule.academic_id);
+          if (!realStudentId) continue;
+          
           // Use the parsed start and end times from flexibleImportEngine
           let slotId = schedule.slot_id;
           
@@ -119,7 +125,7 @@ export default function SmartImport({ onImportSuccess }: { onImportSuccess: () =
           }
           
           processedSchedules.push({
-            student_id: schedule.student_id,
+            student_id: realStudentId,
             subject_id: schedule.subject_id,
             weekday_id: schedule.weekday_id,
             slot_id: slotId

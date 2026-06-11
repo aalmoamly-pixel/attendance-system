@@ -596,6 +596,7 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
     const schedules: any[] = [];
     for (let i = 0; i < students.length; i++) {
       const rowSubjects = processedRows[i].processed.subjects;
+      const student = students[i];
       
       for (const subjData of rowSubjects) {
         const subjectId = subjectsMap.get(subjData.subjectName)?.id;
@@ -632,7 +633,8 @@ export async function flexibleParseExcelOrCsv(file: File): Promise<FlexibleImpor
         }
         
         schedules.push({
-          student_id: i + 1,
+          student_id: i + 1, // Temporary, we'll use academic_id to get real ID
+          academic_id: student.academic_id, // Store academic ID for mapping later
           subject_id: subjectId,
           weekday_id: weekdayId,
           slot_id: slotId,
