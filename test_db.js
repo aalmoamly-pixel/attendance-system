@@ -22,7 +22,7 @@ console.log('Connecting to Supabase at', url);
 const supabase = createClient(url, key);
 
 async function test() {
-  const tables = ['students', 'subjects', 'schedules', 'attendance'];
+  const tables = ['students', 'subjects', 'schedules', 'attendance', 'new_customers'];
   for (const t of tables) {
     try {
       const { data, error } = await supabase.from(t).select('*').limit(1);

@@ -23,6 +23,9 @@ import StudentDashboard from './components/StudentDashboard';
 import Notifications from './components/Notifications';
 import AdminPayments from './components/AdminPayments';
 import PaymentSettings from './components/PaymentSettings';
+import AdminNewCustomers from './components/AdminNewCustomers';
+
+// In the route case, replace NewCustomers with AdminNewCustomers
 import FinancialReports from './components/FinancialReports';
 import StudentFees from './components/StudentFees';
 import GeneralSettings from './components/cms/GeneralSettings';
@@ -78,6 +81,8 @@ function DashboardRoutes({ authState }: { authState: AuthState }) {
         return <Dashboard key={refreshTrigger} setActivePage={setActivePage} />;
       case 'students':
         return <Students key={refreshTrigger} />;
+        case 'new-customers':
+          return <AdminNewCustomers key={refreshTrigger} />;
       case 'subjects':
         return <Subjects key={refreshTrigger} />;
       case 'attendance':

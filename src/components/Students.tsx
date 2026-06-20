@@ -827,7 +827,7 @@ export default function Students() {
                               >
                                 {timeSlots.map(slot => (
                                   <option key={slot.slot_id} value={String(slot.slot_id)}>
-                                    {slot.slot_name} - {slot.start_time}
+                                    {slot.slot_name}
                                   </option>
                                 ))}
                               </select>

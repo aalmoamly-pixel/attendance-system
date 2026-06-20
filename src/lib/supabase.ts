@@ -15,7 +15,8 @@ import type {
   PaymentStatus,
   PaymentMethod,
   PaymentSettings,
-  CMSData
+  CMSData,
+  NewCustomer
 } from '../types/database';
 import { hashPassword } from './crypto';
 
@@ -55,7 +56,8 @@ const LOCAL_KEYS = {
   PERSONAL_NOTES: 'attendance_personal_notes',
   PAYMENTS: 'attendance_payments',
   PAYMENT_SETTINGS: 'attendance_payment_settings',
-  CMS_DATA: 'cms_data'
+  CMS_DATA: 'cms_data',
+  NEW_CUSTOMERS: 'attendance_new_customers'
 };
 
 export const initializeLocalData = async () => {
@@ -518,6 +520,11 @@ export const initializeLocalData = async () => {
       console.log('[initializeLocalData] Payment settings initialized');
     }
     
+    if (!localStorage.getItem(LOCAL_KEYS.NEW_CUSTOMERS)) {
+      localStorage.setItem(LOCAL_KEYS.NEW_CUSTOMERS, JSON.stringify([]));
+      console.log('[initializeLocalData] New customers initialized');
+    }
+    
     console.log('[initializeLocalData] All data initialized successfully!');
   }
 };
@@ -598,7 +605,7 @@ export const db = {
     return JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
   },
 
-  async createStudent(student: Omit<Student, 'student_id'> & { password?: string }): Promise<Student> {
+  async createStudent(student: Omit<Student, 'student_id' | 'password_hash'> & { password?: string; password_hash?: string }): Promise<Student> {
     const { hashPassword } = await import('./auth');
     
     console.log('[createStudent] Input:', student);
@@ -650,7 +657,11 @@ export const db = {
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
       const nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.student_id)) + 1 : 1;
-      const newStudent = { ...studentData, student_id: nextId };
+      const newStudent = { 
+        ...studentData, 
+        student_id: nextId,
+        password_hash: studentData.password_hash || '' 
+      } as Student;
       existing.push(newStudent);
       localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existing));
       console.log('[createStudent] Saved to localStorage:', newStudent);
@@ -2025,7 +2036,7 @@ export const db = {
         }
         result = data;
       } else {
-        // Insert new record
+        // Duplicate uploadReceipt function removed; using db.uploadReceipt defined earlier.
         const { data, error } = await supabase
           .from('cms_data')
           .insert([newData])
@@ -2056,8 +2067,126 @@ export const db = {
       localStorage.setItem(LOCAL_KEYS.CMS_DATA, JSON.stringify(newData));
       return newData;
     }
+  },
+
+  async getNewCustomers(): Promise<NewCustomer[]> {
+    if (supabase) {
+      const { data, error } = await supabase.from('new_customers').select('*').order('created_at', { ascending: false });
+      if (error) {
+        console.error('[NewCustomers] Fetch error:', error);
+        throw error;
+      }
+      return data || [];
+    }
+    return JSON.parse(localStorage.getItem(LOCAL_KEYS.NEW_CUSTOMERS) || '[]');
+  },
+
+  async createNewCustomer(customer: Omit<NewCustomer, 'id' | 'created_at' | 'updated_at' | 'status'>): Promise<NewCustomer> {
+    const now = new Date().toISOString();
+    const newCust = {
+      ...customer,
+      status: 'new' as const,
+      created_at: now,
+      updated_at: now
+    };
+    
+    if (supabase) {
+      const { data, error } = await supabase.from('new_customers').insert(newCust).select('*').single();
+      if (error) {
+        console.error('[NewCustomers] Create error:', error);
+        throw error;
+      }
+      return data;
+    } else {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.NEW_CUSTOMERS) || '[]');
+      const nextId = existing.length > 0 ? Math.max(...existing.map((c: any) => c.id)) + 1 : 1;
+      const custWithId = { ...newCust, id: nextId };
+      existing.push(custWithId);
+      localStorage.setItem(LOCAL_KEYS.NEW_CUSTOMERS, JSON.stringify(existing));
+      return custWithId;
+    }
+  },
+
+  async updateNewCustomer(id: number, customer: Partial<Omit<NewCustomer, 'id'>>): Promise<NewCustomer> {
+    const now = new Date().toISOString();
+    const updateData = {
+      ...customer,
+      updated_at: now
+    };
+    
+    if (supabase) {
+      const { data, error } = await supabase.from('new_customers').update(updateData).eq('id', id).select('*').single();
+      if (error) {
+        console.error('[NewCustomers] Update error:', error);
+        throw error;
+      }
+      return data;
+    } else {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.NEW_CUSTOMERS) || '[]');
+      const index = existing.findIndex((c: any) => c.id === id);
+      if (index !== -1) {
+        existing[index] = { ...existing[index], ...updateData };
+        localStorage.setItem(LOCAL_KEYS.NEW_CUSTOMERS, JSON.stringify(existing));
+        return existing[index];
+      }
+      throw new Error('Customer request not found');
+    }
+  },
+
+  async deleteNewCustomer(id: number): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('new_customers').delete().eq('id', id);
+      if (error) {
+        console.error('[NewCustomers] Delete error:', error);
+        throw error;
+      }
+    } else {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.NEW_CUSTOMERS) || '[]');
+      const filtered = existing.filter((c: any) => c.id !== id);
+      localStorage.setItem(LOCAL_KEYS.NEW_CUSTOMERS, JSON.stringify(filtered));
+    }
+  },
+
+  async ensureReceiptBucket(): Promise<void> {
+    // Bucket must be created in Supabase dashboard manually.
+    // anon key does not have permission to create buckets via API.
+    // This is a no-op — we just try the upload directly.
+  },
+
+  async uploadReceipt(file: File): Promise<string> {
+    if (!supabase) {
+      // No Supabase: convert to base64 and store inline
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Try Supabase Storage first
+    const filePath = `receipts/${Date.now()}_${file.name}`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('payment-receipts')
+      .upload(filePath, file, { upsert: false });
+
+    if (uploadError) {
+      console.warn('[Storage] Supabase storage upload failed, falling back to base64:', uploadError.message);
+      // Fallback: convert to base64 and store inline in the DB column
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const { data } = supabase.storage.from('payment-receipts').getPublicUrl(uploadData.path);
+    console.log('[Storage] Uploaded to Supabase Storage. Public URL:', data.publicUrl);
+    return data.publicUrl;
   }
 };
+
 
 async function clearAllSupabaseTables() {
   if (!supabase) return;
@@ -2227,11 +2356,18 @@ export async function migrateLocalToSupabase() {
       if (error) throw error;
       console.log('[Migration] Inserted payment settings');
     }
+    //12. New Customers
+    const newCustomers = JSON.parse(localStorage.getItem(LOCAL_KEYS.NEW_CUSTOMERS) || '[]');
+    if (newCustomers.length > 0) {
+      const { error } = await supabase.from('new_customers').upsert(newCustomers, { onConflict: 'id' });
+      if (error) throw error;
+      console.log('[Migration] Inserted new customers');
+    }
 
     console.log('[Migration] Migration complete!');
     return {
       success: true,
-      message: `✅ تم استيراد البيانات بنجاح: ${departments.length} تخصص، ${students.length} طالب، ${subjects.length} مادة، ${schedules.length} جدول، ${attendanceLogs.length} سجل حضور، ${notifications.length} إشعار، ${payments.length} دفعة`
+      message: `✅ تم استيراد البيانات بنجاح: ${departments.length} تخصص، ${students.length} طالب، ${subjects.length} مادة، ${schedules.length} جدول، ${attendanceLogs.length} سجل حضور، ${notifications.length} إشعار، ${payments.length} دفعة، ${newCustomers.length} عميل جديد`
     };
   } catch (err: any) {
     console.error('[Migration] Error:', err);

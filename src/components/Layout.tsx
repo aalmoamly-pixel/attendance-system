@@ -34,6 +34,7 @@ interface LayoutProps {
 export default function Layout({ children, activePage, setActivePage, onLogout }: LayoutProps) {
   const [authState] = useState(getAuthState());
   const [unreadCount, setUnreadCount] = useState(0);
+  const [newCustomersCount, setNewCustomersCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cmsMenuOpen, setCmsMenuOpen] = useState(false);
   const isSupabaseLive = !!supabase;
@@ -63,6 +64,14 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
       
       if (isAdmin) {
         count = notifications.filter(n => n.sender_role === 'student' && !n.is_read).length;
+        
+        try {
+          const newCusts = await db.getNewCustomers();
+          const newCount = newCusts.filter(c => c.status === 'new').length;
+          setNewCustomersCount(newCount);
+        } catch (e) {
+          console.error('[Layout] Error loading new customers count:', e);
+        }
       } else if (currentUserId) {
         count = notifications.filter(n => n.student_id === currentUserId && n.sender_role === 'admin' && !n.is_read).length;
       }
@@ -88,6 +97,7 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
   const menuItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard, show: true },
     { id: 'students', label: 'إدارة الطلاب', icon: Users, show: isAdmin },
+    { id: 'new-customers', label: 'العملاء الجدد', icon: Users, notificationBadge: newCustomersCount > 0 ? String(newCustomersCount) : null, show: isAdmin },
     { id: 'subjects', label: 'المواد الدراسية', icon: BookOpen, show: isAdmin },
     { id: 'attendance', label: 'رصد الحضور', icon: CalendarCheck, show: isAdmin },
     { id: 'attendance-report', label: 'تقارير الحضور', icon: BarChart3, show: isAdmin },

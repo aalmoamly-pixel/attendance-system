@@ -301,3 +301,18 @@ export interface CMSData {
   footer: CMSFooter;
   partners: CMSPartnerPage;
 }
+
+export interface NewCustomer {
+  id: number;
+  full_name: string;
+  university_name: string;
+  username: string;
+  password: string;
+  phone: string;
+  receipt_file: string; // Base64 or URL
+  plan_type: 'basic' | 'premium';
+  status: 'new' | 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  updated_at: string;
+}
+
