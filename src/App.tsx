@@ -36,6 +36,7 @@ import PricingPageEditor from './components/cms/PricingPageEditor';
 import ContactPageEditor from './components/cms/ContactPageEditor';
 import FooterEditor from './components/cms/FooterEditor';
 import PartnersPageEditor from './components/cms/PartnersPageEditor';
+import LMSApp from './components/lms/LMSApp';
 import { getAuthState, logout, initializeDefaultAdmin } from './lib/auth';
 import { db } from './lib/supabase';
 import type { AuthState } from './types/database';
@@ -183,6 +184,9 @@ function AppContent() {
           </ProtectedRoute>
         }
       />
+
+      {/* LMS Route */}
+      <Route path="/lms/*" element={<LMSApp />} />
 
       {/* Catch all */}
       <Route path="*" element={<Navigate to="/" replace />} />

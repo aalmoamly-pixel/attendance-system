@@ -45,6 +45,10 @@ export default function PublicNavbar() {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-4">
+            <Link to="/lms" className="btn-secondary flex items-center gap-2 border border-brand-primary/50 text-brand-primary hover:bg-brand-primary/10">
+              <BookOpen className="w-4 h-4" />
+              بوابة LMS الأكاديمية
+            </Link>
             <Link to="/demo" className="btn-secondary">
               تجربة مجانية
             </Link>
@@ -53,7 +57,7 @@ export default function PublicNavbar() {
               className="btn-primary"
             >
               <Lock className="w-5 h-5" />
-              تسجيل الدخول
+              بوابة التحضير
             </button>
           </div>
 
@@ -82,6 +86,14 @@ export default function PublicNavbar() {
               ))}
               <div className="flex flex-col gap-3 pt-4 border-t border-dark-border">
                 <Link
+                  to="/lms"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="btn-secondary w-full flex items-center justify-center gap-2 border border-brand-primary/50 text-brand-primary"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  بوابة LMS الأكاديمية
+                </Link>
+                <Link
                   to="/demo"
                   onClick={() => setIsMenuOpen(false)}
                   className="btn-secondary w-full"
@@ -95,7 +107,7 @@ export default function PublicNavbar() {
                   }}
                   className="btn-primary w-full"
                 >
-                  تسجيل الدخول
+                  بوابة التحضير
                 </button>
               </div>
             </div>

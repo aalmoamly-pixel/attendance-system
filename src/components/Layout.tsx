@@ -196,6 +196,10 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
             <button
               key={item.id}
               onClick={() => {
+                if (item.id === 'lms-link') {
+                  window.location.href = '/lms';
+                  return;
+                }
                 setActivePage(item.id);
                 setMobileMenuOpen(false);
               }}
