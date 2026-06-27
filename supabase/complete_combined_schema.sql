@@ -477,36 +477,37 @@ CREATE POLICY "Allow public access" ON public.lms_special_requests FOR ALL USING
 -- ==========================================
 -- IV. ENABLE SUPABASE REALTIME
 -- ==========================================
+DROP PUBLICATION IF EXISTS supabase_realtime;
 
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.departments;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.students;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.subjects;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.weekdays;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.time_slots;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.student_schedule;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.attendance_log;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.notifications;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.personal_notes;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.payment_settings;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.payments;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.cms_data;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.new_customers;
-
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_users;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_departments;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_courses;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_sections;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_enrollments;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_materials;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_assignments;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_submissions;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_questions;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_exams;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_exam_questions;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_exam_attempts;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_meetings;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_attendance;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_announcements;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_messages;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_certificates;
-ALTER publication supabase_realtime ADD TABLE IF NOT EXISTS public.lms_special_requests;
+CREATE PUBLICATION supabase_realtime FOR TABLE 
+    public.departments,
+    public.students,
+    public.subjects,
+    public.weekdays,
+    public.time_slots,
+    public.student_schedule,
+    public.attendance_log,
+    public.notifications,
+    public.personal_notes,
+    public.payment_settings,
+    public.payments,
+    public.cms_data,
+    public.new_customers,
+    public.lms_users,
+    public.lms_departments,
+    public.lms_courses,
+    public.lms_sections,
+    public.lms_enrollments,
+    public.lms_materials,
+    public.lms_assignments,
+    public.lms_submissions,
+    public.lms_questions,
+    public.lms_exams,
+    public.lms_exam_questions,
+    public.lms_exam_attempts,
+    public.lms_meetings,
+    public.lms_attendance,
+    public.lms_announcements,
+    public.lms_messages,
+    public.lms_certificates,
+    public.lms_special_requests;
