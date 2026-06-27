@@ -211,6 +211,7 @@ CREATE TABLE IF NOT EXISTS public.lms_users (
     role VARCHAR(50) CHECK (role IN ('admin', 'instructor', 'student')) NOT NULL,
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'pending', 'rejected')) NOT NULL,
     avatar_url TEXT,
+    subscription_plan_id VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
