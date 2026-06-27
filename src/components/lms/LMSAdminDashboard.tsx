@@ -49,7 +49,19 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
   const [courseForm, setCourseForm] = useState({ code: '', title: '', description: '', department_id: '', price: '' });
   const [sectionForm, setSectionForm] = useState({ course_id: '', instructor_id: '', section_number: '', semester: '', capacity: '30', schedule_days: [] as string[], schedule_time: '' });
   const [userForm, setUserForm] = useState({ email: '', password_hash: '', full_name: '', phone: '', role: 'student' as LMSUser['role'], subscription_plan_id: '' });
-  const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'شهري', features: '' });
+  const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'شهري', features: '', visible: true });
+
+  // CMS Editor States
+  const [cmsSubTab, setCmsSubTab] = useState<'homepage' | 'platform_identity' | 'portals' | 'media' | 'features' | 'stats' | 'faqs' | 'navbar'>('homepage');
+  const [newFaq, setNewFaq] = useState({ q: '', a: '' });
+  const [editingFaqIdx, setEditingFaqIdx] = useState<number | null>(null);
+  const [newFeature, setNewFeature] = useState({ title: '', desc: '', type: 'platform' as 'platform' | 'lms' | 'attendance' });
+  const [editingFeatureIdx, setEditingFeatureIdx] = useState<{ idx: number; type: 'platform' | 'lms' | 'attendance' } | null>(null);
+  const [newStat, setNewStat] = useState({ label: '', value: '', color: 'from-cyan-400 to-blue-500' });
+  const [editingStatIdx, setEditingStatIdx] = useState<number | null>(null);
+  const [newNavLink, setNewNavLink] = useState({ label: '', href: '' });
+  const [editingNavLinkIdx, setEditingNavLinkIdx] = useState<number | null>(null);
+  const [newMediaUrl, setNewMediaUrl] = useState({ name: '', url: '' });
 
   useEffect(() => {
     loadAll();
@@ -270,15 +282,15 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
       const featArr = planForm.features.split('\n').map((f: string) => f.trim()).filter(Boolean);
       const priceVal = parseFloat(planForm.price) || 0;
       if (editPlanId) {
-        await lmsDb.updateSubscriptionPlan(editPlanId, planForm.name, priceVal, planForm.billing_cycle, featArr);
+        await lmsDb.updateSubscriptionPlan(editPlanId, planForm.name, priceVal, planForm.billing_cycle, featArr, planForm.visible);
         showToast('تم تحديث باقة الاشتراك بنجاح');
       } else {
-        await lmsDb.createSubscriptionPlan(planForm.name, priceVal, planForm.billing_cycle, featArr);
+        await lmsDb.createSubscriptionPlan(planForm.name, priceVal, planForm.billing_cycle, featArr, planForm.visible);
         showToast('تم إنشاء باقة الاشتراك بنجاح');
       }
       setShowPlanModal(false);
       setEditPlanId(null);
-      setPlanForm({ name: '', price: '', billing_cycle: 'شهري', features: '' });
+      setPlanForm({ name: '', price: '', billing_cycle: 'شهري', features: '', visible: true });
       await loadAll();
     } catch (err: any) {
       alert(err.message);
@@ -302,7 +314,8 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
       name: p.name,
       price: p.price.toString(),
       billing_cycle: p.billing_cycle,
-      features: p.features.join('\n')
+      features: p.features.join('\n'),
+      visible: p.visible !== false
     });
     setShowPlanModal(true);
   };
@@ -852,7 +865,16 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
                   <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
                     <ShieldCheck className="w-6 h-6 text-emerald-400" />
                   </div>
-                  <h4 className="font-black text-white text-lg">{plan.name}</h4>
+                  <div className="flex items-center justify-between flex-row-reverse mb-2">
+                    <h4 className="font-black text-white text-lg">{plan.name}</h4>
+                    <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-black border ${
+                      plan.visible !== false 
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                        : 'bg-slate-500/10 border-slate-500/20 text-slate-400'
+                    }`}>
+                      {plan.visible !== false ? 'مرئية بالرئيسية' : 'مخفية'}
+                    </span>
+                  </div>
                   <div className="flex items-baseline gap-1 flex-row-reverse text-right mt-2 mb-4">
                     <span className="text-2xl font-black text-emerald-400 font-mono">{plan.price}</span>
                     <span className="text-xs text-slate-400 font-bold">ر.س / {plan.billing_cycle}</span>
@@ -889,119 +911,1304 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
         </div>
       )}
 
-      {/* Site settings Tab */}
+      {/* Site settings Tab (Complete Dynamic CMS Panel) */}
       {activeTab === 'site_settings' && siteConfig && (
-        <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-6">
-          <div className="flex items-center justify-between flex-row-reverse border-b border-[#21263d] pb-4">
-            <h3 className="text-white font-black text-lg">إدارة وتعديل محتوى الصفحة الرئيسية للموقع</h3>
+        <div className="bg-[#131622] border border-[#21263d] p-6 sm:p-8 rounded-3xl space-y-6" dir="rtl">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-[#21263d] pb-5">
+            <div className="text-right">
+              <h3 className="text-white font-black text-xl">لوحة التحكم بإدارة محتوى الموقع (CMS)</h3>
+              <p className="text-xs text-slate-400 mt-1">قم بتعديل وتحديث كامل نصوص وصور وأقسام الصفحة الرئيسية والقائمة العلوية فورياً بدون تعديل كود.</p>
+            </div>
             <button
               onClick={handleSaveSiteConfig}
-              className="px-5 py-2.5 rounded-xl bg-brand-primary hover:bg-brand-primary/95 text-sm font-bold text-white shadow shadow-brand-primary/25 transition cursor-pointer"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-brand-primary hover:bg-brand-primary/95 text-sm font-bold text-white shadow-lg shadow-brand-primary/25 hover:shadow-brand-primary/35 transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              حفظ التغييرات
+              <CheckCircle className="w-5 h-5" />
+              <span>حفظ كافة التغييرات ونشرها</span>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 text-right">
-            {/* Header Content */}
-            <div className="space-y-4">
-              <h4 className="text-brand-primary font-black text-sm text-right border-r-2 border-brand-primary pr-2">القسم الترحيبي (Hero Section)</h4>
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className={labelClass}>عنوان الترحيب الرئيسي</label>
-                  <input
-                    type="text"
-                    value={siteConfig.welcomeTitle || ''}
-                    onChange={e => setSiteConfig({ ...siteConfig, welcomeTitle: e.target.value })}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>نص الوصف الترحيبي</label>
-                  <textarea
-                    rows={3}
-                    value={siteConfig.welcomeDesc || ''}
-                    onChange={e => setSiteConfig({ ...siteConfig, welcomeDesc: e.target.value })}
-                    className={inputClass + ' resize-none'}
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-stretch">
+            {/* CMS Sidebar Navigation */}
+            <div className="lg:col-span-1 flex flex-col gap-1.5 bg-[#090b10] border border-[#21263d] p-4 rounded-2xl h-fit">
+              <span className="text-[10px] font-black text-slate-500 uppercase px-3 pb-2 border-b border-[#21263d]/40 mb-2 block">أقسام إدارة المحتوى</span>
+              {[
+                { id: 'homepage', label: 'الرئيسية وترتيب الأقسام' },
+                { id: 'platform_identity', label: 'هوية المنصة والاتصال' },
+                { id: 'portals', label: 'بوابات النظامين' },
+                { id: 'media', label: 'مكتبة الوسائط' },
+                { id: 'features', label: 'إدارة المميزات' },
+                { id: 'stats', label: 'إحصائيات الموقع' },
+                { id: 'faqs', label: 'الأسئلة الشائعة FAQ' },
+                { id: 'navbar', label: 'أزرار القائمة العلوية' },
+              ].map(sub => (
+                <button
+                  key={sub.id}
+                  onClick={() => setCmsSubTab(sub.id as any)}
+                  className={`w-full text-right px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    cmsSubTab === sub.id
+                      ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/20'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+                  }`}
+                >
+                  <span>{sub.label}</span>
+                  {cmsSubTab === sub.id && <span className="w-1.5 h-1.5 rounded-full bg-brand-primary" />}
+                </button>
+              ))}
             </div>
 
-            {/* Statistics Content */}
-            <div className="space-y-4 pt-4 border-t border-[#21263d]">
-              <h4 className="text-brand-primary font-black text-sm text-right border-r-2 border-brand-primary pr-2">إحصائيات الموقع (Statistics)</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {siteConfig.stats?.map((stat: any, idx: number) => (
-                  <div key={idx} className="bg-[#090b10] border border-[#21263d] p-4 rounded-2xl space-y-2">
-                    <div className="text-xs text-slate-500 font-bold text-right">الإحصائية {idx + 1}</div>
-                    <div>
-                      <label className="block text-[10px] text-slate-400 mb-1">اسم المؤشر</label>
-                      <input
-                        type="text"
-                        value={stat.label}
-                        onChange={e => {
-                          const newStats = [...siteConfig.stats];
-                          newStats[idx].label = e.target.value;
-                          setSiteConfig({ ...siteConfig, stats: newStats });
-                        }}
-                        className={inputClass + ' py-2 text-xs'}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-400 mb-1">القيمة المعروضة</label>
-                      <input
-                        type="text"
-                        value={stat.value}
-                        onChange={e => {
-                          const newStats = [...siteConfig.stats];
-                          newStats[idx].value = e.target.value;
-                          setSiteConfig({ ...siteConfig, stats: newStats });
-                        }}
-                        className={inputClass + ' py-2 font-mono text-left text-xs'}
-                      />
+            {/* CMS Workspace Content Area */}
+            <div className="lg:col-span-3 bg-[#0c0e18]/40 border border-[#202537] p-6 rounded-2xl space-y-6">
+
+              {/* Platform Identity & Contact Section */}
+              {cmsSubTab === 'platform_identity' && (
+                <div className="space-y-6">
+                  <h4 className="text-white font-black text-base border-r-2 border-brand-primary pr-2 mb-4">هوية المنصة ومعلومات التواصل</h4>
+                  
+                  {/* Part 1: Core Branding */}
+                  <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4">
+                    <div className="text-brand-primary font-bold text-sm pb-1.5 border-b border-[#21263d]/40">شعار المنصة والهوية البصرية</div>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className={labelClass}>اسم المنصة (Platform Name)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.platformName || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, platformName: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className={labelClass}>رابط شعار المنصة (Logo Image URL)</label>
+                          <div className="flex gap-2 mb-2">
+                            <input
+                              type="text"
+                              value={siteConfig.logoUrl || ''}
+                              onChange={e => setSiteConfig({ ...siteConfig, logoUrl: e.target.value })}
+                              className={inputClass + ' font-mono text-left flex-1'}
+                              placeholder="رابط الشعار المباشر"
+                            />
+                            {siteConfig.logoUrl && (
+                              <div className="w-12 h-12 rounded-xl border border-[#21263d] overflow-hidden bg-slate-950 flex items-center justify-center shrink-0">
+                                <img src={siteConfig.logoUrl} alt="Logo Preview" className="max-w-full max-h-full object-contain" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 mt-2 max-h-[100px] overflow-y-auto bg-slate-950/40 p-2 rounded-xl border border-[#21263d]/60">
+                            <span className="text-[10px] text-slate-500 font-bold block w-full">اختر من مكتبة الوسائط:</span>
+                            {siteConfig.mediaLibrary?.map((m: any) => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setSiteConfig({ ...siteConfig, logoUrl: m.url })}
+                                className="w-10 h-10 rounded border border-[#21263d] hover:border-brand-primary overflow-hidden cursor-pointer shrink-0"
+                              >
+                                <img src={m.url} alt="" className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>رابط أيقونة المتصفح (Favicon URL)</label>
+                          <div className="flex gap-2 mb-2">
+                            <input
+                              type="text"
+                              value={siteConfig.faviconUrl || ''}
+                              onChange={e => setSiteConfig({ ...siteConfig, faviconUrl: e.target.value })}
+                              className={inputClass + ' font-mono text-left flex-1'}
+                              placeholder="رابط أيقونة Favicon"
+                            />
+                            {siteConfig.faviconUrl && (
+                              <div className="w-12 h-12 rounded-xl border border-[#21263d] overflow-hidden bg-slate-950 flex items-center justify-center shrink-0">
+                                <img src={siteConfig.faviconUrl} alt="Favicon Preview" className="w-6 h-6 object-contain" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 mt-2 max-h-[100px] overflow-y-auto bg-slate-950/40 p-2 rounded-xl border border-[#21263d]/60">
+                            <span className="text-[10px] text-slate-500 font-bold block w-full">اختر من مكتبة الوسائط:</span>
+                            {siteConfig.mediaLibrary?.map((m: any) => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setSiteConfig({ ...siteConfig, faviconUrl: m.url })}
+                                className="w-10 h-10 rounded border border-[#21263d] hover:border-brand-primary overflow-hidden cursor-pointer shrink-0"
+                              >
+                                <img src={m.url} alt="" className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Features Content */}
-            <div className="space-y-4 pt-4 border-t border-[#21263d]">
-              <h4 className="text-brand-primary font-black text-sm text-right border-r-2 border-brand-primary pr-2">مميزات المنصة (Core Features)</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {siteConfig.features?.map((feat: any, idx: number) => (
-                  <div key={idx} className="bg-[#090b10] border border-[#21263d] p-4 rounded-2xl space-y-2">
-                    <div className="text-xs text-slate-500 font-bold text-right">الميزة {idx + 1}</div>
+                  {/* Part 2: Contact & Support */}
+                  <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4">
+                    <div className="text-brand-secondary font-bold text-sm pb-1.5 border-b border-[#21263d]/40">بيانات التواصل والدعم الفني</div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>رقم الهاتف</label>
+                        <input
+                          type="text"
+                          value={siteConfig.contactPhone || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, contactPhone: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                          placeholder="مثال: 0501234567"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className={labelClass}>البريد الإلكتروني</label>
+                        <input
+                          type="email"
+                          value={siteConfig.contactEmail || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, contactEmail: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                          placeholder="example@domain.com"
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>العنوان الجغرافي للمؤسسة</label>
+                        <input
+                          type="text"
+                          value={siteConfig.contactAddress || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, contactAddress: e.target.value })}
+                          className={inputClass}
+                          placeholder="الرياض، المملكة العربية السعودية"
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>رابط المحادثة المباشرة للواتساب (WhatsApp Link)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.whatsappLink || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, whatsappLink: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                          placeholder="https://wa.me/..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Part 3: Social Links */}
+                  <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4">
+                    <div className="text-purple-400 font-bold text-sm pb-1.5 border-b border-[#21263d]/40">روابط صفحات شبكات التواصل الاجتماعي</div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>صفحة فيسبوك (Facebook URL)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.socialFacebook || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, socialFacebook: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>حساب تويتر / إكس (Twitter/X URL)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.socialTwitter || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, socialTwitter: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>حساب إنستغرام (Instagram URL)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.socialInstagram || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, socialInstagram: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>صفحة لينكد إن (LinkedIn URL)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.socialLinkedin || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, socialLinkedin: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Part 4: Unified Login Gateway Copy */}
+                  <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4">
+                    <div className="text-amber-400 font-bold text-sm pb-1.5 border-b border-[#21263d]/40">نصوص وإعدادات بوابة الدخول الموحد</div>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className={labelClass}>عنوان قسم الدخول الموحد (Login Title)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.unifiedLoginTitle || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, unifiedLoginTitle: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>الوصف التفصيلي لقسم الدخول الموحد (Login Description)</label>
+                        <textarea
+                          rows={3}
+                          value={siteConfig.unifiedLoginDesc || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, unifiedLoginDesc: e.target.value })}
+                          className={inputClass + ' resize-none'}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className={labelClass}>نص زر دخول نظام التحضير</label>
+                          <input
+                            type="text"
+                            value={siteConfig.unifiedLoginBtnAttendance || ''}
+                            onChange={e => setSiteConfig({ ...siteConfig, unifiedLoginBtnAttendance: e.target.value })}
+                            className={inputClass}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>نص زر دخول منصة LMS</label>
+                          <input
+                            type="text"
+                            value={siteConfig.unifiedLoginBtnLms || ''}
+                            onChange={e => setSiteConfig({ ...siteConfig, unifiedLoginBtnLms: e.target.value })}
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 1. HOMEPAGE & SECTIONS ORDER SECTION */}
+              {cmsSubTab === 'homepage' && (
+                <div className="space-y-6">
+                  <h4 className="text-white font-black text-base border-r-2 border-brand-primary pr-2 mb-4">القسم الترحيبي والتخطيط (Hero & Layout)</h4>
+                  
+                  <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <label className="block text-[10px] text-slate-400 mb-1">عنوان الميزة</label>
+                      <label className={labelClass}>عنوان الترحيب الرئيسي (Hero Title)</label>
                       <input
                         type="text"
-                        value={feat.title}
-                        onChange={e => {
-                          const newFeats = [...siteConfig.features];
-                          newFeats[idx].title = e.target.value;
-                          setSiteConfig({ ...siteConfig, features: newFeats });
-                        }}
-                        className={inputClass + ' py-2 text-xs'}
+                        value={siteConfig.welcomeTitle || ''}
+                        onChange={e => setSiteConfig({ ...siteConfig, welcomeTitle: e.target.value })}
+                        className={inputClass}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-400 mb-1">شرح الميزة</label>
+                      <label className={labelClass}>وصف الترحيب الفرعي (Hero Description)</label>
+                      <textarea
+                        rows={3}
+                        value={siteConfig.welcomeDesc || ''}
+                        onChange={e => setSiteConfig({ ...siteConfig, welcomeDesc: e.target.value })}
+                        className={inputClass + ' resize-none'}
+                      />
+                    </div>
+                    
+                    {/* Image Fields with Library Picker */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>رابط صورة البانر (Banner Image URL)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.bannerImage || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, bannerImage: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                        <div className="flex flex-wrap gap-1.5 mt-2 max-h-[100px] overflow-y-auto bg-slate-950/40 p-2 rounded-xl border border-[#21263d]/60">
+                          <span className="text-[10px] text-slate-500 font-bold block w-full">اختر من مكتبة الوسائط:</span>
+                          {siteConfig.mediaLibrary?.map((m: any) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setSiteConfig({ ...siteConfig, bannerImage: m.url })}
+                              className="w-10 h-10 rounded border border-[#21263d] hover:border-brand-primary overflow-hidden cursor-pointer shrink-0"
+                            >
+                              <img src={m.url} alt="" className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelClass}>رابط صورة الخلفية (Background Image URL - اختياري)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.backgroundImage || ''}
+                          onChange={e => setSiteConfig({ ...siteConfig, backgroundImage: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                        <div className="flex flex-wrap gap-1.5 mt-2 max-h-[100px] overflow-y-auto bg-slate-950/40 p-2 rounded-xl border border-[#21263d]/60">
+                          <span className="text-[10px] text-slate-500 font-bold block w-full">اختر من مكتبة الوسائط:</span>
+                          {siteConfig.mediaLibrary?.map((m: any) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setSiteConfig({ ...siteConfig, backgroundImage: m.url })}
+                              className="w-10 h-10 rounded border border-[#21263d] hover:border-brand-primary overflow-hidden cursor-pointer shrink-0"
+                            >
+                              <img src={m.url} alt="" className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section ordering list */}
+                  <div className="pt-4 border-t border-[#21263d] space-y-3">
+                    <h5 className="text-white font-bold text-sm">ترتيب أقسام الصفحة الرئيسية وإخفائها/إظهارها:</h5>
+                    <p className="text-slate-400 text-[11px]">رتب أقسام موقعك الرئيسية بالسحب والإفلات أو باستخدام أزرار الترتيب، أو قم بإخفاء أي قسم بضغطة زر.</p>
+                    <div className="space-y-2 max-w-xl">
+                      {(siteConfig.sectionOrder || ['hero', 'services', 'stats', 'features', 'pricing', 'faq']).map((secId: string, idx: number, arr: string[]) => {
+                        const isVisible = siteConfig.sectionVisibility?.[secId] !== false;
+                        const secLabel = 
+                          secId === 'hero' ? 'القسم الترحيبي (Hero Section)' :
+                          secId === 'services' ? 'بطاقات الأنظمة والبوابات (Services)' :
+                          secId === 'stats' ? 'لوحة الأرقام والإحصائيات (Stats)' :
+                          secId === 'features' ? 'مزايا المنصة الأكاديمية (Features)' :
+                          secId === 'pricing' ? 'باقات خطط الاشتراك (Pricing)' :
+                          'الأسئلة الشائعة للجمهور (FAQ)';
+                        return (
+                          <div key={secId} className="flex items-center justify-between p-3.5 bg-[#090b10] border border-[#21263d] rounded-xl flex-row-reverse text-right">
+                            <div className="flex items-center gap-3 flex-row-reverse">
+                              <span className="text-slate-500 text-xs font-bold font-mono">#{idx + 1}</span>
+                              <span className="text-white font-bold text-xs">{secLabel}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {/* Order buttons */}
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => {
+                                  const order = [...siteConfig.sectionOrder];
+                                  const temp = order[idx];
+                                  order[idx] = order[idx - 1];
+                                  order[idx - 1] = temp;
+                                  setSiteConfig({ ...siteConfig, sectionOrder: order });
+                                }}
+                                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                                title="نقل للأعلى"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === arr.length - 1}
+                                onClick={() => {
+                                  const order = [...siteConfig.sectionOrder];
+                                  const temp = order[idx];
+                                  order[idx] = order[idx + 1];
+                                  order[idx + 1] = temp;
+                                  setSiteConfig({ ...siteConfig, sectionOrder: order });
+                                }}
+                                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                                title="نقل للأسفل"
+                              >
+                                ▼
+                              </button>
+                              
+                              {/* Visibility Toggle */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const vis = { ...(siteConfig.sectionVisibility || {}) };
+                                  vis[secId] = isVisible ? false : true;
+                                  setSiteConfig({ ...siteConfig, sectionVisibility: vis });
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black cursor-pointer transition-all ${
+                                  isVisible 
+                                    ? 'bg-emerald-500/10 border border-emerald-500/25 text-emerald-400' 
+                                    : 'bg-rose-500/10 border border-rose-500/25 text-rose-400'
+                                }`}
+                              >
+                                {isVisible ? 'مرئي في الصفحة' : 'مخفي'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. PORTALS (Attendance & LMS Systems Editor) */}
+              {cmsSubTab === 'portals' && siteConfig.portals && (
+                <div className="space-y-6">
+                  <h4 className="text-white font-black text-base border-r-2 border-brand-primary pr-2 mb-4">إدارة بوابات النظامين الأساسيين</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Attendance portal editor */}
+                    <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4 text-right">
+                      <div className="text-brand-primary font-bold text-sm pb-2 border-b border-[#21263d]/50">1- نظام التحضير الأكاديمي</div>
+                      <div>
+                        <label className={labelClass}>اسم النظام</label>
+                        <input
+                          type="text"
+                          value={siteConfig.portals.attendance.name}
+                          onChange={e => {
+                            const p = { ...siteConfig.portals };
+                            p.attendance.name = e.target.value;
+                            setSiteConfig({ ...siteConfig, portals: p });
+                          }}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>وصف النظام</label>
+                        <textarea
+                          rows={3}
+                          value={siteConfig.portals.attendance.desc}
+                          onChange={e => {
+                            const p = { ...siteConfig.portals };
+                            p.attendance.desc = e.target.value;
+                            setSiteConfig({ ...siteConfig, portals: p });
+                          }}
+                          className={inputClass + ' resize-none'}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>رابط التوجيه (Link)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.portals.attendance.link}
+                          onChange={e => {
+                            const p = { ...siteConfig.portals };
+                            p.attendance.link = e.target.value;
+                            setSiteConfig({ ...siteConfig, portals: p });
+                          }}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>صورة الغلاف للبوابة</label>
+                        <input
+                          type="text"
+                          value={siteConfig.portals.attendance.image}
+                          onChange={e => {
+                            const p = { ...siteConfig.portals };
+                            p.attendance.image = e.target.value;
+                            setSiteConfig({ ...siteConfig, portals: p });
+                          }}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                        <div className="flex flex-wrap gap-1.5 mt-2 max-h-[80px] overflow-y-auto bg-slate-955/40 p-1.5 rounded-lg">
+                          {siteConfig.mediaLibrary?.map((m: any) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                const p = { ...siteConfig.portals };
+                                p.attendance.image = m.url;
+                                setSiteConfig({ ...siteConfig, portals: p });
+                              }}
+                              className="w-8 h-8 rounded border border-[#21263d] overflow-hidden cursor-pointer shrink-0"
+                            >
+                              <img src={m.url} alt="" className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* LMS Portal Editor */}
+                    <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4 text-right">
+                      <div className="text-brand-secondary font-bold text-sm pb-2 border-b border-[#21263d]/50">2- منصة التعلم الإلكتروني LMS</div>
+                      <div>
+                        <label className={labelClass}>اسم المنصة</label>
+                        <input
+                          type="text"
+                          value={siteConfig.portals.lms.name}
+                          onChange={e => {
+                            const p = { ...siteConfig.portals };
+                            p.lms.name = e.target.value;
+                            setSiteConfig({ ...siteConfig, portals: p });
+                          }}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>وصف المنصة</label>
+                        <textarea
+                          rows={3}
+                          value={siteConfig.portals.lms.desc}
+                          onChange={e => {
+                            const p = { ...siteConfig.portals };
+                            p.lms.desc = e.target.value;
+                            setSiteConfig({ ...siteConfig, portals: p });
+                          }}
+                          className={inputClass + ' resize-none'}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>رابط التوجيه (Link)</label>
+                        <input
+                          type="text"
+                          value={siteConfig.portals.lms.link}
+                          onChange={e => {
+                            const p = { ...siteConfig.portals };
+                            p.lms.link = e.target.value;
+                            setSiteConfig({ ...siteConfig, portals: p });
+                          }}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>صورة الغلاف للبوابة</label>
+                        <input
+                          type="text"
+                          value={siteConfig.portals.lms.image}
+                          onChange={e => {
+                            const p = { ...siteConfig.portals };
+                            p.lms.image = e.target.value;
+                            setSiteConfig({ ...siteConfig, portals: p });
+                          }}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                        <div className="flex flex-wrap gap-1.5 mt-2 max-h-[80px] overflow-y-auto bg-slate-955/40 p-1.5 rounded-lg">
+                          {siteConfig.mediaLibrary?.map((m: any) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                const p = { ...siteConfig.portals };
+                                p.lms.image = m.url;
+                                setSiteConfig({ ...siteConfig, portals: p });
+                              }}
+                              className="w-8 h-8 rounded border border-[#21263d] overflow-hidden cursor-pointer shrink-0"
+                            >
+                              <img src={m.url} alt="" className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. MEDIA LIBRARY (Upload, Delete, Simulate Upload) */}
+              {cmsSubTab === 'media' && (
+                <div className="space-y-6">
+                  <h4 className="text-white font-black text-base border-r-2 border-brand-primary pr-2 mb-4">مكتبة الوسائط الرقمية (Media Library)</h4>
+                  
+                  {/* Upload Form */}
+                  <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4">
+                    <div className="text-white font-bold text-sm">إضافة وسائط وصور جديدة للمكتبة:</div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>اسم الصورة / الكود التوضيحي</label>
+                        <input
+                          type="text"
+                          placeholder="مثال: صورة غلاف نظام التحضير"
+                          value={newMediaUrl.name}
+                          onChange={e => setNewMediaUrl({ ...newMediaUrl, name: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>رابط الصورة المباشر (URL)</label>
+                        <input
+                          type="text"
+                          placeholder="https://images.unsplash.com/..."
+                          value={newMediaUrl.url}
+                          onChange={e => setNewMediaUrl({ ...newMediaUrl, url: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newMediaUrl.name || !newMediaUrl.url) {
+                            alert('يرجى كتابة اسم الصورة ورابطها أولاً');
+                            return;
+                          }
+                          const updated = [...(siteConfig.mediaLibrary || [])];
+                          updated.push({
+                            id: `med-${Math.random().toString(36).substring(2, 9)}`,
+                            name: newMediaUrl.name,
+                            url: newMediaUrl.url
+                          });
+                          setSiteConfig({ ...siteConfig, mediaLibrary: updated });
+                          setNewMediaUrl({ name: '', url: '' });
+                          showToast('تمت إضافة الصورة إلى مكتبة الوسائط بنجاح');
+                        }}
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:scale-[1.01] transition-all cursor-pointer"
+                      >
+                        إضافة بالرابط
+                      </button>
+                      
+                      <div className="w-full sm:w-auto relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              const base64 = reader.result as string;
+                              const updated = [...(siteConfig.mediaLibrary || [])];
+                              updated.push({
+                                id: `med-${Math.random().toString(36).substring(2, 9)}`,
+                                name: file.name.substring(0, 25) || 'صورة مرفوعة',
+                                url: base64
+                              });
+                              setSiteConfig({ ...siteConfig, mediaLibrary: updated });
+                              showToast('تم رفع الصورة محلياً وحفظها بنجاح');
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                        <button
+                          type="button"
+                          className="w-full px-5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-bold hover:text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          📁 رفع ملف صورة من جهازك محلياً
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Media Grid */}
+                  <div className="space-y-3">
+                    <h5 className="text-white font-bold text-sm">الصور المرفوعة والمتاحة بالمكتبة:</h5>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {siteConfig.mediaLibrary?.map((media: any, idx: number) => (
+                        <div key={media.id || idx} className="bg-[#090b10] border border-[#21263d] rounded-xl overflow-hidden p-2 space-y-2 group relative">
+                          <div className="w-full h-28 rounded-lg overflow-hidden bg-slate-950 relative">
+                            <img src={media.url} alt={media.name} className="w-full h-full object-cover" />
+                            {/* Copy URL overlay on hover */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(media.url);
+                                showToast('تم نسخ رابط الصورة إلى الحافظة');
+                              }}
+                              className="absolute inset-0 bg-black/70 flex items-center justify-center text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            >
+                              📋 نسخ الرابط
+                            </button>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[11px] font-bold text-white truncate">{media.name}</div>
+                            <div className="text-[9px] text-slate-500 font-mono truncate">{media.url.startsWith('data:') ? 'مرفوعة محلياً (Base64)' : media.url}</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!confirm(`هل تريد حذف الصورة "${media.name}" من مكتبة الوسائط؟`)) return;
+                              const updated = siteConfig.mediaLibrary.filter((m: any) => m.id !== media.id);
+                              setSiteConfig({ ...siteConfig, mediaLibrary: updated });
+                              showToast('تم حذف الصورة من مكتبة الوسائط');
+                            }}
+                            className="w-full py-1.5 rounded bg-rose-950/40 hover:bg-rose-950 text-[10px] text-rose-400 font-bold border border-rose-900/30 transition cursor-pointer"
+                          >
+                            حذف الصورة
+                          </button>
+                        </div>
+                      ))}
+                      {(!siteConfig.mediaLibrary || siteConfig.mediaLibrary.length === 0) && (
+                        <p className="col-span-4 text-center text-slate-600 py-12 text-xs italic">مكتبة الوسائط فارغة. أضف أو ارفع بعض الصور.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. FEATURES CRUD (Platform, LMS, Attendance Features) */}
+              {cmsSubTab === 'features' && (
+                <div className="space-y-6">
+                  <h4 className="text-white font-black text-base border-r-2 border-brand-primary pr-2 mb-4">إدارة مميزات المنصة والأنظمة (Features CRUD)</h4>
+                  
+                  {/* Form to add/edit feature */}
+                  <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4">
+                    <div className="text-white font-bold text-sm">
+                      {editingFeatureIdx ? 'تعديل الميزة المحددة:' : 'إضافة ميزة جديدة لموقعك:'}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>مكان العرض (القسم التابع له)</label>
+                        <select
+                          value={newFeature.type}
+                          onChange={e => setNewFeature({ ...newFeature, type: e.target.value as any })}
+                          className={inputClass + ' bg-[#090b10]'}
+                        >
+                          <option value="platform">مميزات المنصة العامة (Homepage Features)</option>
+                          <option value="attendance">مميزات وعناصر نظام التحضير الأكاديمي</option>
+                          <option value="lms">مميزات وعناصر منصة التعلم LMS</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>عنوان الميزة (Feature Title)</label>
+                        <input
+                          type="text"
+                          placeholder="مثال: رصد الحضور اليومي"
+                          value={newFeature.title}
+                          onChange={e => setNewFeature({ ...newFeature, title: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClass}>شرح وتفاصيل الميزة</label>
                       <textarea
                         rows={2}
-                        value={feat.desc}
-                        onChange={e => {
-                          const newFeats = [...siteConfig.features];
-                          newFeats[idx].desc = e.target.value;
-                          setSiteConfig({ ...siteConfig, features: newFeats });
-                        }}
-                        className={inputClass + ' py-2 text-xs resize-none'}
+                        placeholder="اكتب تفاصيل الميزة والخدمة هنا باختصار..."
+                        value={newFeature.desc}
+                        onChange={e => setNewFeature({ ...newFeature, desc: e.target.value })}
+                        className={inputClass + ' resize-none'}
                       />
                     </div>
+                    <div className="flex gap-2 justify-start">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newFeature.title || !newFeature.desc) {
+                            alert('يرجى ملء كافة حقول الميزة');
+                            return;
+                          }
+                          const config = { ...siteConfig };
+                          const targetKey = 
+                            newFeature.type === 'platform' ? 'platformFeatures' :
+                            newFeature.type === 'attendance' ? 'attendanceFeatures' :
+                            'lmsFeatures';
+                          
+                          if (!config[targetKey]) config[targetKey] = [];
+
+                          if (editingFeatureIdx) {
+                            // Update
+                            config[targetKey][editingFeatureIdx.idx] = { title: newFeature.title, desc: newFeature.desc };
+                            showToast('تم تحديث الميزة بنجاح');
+                            setEditingFeatureIdx(null);
+                          } else {
+                            // Add new
+                            config[targetKey].push({ title: newFeature.title, desc: newFeature.desc });
+                            showToast('تمت إضافة الميزة الجديدة بنجاح');
+                          }
+
+                          setNewFeature({ title: '', desc: '', type: 'platform' });
+                          setSiteConfig(config);
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:scale-[1.01] transition-all cursor-pointer"
+                      >
+                        {editingFeatureIdx ? 'حفظ التحديث' : 'إضافة الميزة'}
+                      </button>
+                      {editingFeatureIdx && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingFeatureIdx(null);
+                            setNewFeature({ title: '', desc: '', type: 'platform' });
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-xs font-bold hover:text-white transition cursor-pointer"
+                        >
+                          إلغاء التعديل
+                        </button>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
+
+                  {/* Lists of features by system */}
+                  {['platform', 'attendance', 'lms'].map(sysType => {
+                    const targetKey = 
+                      sysType === 'platform' ? 'platformFeatures' :
+                      sysType === 'attendance' ? 'attendanceFeatures' :
+                      'lmsFeatures';
+                    const list = siteConfig[targetKey] || [];
+                    const titleStr = 
+                      sysType === 'platform' ? 'مميزات المنصة الرئيسية العامة' :
+                      sysType === 'attendance' ? 'مميزات نظام التحضير الأكاديمي' :
+                      'مميزات منصة التعلم LMS';
+                    
+                    return (
+                      <div key={sysType} className="space-y-2 border-t border-[#21263d]/50 pt-4">
+                        <h5 className="text-white font-bold text-xs flex items-center justify-start gap-1.5 flex-row-reverse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-brand-primary" />
+                          <span>{titleStr} ({list.length}):</span>
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {list.map((f: any, idx: number) => (
+                            <div key={idx} className="bg-[#090b10] border border-[#21263d] rounded-xl p-3.5 flex items-start justify-between flex-row-reverse text-right relative group">
+                              <div className="text-right space-y-1 pr-1.5 max-w-[80%]">
+                                <div className="text-xs font-black text-white">{f.title}</div>
+                                <div className="text-[10px] text-slate-400 leading-relaxed">{f.desc}</div>
+                              </div>
+                              <div className="flex gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingFeatureIdx({ idx, type: sysType as any });
+                                    setNewFeature({ title: f.title, desc: f.desc, type: sysType as any });
+                                  }}
+                                  className="p-1 rounded bg-[#131622] text-brand-secondary border border-[#21263d] cursor-pointer"
+                                  title="تعديل الميزة"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!confirm('هل تريد حذف هذه الميزة؟')) return;
+                                    const config = { ...siteConfig };
+                                    config[targetKey] = config[targetKey].filter((_: any, i: number) => i !== idx);
+                                    setSiteConfig(config);
+                                    showToast('تم حذف الميزة بنجاح');
+                                  }}
+                                  className="p-1 rounded bg-[#131622] text-rose-400 border border-[#21263d] cursor-pointer"
+                                  title="حذف الميزة"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          {list.length === 0 && (
+                            <p className="col-span-2 text-slate-600 text-xs italic py-2 text-right">لا توجد مميزات مضافة لهذا القسم حالياً.</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 5. STATS EDITOR */}
+              {cmsSubTab === 'stats' && (
+                <div className="space-y-6">
+                  <h4 className="text-white font-black text-base border-r-2 border-brand-primary pr-2 mb-4">إدارة إحصائيات وأرقام المنصة</h4>
+                  
+                  {/* Add/edit form */}
+                  <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4">
+                    <div className="text-white font-bold text-sm">
+                      {editingStatIdx !== null ? 'تعديل المؤشر الإحصائي:' : 'إضافة مؤشر إحصائي جديد للموقع:'}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className={labelClass}>اسم المؤشر الإحصائي</label>
+                        <input
+                          type="text"
+                          placeholder="مثال: عدد الطلاب"
+                          value={newStat.label}
+                          onChange={e => setNewStat({ ...newStat, label: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>القيمة الرقمية المعروضة</label>
+                        <input
+                          type="text"
+                          placeholder="مثال: +15,000"
+                          value={newStat.value}
+                          onChange={e => setNewStat({ ...newStat, value: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>مظهر التدرج اللوني</label>
+                        <select
+                          value={newStat.color}
+                          onChange={e => setNewStat({ ...newStat, color: e.target.value })}
+                          className={inputClass + ' bg-[#090b10]'}
+                        >
+                          <option value="from-cyan-400 to-blue-500">سماوي / أزرق</option>
+                          <option value="from-purple-500 to-pink-500">بنفسجي / وردي</option>
+                          <option value="from-amber-400 to-orange-500">برتقالي / أصفر</option>
+                          <option value="from-emerald-400 to-teal-500">أخضر / تركواز</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-start">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newStat.label || !newStat.value) {
+                            alert('يرجى ملء اسم وقيمة الإحصائية');
+                            return;
+                          }
+                          const config = { ...siteConfig };
+                          if (!config.stats) config.stats = [];
+
+                          if (editingStatIdx !== null) {
+                            config.stats[editingStatIdx] = newStat;
+                            showToast('تم تحديث الإحصائية بنجاح');
+                            setEditingStatIdx(null);
+                          } else {
+                            config.stats.push(newStat);
+                            showToast('تمت إضافة الإحصائية بنجاح');
+                          }
+
+                          setNewStat({ label: '', value: '', color: 'from-cyan-400 to-blue-500' });
+                          setSiteConfig(config);
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:scale-[1.01] transition-all cursor-pointer"
+                      >
+                        {editingStatIdx !== null ? 'حفظ التحديث' : 'إضافة المؤشر'}
+                      </button>
+                      {editingStatIdx !== null && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingStatIdx(null);
+                            setNewStat({ label: '', value: '', color: 'from-cyan-400 to-blue-500' });
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-xs font-bold hover:text-white transition cursor-pointer"
+                        >
+                          إلغاء التعديل
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* List of statistics */}
+                  <div className="space-y-2">
+                    <h5 className="text-white font-bold text-sm">المؤشرات الحالية بالصفحة الرئيسية:</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {siteConfig.stats?.map((s: any, idx: number) => (
+                        <div key={idx} className="bg-[#090b10] border border-[#21263d] rounded-2xl p-4 flex items-center justify-between flex-row-reverse text-right relative group">
+                          <div className="text-right">
+                            <div className={`text-xl font-black bg-gradient-to-r ${s.color} bg-clip-text text-transparent font-mono`}>{s.value}</div>
+                            <div className="text-xs text-slate-400 mt-0.5 font-bold">{s.label}</div>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingStatIdx(idx);
+                                setNewStat(s);
+                              }}
+                              className="p-1.5 rounded bg-[#131622] text-brand-secondary border border-[#21263d] cursor-pointer"
+                              title="تعديل الإحصائية"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!confirm('هل تريد حذف هذه الإحصائية؟')) return;
+                                const config = { ...siteConfig };
+                                config.stats = config.stats.filter((_: any, i: number) => i !== idx);
+                                setSiteConfig(config);
+                                showToast('تم حذف الإحصائية');
+                              }}
+                              className="p-1.5 rounded bg-[#131622] text-rose-400 border border-[#21263d] cursor-pointer"
+                              title="حذف الإحصائية"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 6. FAQ CRUD SECTION */}
+              {cmsSubTab === 'faqs' && (
+                <div className="space-y-6">
+                  <h4 className="text-white font-black text-base border-r-2 border-brand-primary pr-2 mb-4">إدارة الأسئلة الشائعة للجمهور (FAQ CRUD)</h4>
+                  
+                  {/* FAQ Form */}
+                  <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4">
+                    <div className="text-white font-bold text-sm">
+                      {editingFaqIdx !== null ? 'تعديل السؤال الشائع المحدد:' : 'إضافة سؤال وجواب جديد للموقع:'}
+                    </div>
+                    <div>
+                      <label className={labelClass}>صيغة السؤال الشائع *</label>
+                      <input
+                        type="text"
+                        placeholder="مثال: هل المنصة مجانية للطلاب؟"
+                        value={newFaq.q}
+                        onChange={e => setNewFaq({ ...newFaq, q: e.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>إجابة السؤال بالتفصيل *</label>
+                      <textarea
+                        rows={3}
+                        placeholder="اكتب الإجابة المفصلة التي ستظهر للمستخدم هنا..."
+                        value={newFaq.a}
+                        onChange={e => setNewFaq({ ...newFaq, a: e.target.value })}
+                        className={inputClass + ' resize-none'}
+                      />
+                    </div>
+                    <div className="flex gap-2 justify-start">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newFaq.q || !newFaq.a) {
+                            alert('يرجى كتابة السؤال والجواب معاً');
+                            return;
+                          }
+                          const config = { ...siteConfig };
+                          if (!config.faqs) config.faqs = [];
+
+                          if (editingFaqIdx !== null) {
+                            config.faqs[editingFaqIdx] = newFaq;
+                            showToast('تم تحديث السؤال بنجاح');
+                            setEditingFaqIdx(null);
+                          } else {
+                            config.faqs.push(newFaq);
+                            showToast('تمت إضافة السؤال بنجاح');
+                          }
+
+                          setNewFaq({ q: '', a: '' });
+                          setSiteConfig(config);
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:scale-[1.01] transition-all cursor-pointer"
+                      >
+                        {editingFaqIdx !== null ? 'حفظ التحديث' : 'إضافة السؤال'}
+                      </button>
+                      {editingFaqIdx !== null && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingFaqIdx(null);
+                            setNewFaq({ q: '', a: '' });
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-xs font-bold hover:text-white transition cursor-pointer"
+                        >
+                          إلغاء التعديل
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* FAQs List */}
+                  <div className="space-y-3">
+                    <h5 className="text-white font-bold text-sm">الأسئلة الحالية المعروضة بالموقع ({siteConfig.faqs?.length || 0}):</h5>
+                    <div className="space-y-3">
+                      {siteConfig.faqs?.map((faq: any, idx: number) => (
+                        <div key={idx} className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl flex items-start justify-between flex-row-reverse text-right relative group">
+                          <div className="text-right space-y-1.5 pr-2 max-w-[85%]">
+                            <div className="text-xs font-black text-white flex items-center gap-1.5 flex-row-reverse text-right">
+                              <span className="text-brand-primary">Q:</span>
+                              <span>{faq.q}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 leading-relaxed pr-5">{faq.a}</div>
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingFaqIdx(idx);
+                                setNewFaq(faq);
+                              }}
+                              className="p-1.5 rounded bg-[#131622] text-brand-secondary border border-[#21263d] cursor-pointer"
+                              title="تعديل السؤال"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!confirm('هل تريد حذف هذا السؤال الشائع؟')) return;
+                                const config = { ...siteConfig };
+                                config.faqs = config.faqs.filter((_: any, i: number) => i !== idx);
+                                setSiteConfig(config);
+                                showToast('تم حذف السؤال الشائع بنجاح');
+                              }}
+                              className="p-1.5 rounded bg-[#131622] text-rose-400 border border-[#21263d] cursor-pointer"
+                              title="حذف السؤال"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {(!siteConfig.faqs || siteConfig.faqs.length === 0) && (
+                        <p className="text-slate-600 text-xs italic py-6 text-center">لا توجد أسئلة شائعة مضافة بعد.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 7. NAVBAR LINKS CRUD & REORDER */}
+              {cmsSubTab === 'navbar' && (
+                <div className="space-y-6">
+                  <h4 className="text-white font-black text-base border-r-2 border-brand-primary pr-2 mb-4">إدارة أزرار وقائمة التنقل العلوية (Navbar Links)</h4>
+                  
+                  {/* Form */}
+                  <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-4">
+                    <div className="text-white font-bold text-sm">
+                      {editingNavLinkIdx !== null ? 'تعديل زر التنقل المحدد:' : 'إضافة زر تنقل جديد بالقائمة:'}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>اسم الزر (Label)</label>
+                        <input
+                          type="text"
+                          placeholder="مثال: الخدمات"
+                          value={newNavLink.label}
+                          onChange={e => setNewNavLink({ ...newNavLink, label: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>الرابط الموجه له (URL/Anchor)</label>
+                        <input
+                          type="text"
+                          placeholder="مثال: #services أو /about"
+                          value={newNavLink.href}
+                          onChange={e => setNewNavLink({ ...newNavLink, href: e.target.value })}
+                          className={inputClass + ' font-mono text-left'}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-start">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newNavLink.label || !newNavLink.href) {
+                            alert('يرجى ملء اسم ورابط زر التنقل');
+                            return;
+                          }
+                          const config = { ...siteConfig };
+                          if (!config.navbarLinks) config.navbarLinks = [];
+
+                          if (editingNavLinkIdx !== null) {
+                            config.navbarLinks[editingNavLinkIdx] = { 
+                              id: config.navbarLinks[editingNavLinkIdx].id || `nav-${Math.random().toString(36).substring(2, 9)}`,
+                              ...newNavLink 
+                            };
+                            showToast('تم تحديث زر التنقل بالقائمة');
+                            setEditingNavLinkIdx(null);
+                          } else {
+                            config.navbarLinks.push({
+                              id: `nav-${Math.random().toString(36).substring(2, 9)}`,
+                              ...newNavLink
+                            });
+                            showToast('تمت إضافة زر التنقل بنجاح للقائمة');
+                          }
+
+                          setNewNavLink({ label: '', href: '' });
+                          setSiteConfig(config);
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:scale-[1.01] transition-all cursor-pointer"
+                      >
+                        {editingNavLinkIdx !== null ? 'حفظ التحديث' : 'إضافة للقائمة'}
+                      </button>
+                      {editingNavLinkIdx !== null && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingNavLinkIdx(null);
+                            setNewNavLink({ label: '', href: '' });
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-xs font-bold hover:text-white transition cursor-pointer"
+                        >
+                          إلغاء التعديل
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* List & Reorder */}
+                  <div className="space-y-2">
+                    <h5 className="text-white font-bold text-sm">الأزرار الحالية في القائمة العلوية:</h5>
+                    <div className="space-y-2 max-w-lg">
+                      {siteConfig.navbarLinks?.map((link: any, idx: number, arr: any[]) => (
+                        <div key={link.id || idx} className="bg-[#090b10] border border-[#21263d] rounded-xl p-3.5 flex items-center justify-between flex-row-reverse text-right relative group">
+                          <div className="flex items-center gap-4 flex-row-reverse">
+                            <span className="text-slate-500 font-mono text-xs font-bold">#{idx + 1}</span>
+                            <div>
+                              <span className="text-white font-bold text-xs block">{link.label}</span>
+                              <span className="text-[10px] text-slate-500 font-mono block mt-0.5">{link.href}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            {/* Up / Down reorder */}
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => {
+                                const links = [...siteConfig.navbarLinks];
+                                const temp = links[idx];
+                                links[idx] = links[idx - 1];
+                                links[idx - 1] = temp;
+                                setSiteConfig({ ...siteConfig, navbarLinks: links });
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                              title="نقل للأعلى"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === arr.length - 1}
+                              onClick={() => {
+                                const links = [...siteConfig.navbarLinks];
+                                const temp = links[idx];
+                                links[idx] = links[idx + 1];
+                                links[idx + 1] = temp;
+                                setSiteConfig({ ...siteConfig, navbarLinks: links });
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                              title="نقل للأسفل"
+                            >
+                              ▼
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingNavLinkIdx(idx);
+                                setNewNavLink({ label: link.label, href: link.href });
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-900 text-brand-secondary border border-[#21263d] cursor-pointer"
+                              title="تعديل"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!confirm(`هل تريد حذف زر "${link.label}" من القائمة؟`)) return;
+                                const config = { ...siteConfig };
+                                config.navbarLinks = config.navbarLinks.filter((_: any, i: number) => i !== idx);
+                                setSiteConfig(config);
+                                showToast('تم حذف الزر من القائمة');
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-900 text-rose-400 border border-[#21263d] cursor-pointer"
+                              title="حذف"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {(!siteConfig.navbarLinks || siteConfig.navbarLinks.length === 0) && (
+                        <p className="text-slate-600 text-xs italic py-6 text-center">لا توجد أزرار تنقل بالقائمة مضافة.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         </div>
@@ -1228,6 +2435,19 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
                 rows={4} 
                 className={inputClass + ' resize-none'} 
               />
+            </div>
+            {/* Checkbox for Visibility */}
+            <div className="flex items-center gap-2.5 flex-row-reverse justify-start pb-2">
+              <input 
+                type="checkbox" 
+                id="plan-visible"
+                checked={planForm.visible}
+                onChange={e => setPlanForm({ ...planForm, visible: e.target.checked })}
+                className="w-4 h-4 accent-brand-primary rounded border-slate-700 bg-slate-900 cursor-pointer"
+              />
+              <label htmlFor="plan-visible" className="text-xs font-bold text-slate-300 cursor-pointer select-none">
+                عرض ونشر هذه الباقة في الصفحة الرئيسية
+              </label>
             </div>
             <button 
               onClick={handleCreateOrUpdatePlan} 

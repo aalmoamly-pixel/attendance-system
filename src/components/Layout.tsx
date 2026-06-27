@@ -21,6 +21,7 @@ import {
   ChevronsUp,
   AlertTriangle
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase, db } from '../lib/supabase';
 import { getAuthState, logout, isDemoMode } from '../lib/auth';
 
@@ -38,6 +39,32 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cmsMenuOpen, setCmsMenuOpen] = useState(false);
   const isSupabaseLive = !!supabase;
+
+  // Platform identity CMS integration
+  const [platformName, setPlatformName] = useState('حضورك الذكي');
+  const [logoUrl, setLogoUrl] = useState('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('lms_site_config');
+    if (saved) {
+      try {
+        const config = JSON.parse(saved);
+        if (config.platformName) setPlatformName(config.platformName);
+        if (config.logoUrl) setLogoUrl(config.logoUrl);
+        if (config.faviconUrl) {
+          let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.getElementsByTagName('head')[0].appendChild(link);
+          }
+          link.href = config.faviconUrl;
+        }
+      } catch (e) {
+        console.error('[Layout] Error loading identity from site config:', e);
+      }
+    }
+  }, []);
 
   const cmsMenuItems = [
     { id: 'cms-general', label: 'الإعدادات العامة', show: true },
@@ -115,15 +142,19 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
   const SidebarContent = () => (
     <aside className="flex flex-col w-72 bg-dark-card border-l border-dark-border/40 h-screen overflow-hidden">
       {/* Brand Logo Header */}
-      <div className="p-6 border-b border-dark-border/40 flex items-center gap-3 shrink-0">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center shadow-xl shadow-brand-primary/30 transform hover:scale-105 transition-all shrink-0">
-          <Sparkles className="w-6 h-6 text-white animate-pulse" />
-        </div>
+      <Link to="/" className="p-6 border-b border-dark-border/40 flex items-center gap-3 shrink-0 hover:opacity-90 transition-opacity">
+        {logoUrl ? (
+          <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain rounded-2xl shadow-xl transform hover:scale-105 transition-all shrink-0" />
+        ) : (
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center shadow-xl shadow-brand-primary/30 transform hover:scale-105 transition-all shrink-0">
+            <Sparkles className="w-6 h-6 text-white animate-pulse" />
+          </div>
+        )}
         <div>
-          <h1 className="font-black text-lg tracking-wide text-white">حضورك الذكي</h1>
+          <h1 className="font-black text-lg tracking-wide text-white leading-tight">{platformName}</h1>
           <span className="text-xs font-semibold text-brand-secondary">Smart Attendance AI</span>
         </div>
-      </div>
+      </Link>
 
       {/* Database Status Tag */}
       <div className="px-6 py-3 shrink-0">
@@ -142,6 +173,14 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
 
       {/* Navigation Items */}
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+        {/* Fixed Return to Home Page button */}
+        <Link 
+          to="/"
+          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-dark-muted hover:text-white hover:bg-dark-hover/70 font-medium transition-all mb-2 border border-dashed border-dark-border/40 hover:border-brand-primary/40 bg-dark-bg/10"
+        >
+          <span>🏠</span>
+          <span>العودة للرئيسية</span>
+        </Link>
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activePage === item.id || activePage.startsWith('cms-') && item.id === 'cms';
@@ -321,6 +360,18 @@ export default function Layout({ children, activePage, setActivePage, onLogout }
             </button>
             
             <div>
+              {/* Breadcrumb Navigation */}
+              <div className="flex items-center gap-1.5 text-xs text-dark-muted mb-2 font-medium">
+                <Link to="/" className="hover:text-brand-primary transition-colors">الرئيسية</Link>
+                <span>/</span>
+                <span className="text-slate-300">{isAdmin && (activePage.startsWith('cms-') || activePage === 'new-customers') ? 'لوحة الإدارة' : 'نظام التحضير الأكاديمي'}</span>
+                {activePage !== 'dashboard' && (
+                  <>
+                    <span>/</span>
+                    <span className="text-brand-primary">{menuItems.find(i => i.id === activePage)?.label}</span>
+                  </>
+                )}
+              </div>
               <h2 className="text-xl md:text-2xl font-black text-white">
                 {menuItems.find(i => i.id === activePage)?.label}
               </h2>

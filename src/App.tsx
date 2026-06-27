@@ -188,6 +188,9 @@ function AppContent() {
       {/* LMS Route */}
       <Route path="/lms/*" element={<LMSApp />} />
 
+      {/* Attendance Redirect Route */}
+      <Route path="/attendance" element={<Navigate to="/login" replace />} />
+
       {/* Catch all */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

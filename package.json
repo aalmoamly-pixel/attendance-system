@@ -2,7 +2,7 @@
   "name": "system",
   "private": true,
   "version": "1.0.0",
-  "description": "نظام إدارة الحضور الذكي - Web, Android, Windows Desktop",
+  "description": "نظام إدارة الحضور الذكي والتعلم الإلكتروني - Web, Android, Windows Desktop",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",

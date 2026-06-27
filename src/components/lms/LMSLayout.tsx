@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   BookOpen, 
   Users, 
@@ -31,6 +32,32 @@ interface LMSLayoutProps {
 
 export default function LMSLayout({ children, activeTab, setActiveTab, role, userName, onLogout }: LMSLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Platform identity CMS integration
+  const [platformName, setPlatformName] = useState('بلاك بورد الأكاديمي');
+  const [logoUrl, setLogoUrl] = useState('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('lms_site_config');
+    if (saved) {
+      try {
+        const config = JSON.parse(saved);
+        if (config.platformName) setPlatformName(config.platformName);
+        if (config.logoUrl) setLogoUrl(config.logoUrl);
+        if (config.faviconUrl) {
+          let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.getElementsByTagName('head')[0].appendChild(link);
+          }
+          link.href = config.faviconUrl;
+        }
+      } catch (e) {
+        console.error('[LMSLayout] Error loading identity from site config:', e);
+      }
+    }
+  }, []);
 
   const getMenuItems = () => {
     switch (role) {
@@ -77,15 +104,19 @@ export default function LMSLayout({ children, activeTab, setActiveTab, role, use
   const Sidebar = () => (
     <div className="flex flex-col w-72 bg-[#0d0f17] border-l border-[#1c2032] h-screen overflow-hidden text-right">
       {/* Brand Header */}
-      <div className="p-6 border-b border-[#1c2032] flex items-center gap-3 shrink-0">
-        <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-brand-secondary to-brand-primary flex items-center justify-center shadow-lg shadow-brand-primary/20 transform hover:scale-105 transition-all">
-          <GraduationCap className="w-6 h-6 text-white" />
-        </div>
+      <Link to="/" className="p-6 border-b border-[#1c2032] flex items-center gap-3 shrink-0 hover:opacity-90 transition-opacity">
+        {logoUrl ? (
+          <img src={logoUrl} alt="Logo" className="w-11 h-11 object-contain rounded-xl shadow-lg transform hover:scale-105 transition-all" />
+        ) : (
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-brand-secondary to-brand-primary flex items-center justify-center shadow-lg shadow-brand-primary/20 transform hover:scale-105 transition-all">
+            <GraduationCap className="w-6 h-6 text-white" />
+          </div>
+        )}
         <div>
-          <h1 className="font-black text-base text-white">بلاك بورد الأكاديمي</h1>
+          <h1 className="font-black text-base text-white leading-tight">{platformName}</h1>
           <span className="text-[10px] font-bold text-brand-primary tracking-wider block">BLACKBOARD ULTRA</span>
         </div>
-      </div>
+      </Link>
 
       {/* Role Badge */}
       <div className="px-6 py-4 shrink-0">
@@ -99,6 +130,14 @@ export default function LMSLayout({ children, activeTab, setActiveTab, role, use
 
       {/* Menu List */}
       <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+        {/* Fixed Return to Home Page button */}
+        <Link 
+          to="/"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-[#121626] font-medium transition-all mb-2 border border-dashed border-[#232a43] hover:border-brand-primary/40 bg-[#0d0f17]/40"
+        >
+          <span>🏠</span>
+          <span>الصفحة الرئيسية</span>
+        </Link>
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -175,6 +214,18 @@ export default function LMSLayout({ children, activeTab, setActiveTab, role, use
               <Menu className="w-5 h-5" />
             </button>
             <div className="text-right">
+              {/* Breadcrumb Navigation */}
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2 font-medium justify-start flex-row-reverse text-right">
+                <Link to="/" className="hover:text-brand-primary transition-colors">الرئيسية</Link>
+                <span>/</span>
+                <span className="text-slate-300">{role === 'admin' ? 'لوحة الإدارة' : 'منصة التعلم LMS'}</span>
+                {activeTab !== 'dashboard' && (
+                  <>
+                    <span>/</span>
+                    <span className="text-brand-primary">{menuItems.find(i => i.id === activeTab)?.label}</span>
+                  </>
+                )}
+              </div>
               <h2 className="text-xl md:text-2xl font-black text-white">
                 {menuItems.find(i => i.id === activeTab)?.label || 'المنصة التعليمية'}
               </h2>

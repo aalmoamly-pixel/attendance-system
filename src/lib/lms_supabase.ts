@@ -1441,34 +1441,121 @@ export const lmsDb = {
   async getSiteConfig(): Promise<any> {
     await checkLmsMode();
     const configStr = localStorage.getItem(LOCAL_KEYS.SITE_CONFIG);
+    let config: any = null;
     if (configStr) {
       try {
-        return JSON.parse(configStr);
-      } catch {
-        // Fallback to default seeding
-      }
+        config = JSON.parse(configStr);
+      } catch (e) {}
     }
-    // Seed and return default config
+
     const defaultConfig = {
-      welcomeTitle: 'مستقبل التعليم الأكاديمي الذكي والحديث',
-      welcomeDesc: 'منصة رقمية متكاملة تمنح الطلاب والأساتذة بيئة تعليمية تفاعلية لإدارة المحاضرات، حل الواجبات، أداء الاختبارات المحوسبة، والتواصل الفوري بهوية بصرية رائعة.',
-      stats: [
-        { label: 'طالب نشط', value: '+15,000' },
-        { label: 'مقرر دراسي رقمي', value: '480+' },
-        { label: 'نسبة الرضا والنجاح', value: '99.8%' },
-        { label: 'شريك أكاديمي معتمد', value: '50+' }
+      platformName: 'منصة تعليم الذكية',
+      logoUrl: '',
+      faviconUrl: '',
+      contactPhone: '0501234567',
+      contactEmail: 'info@smart-education.edu',
+      contactAddress: 'الرياض، المملكة العربية السعودية',
+      whatsappLink: 'https://wa.me/966501234567',
+      socialFacebook: 'https://facebook.com',
+      socialTwitter: 'https://twitter.com',
+      socialInstagram: 'https://instagram.com',
+      socialLinkedin: 'https://linkedin.com',
+      unifiedLoginTitle: 'بوابة دخول موحدة وذكية',
+      unifiedLoginDesc: 'سواء كنت طالباً، معلماً، أو مديراً للنظام، بوابتنا الذكية تتعرف على هويتك وصلاحياتك وتوجهك إلى لوحة التحكم الخاصة بك تلقائياً عند تسجيل الدخول دون الحاجة لتحديد دورك مسبقاً.',
+      unifiedLoginBtnAttendance: 'تسجيل الدخول الموحد (نظام التحضير)',
+      unifiedLoginBtnLms: 'تسجيل الدخول الموحد (منصة LMS)',
+      welcomeTitle: 'منصة تعليم الذكية للخدمات الأكاديمية والتعلم الإلكتروني',
+      welcomeDesc: 'بوابة موحدة تجمع بين إدارة الحضور والملف الأكاديمي والرسوم والنتائج والاختبارات الإلكترونية ومنصة التعلم الحديثة في مكان واحد.',
+      heroButtons: [
+        { label: 'دخول منصة التعلم LMS', href: '/lms', isPrimary: true },
+        { label: 'دخول نظام التحضير', href: '/attendance', isPrimary: false }
       ],
-      features: [
+      bannerImage: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=600&auto=format&fit=crop',
+      backgroundImage: '',
+      sectionOrder: ['hero', 'services', 'stats', 'features', 'pricing', 'faq'],
+      sectionVisibility: {
+        hero: true,
+        services: true,
+        stats: true,
+        features: true,
+        pricing: true,
+        faq: true
+      },
+      portals: {
+        attendance: {
+          name: 'نظام التحضير الأكاديمي',
+          desc: 'بوابة أكاديمية متكاملة لرصد حضور وغياب الطلاب اليومي وتتبع الجدول والمكافآت وإصدار كشوفات الدرجات والتقارير التنظيمية للكلية.',
+          image: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=400&auto=format&fit=crop',
+          link: '/attendance'
+        },
+        lms: {
+          name: 'منصة التعلم الإلكتروني LMS',
+          desc: 'نظام إدارة تعلم رقمي متطور يتيح استعراض المحاضرات والملفات، حل الواجبات، أداء الاختبارات الإلكترونية المؤقتة، وحضور الفصول الافتراضية.',
+          image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=400&auto=format&fit=crop',
+          link: '/lms'
+        }
+      },
+      mediaLibrary: [
+        { id: 'med-1', name: 'صورة المنصة الرئيسية', url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=600&auto=format&fit=crop' },
+        { id: 'med-2', name: 'صورة التحضير الأكاديمي', url: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=400&auto=format&fit=crop' },
+        { id: 'med-3', name: 'صورة منصة التعلم LMS', url: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=400&auto=format&fit=crop' }
+      ],
+      platformFeatures: [
         { title: 'محاضرات ومواد علمية رقمية', desc: 'استعراض مستندات المناهج والعروض التقديمية ومقاطع الفيديو التعليمية بجودة عالية.' },
         { title: 'واجبات ومهام تفاعلية', desc: 'نظام متكامل لتسليم الواجبات المنزلية، وتلقي التقييمات والملاحظات من الأستاذ مباشرة.' },
-        { title: 'اختبارات مؤقتة ذكية', desc: 'أداء الاختبارات الدورية بنظام محوسب ذكي مع احتساب الوقت تلقائياً وتصحيح فوري.' },
-        { title: 'حلقات دراسية وبث مباشر', desc: 'قاعات محاضرات افتراضية متكاملة عبر Zoom وTeams للتفاعل الفوري مع الهيئة التدريسية.' },
-        { title: 'مراسلة خاصة وتواصل سريع', desc: 'نظام محادثات فوري يسمح للطلاب بالتواصل المباشر مع أساتذة المقرر لطلب المساعدة.' },
-        { title: 'شهادات ودرجات معتمدة', desc: 'استخراج كشوفات الدرجات وإصدار شهادات التفوق الأكاديمي الرقمية القابلة للطباعة بنقرة زر.' }
+        { title: 'اختبارات مؤقتة ذكية', desc: 'أداء الاختبارات الدورية بنظام محوسب ذكي مع احتساب الوقت تلقائياً وتصحيح فوري.' }
+      ],
+      attendanceFeatures: [
+        { title: 'حضور وغياب يومي تفاعلي', desc: 'تسجيل الحضور والغياب للطلاب بضغطة زر مع احتساب التقرير والنسب المئوية تلقائياً.' },
+        { title: 'الملف الأكائيمي الشامل للطالب', desc: 'سجل كامل يحتوي على تقدير الطالب الدراسي، ونتائج المقررات والتدرج الأكاديمي.' },
+        { title: 'النتائج والتقديرات الفصلية', desc: 'عرض فوري للتقديرات رصد وحساب المعدل التراكمي والفصلي للطلاب.' },
+        { title: 'إدارة الرسوم الدراسية والمدفوعات', desc: 'تتبع سداد الرسوم وإصدار الفواتير وسندات القبض إلكترونياً.' },
+        { title: 'الخدمات الجامعية والجدول الدراسي', desc: 'جدول المحاضرات اليومي ومواعيد القاعات وأسماء الهيئة التدريسية لكل شعبة.' }
+      ],
+      lmsFeatures: [
+        { title: 'رفع واستعراض المحاضرات والمواد الرقمية', desc: 'مساحة سحابية للمدرسين لرفع الملفات والكتب ومقاطع الفيديو والروابط للطلاب.' },
+        { title: 'تسليم الواجبات والأنشطة التفاعلية', desc: 'تمكين الطلاب من تسليم ملفات الأنشطة وتلقي التغذية الراجعة والدرجات من المدرس.' },
+        { title: 'اختبارات إلكترونية ذكية بنظام العد التنازلي', desc: 'تأدية الاختبارات الرقمية مع مؤقت للعد التنازلي وسحب تلقائي للورقة وتصحيح ذاتي.' },
+        { title: 'فصول افتراضية وبث مباشر (Zoom/Teams)', desc: 'دمج قاعات البث المباشر لحضور المحاضرات واللقاءات التفاعلية وحلقات النقاش.' },
+        { title: 'إصدار شهادات إلكترونية قابلة للطباعة', desc: 'توليد شهادة إتمام المقررات بنجاح للطلاب تلقائياً ومشاركتها إلكترونياً.' }
+      ],
+      stats: [
+        { label: 'طالب نشط', value: '+15,000', color: 'from-cyan-400 to-blue-500' },
+        { label: 'شريك أكاديمي معتمد', value: '50+', color: 'from-purple-500 to-pink-500' },
+        { label: 'عدد الاختبارات', value: '480+', color: 'from-amber-400 to-orange-500' },
+        { label: 'نسبة رضا المستخدمين', value: '99.8%', color: 'from-emerald-400 to-teal-500' }
+      ],
+      faqs: [
+        { q: 'هل يمكنني تسجيل حساب كطالب واستخدام المنصة مجاناً؟', a: 'نعم، المنصة مجانية بالكامل للطلاب. يمكنك التسجيل والوصول لجميع المحاضرات، حل الواجبات، وتقديم الاختبارات وإصدار الشهادات الأكاديمية مجاناً وبدون أي تكاليف.' },
+        { q: 'كيف يعمل التخزين في المنصة بعد إلغاء Supabase؟', a: 'يتم حفظ جميع بياناتك ومحاضراتك وإجاباتك محلياً على جهازك باستخدام LocalStorage. هذا يعني أن المنصة تعمل فوراً دون الحاجة لقاعدة بيانات سحابية وتمنحك خصوصية وسرعة فائقة.' },
+        { q: 'هل يدعم نظام الاختبارات حد وقت معين؟', a: 'نعم، يحتوي نظام الاختبارات على محرك توقيت ذكي (Countdown Timer). يبدأ الوقت فور بدء الطالب، ويتم سحب ورقة الاختبار وحفظ الإجابات تلقائياً فور انتهاء المهلة المحددة.' },
+        { q: 'هل يمكن إصدار شهادات النجاح وطباعتها؟', a: 'بالتأكيد، بمجرد اجتياز الطالب للمقرر وحصوله على درجات النجاح، يتم توليد شهادة تفوق أكاديمية رقمية معتمدة برمز خاص بها، ويمكن طباعتها مباشرة أو حفظها كملف PDF.' }
+      ],
+      navbarLinks: [
+        { id: 'nav-1', label: 'الرئيسية', href: '#hero' },
+        { id: 'nav-2', label: 'الخدمات', href: '#services' },
+        { id: 'nav-3', label: 'المميزات', href: '#features' },
+        { id: 'nav-4', label: 'الأسعار والباقات', href: '#pricing' },
+        { id: 'nav-5', label: 'الأسئلة الشائعة', href: '#faq' }
       ]
     };
-    localStorage.setItem(LOCAL_KEYS.SITE_CONFIG, JSON.stringify(defaultConfig));
-    return defaultConfig;
+
+    if (!config) {
+      config = defaultConfig;
+      localStorage.setItem(LOCAL_KEYS.SITE_CONFIG, JSON.stringify(config));
+    } else {
+      let updated = false;
+      for (const key of Object.keys(defaultConfig)) {
+        if (config[key] === undefined) {
+          config[key] = (defaultConfig as any)[key];
+          updated = true;
+        }
+      }
+      if (updated) {
+        localStorage.setItem(LOCAL_KEYS.SITE_CONFIG, JSON.stringify(config));
+      }
+    }
+    return config;
   },
 
   async updateSiteConfig(config: any): Promise<void> {
@@ -1587,7 +1674,7 @@ export const lmsDb = {
     }
     return plans;
   },
-  async createSubscriptionPlan(name: string, price: number, billingCycle: string, features: string[]): Promise<LMSSubscriptionPlan> {
+  async createSubscriptionPlan(name: string, price: number, billingCycle: string, features: string[], visible = true): Promise<LMSSubscriptionPlan> {
     await checkLmsMode();
     const plans = getLocal<LMSSubscriptionPlan>(LOCAL_KEYS.SUBSCRIPTION_PLANS);
     const newPlan: LMSSubscriptionPlan = {
@@ -1596,13 +1683,14 @@ export const lmsDb = {
       price,
       billing_cycle: billingCycle,
       features,
+      visible,
       created_at: new Date().toISOString()
     };
     plans.push(newPlan);
     setLocal(LOCAL_KEYS.SUBSCRIPTION_PLANS, plans);
     return newPlan;
   },
-  async updateSubscriptionPlan(id: string, name: string, price: number, billingCycle: string, features: string[]): Promise<void> {
+  async updateSubscriptionPlan(id: string, name: string, price: number, billingCycle: string, features: string[], visible = true): Promise<void> {
     await checkLmsMode();
     const plans = getLocal<LMSSubscriptionPlan>(LOCAL_KEYS.SUBSCRIPTION_PLANS);
     const index = plans.findIndex(p => p.id === id);
@@ -1611,6 +1699,7 @@ export const lmsDb = {
       plans[index].price = price;
       plans[index].billing_cycle = billingCycle;
       plans[index].features = features;
+      plans[index].visible = visible;
       setLocal(LOCAL_KEYS.SUBSCRIPTION_PLANS, plans);
     }
   },

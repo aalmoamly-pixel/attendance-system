@@ -193,6 +193,12 @@ export default function LMSLanding({ onLoginSuccess }: LMSLandingProps) {
 
           {/* Auth Button */}
           <div className="flex items-center gap-3">
+            <a 
+              href="/"
+              className="px-4 py-2.5 rounded-xl bg-[#131622] hover:bg-[#181d31] border border-[#22273b] hover:border-slate-700 text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span>🏠 العودة للبوابة الرئيسية</span>
+            </a>
             <button 
               onClick={() => handleOpenAuth('login', 'student')}
               className="px-5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm font-bold text-white hover:bg-slate-800 transition-all cursor-pointer"
