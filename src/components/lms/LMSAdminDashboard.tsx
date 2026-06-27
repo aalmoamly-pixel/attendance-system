@@ -842,7 +842,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
             <button 
               onClick={() => {
                 setEditPlanId(null);
-                setPlanForm({ name: '', price: '', billing_cycle: 'شهري', features: '' });
+                setPlanForm({ name: '', price: '', billing_cycle: 'شهري', features: '', visible: true });
                 setShowPlanModal(true);
               }} 
               className="px-4 py-2.5 rounded-xl bg-brand-primary hover:bg-brand-primary/95 text-sm font-bold text-white shadow shadow-brand-primary/20 hover:scale-[1.01] transition-all flex items-center gap-2 cursor-pointer flex-row-reverse"
@@ -2391,7 +2391,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
           <div className="relative bg-[#0c0e18] border border-[#212739] w-full max-w-md p-6 space-y-4 rounded-3xl text-right shadow-2xl animate-fade-in">
             <div className="flex items-center justify-between mb-2 flex-row-reverse">
               <h3 className="text-white font-black text-lg">{editPlanId ? 'تعديل باقة الاشتراك' : 'إضافة باقة اشتراك جديدة'}</h3>
-              <button onClick={() => { setShowPlanModal(false); setEditPlanId(null); setPlanForm({ name: '', price: '', billing_cycle: 'شهري', features: '' }); }} className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer">✕</button>
+              <button onClick={() => { setShowPlanModal(false); setEditPlanId(null); setPlanForm({ name: '', price: '', billing_cycle: 'شهري', features: '', visible: true }); }} className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer">✕</button>
             </div>
             <div>
               <label className={labelClass}>اسم الباقة *</label>

@@ -10,7 +10,6 @@ import {
   LogIn,
   Check,
   HelpCircle,
-  Sparkles,
   CreditCard,
   X,
   Upload,

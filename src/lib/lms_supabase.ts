@@ -185,6 +185,7 @@ export interface LMSSubscriptionPlan {
   price: number;
   billing_cycle: string; // e.g. "شهري", "فصلي", "سنوي"
   features: string[];
+  visible: boolean;
   created_at: string;
 }
 
@@ -1665,9 +1666,9 @@ export const lmsDb = {
     const plans = getLocal<LMSSubscriptionPlan>(LOCAL_KEYS.SUBSCRIPTION_PLANS);
     if (plans.length === 0) {
       const defaultPlans: LMSSubscriptionPlan[] = [
-        { id: 'plan-silver', name: 'الباقة الفضية (شاملة)', price: 150, billing_cycle: 'شهري', features: ['الوصول لكافة المحاضرات والملفات', 'تسليم الواجبات وحل الاختبارات', 'شات ومراسلة مع الأساتذة'], created_at: new Date().toISOString() },
-        { id: 'plan-gold', name: 'الباقة الذهبية (شاملة + دعم)', price: 299, billing_cycle: 'فصلي', features: ['الوصول لكافة المحاضرات والملفات', 'تسليم الواجبات وحل الاختبارات', 'شات ومراسلة مع الأساتذة', 'حضور المحاضرات المباشرة وتتبع التقدم'], created_at: new Date().toISOString() },
-        { id: 'plan-diamond', name: 'الباقة الماسية (دعم خاص)', price: 499, billing_cycle: 'سنوي', features: ['الوصول لكافة المحاضرات والملفات', 'تسليم الواجبات وحل الاختبارات', 'شات ومراسلة مع الأساتذة', 'حضور المحاضرات المباشرة وتتبع التقدم', 'أولوية رصد طلبات الحصص والدروس الخاصة الموجهة'], created_at: new Date().toISOString() }
+        { id: 'plan-silver', name: 'الباقة الفضية (شاملة)', price: 150, billing_cycle: 'شهري', features: ['الوصول لكافة المحاضرات والملفات', 'تسليم الواجبات وحل الاختبارات', 'شات ومراسلة مع الأساتذة'], visible: true, created_at: new Date().toISOString() },
+        { id: 'plan-gold', name: 'الباقة الذهبية (شاملة + دعم)', price: 299, billing_cycle: 'فصلي', features: ['الوصول لكافة المحاضرات والملفات', 'تسليم الواجبات وحل الاختبارات', 'شات ومراسلة مع الأساتذة', 'حضور المحاضرات المباشرة وتتبع التقدم'], visible: true, created_at: new Date().toISOString() },
+        { id: 'plan-diamond', name: 'الباقة الماسية (دعم خاص)', price: 499, billing_cycle: 'سنوي', features: ['الوصول لكافة المحاضرات والملفات', 'تسليم الواجبات وحل الاختبارات', 'شات ومراسلة مع الأساتذة', 'حضور المحاضرات المباشرة وتتبع التقدم', 'أولوية رصد طلبات الحصص والدروس الخاصة الموجهة'], visible: true, created_at: new Date().toISOString() }
       ];
       setLocal(LOCAL_KEYS.SUBSCRIPTION_PLANS, defaultPlans);
       return defaultPlans;
