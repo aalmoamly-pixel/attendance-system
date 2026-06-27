@@ -230,12 +230,17 @@ const setLocal = <T>(key: string, data: T[]): void => {
   localStorage.setItem(key, JSON.stringify(data));
 };
 
-// Initialize local storage and seed data
+// Initialize database/local storage and seed data
 const checkLmsMode = async () => {
   if (isChecked) return;
   isChecked = true;
-  console.log('[LMS DB] Using LocalStorage mode for all data.');
-  seedLMSLocalData();
+  if (!useLmsLocal && supabase) {
+    console.log('[LMS DB] Using Supabase Cloud mode for all data.');
+    await seedLMSSupabaseData();
+  } else {
+    console.log('[LMS DB] Using LocalStorage mode for all data.');
+    seedLMSLocalData();
+  }
 };
 
 // Seed LocalStorage dummy data

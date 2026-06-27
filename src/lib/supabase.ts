@@ -780,7 +780,7 @@ export const db = {
       
       // 2. Delete all payments (critical - payments have FK to students)
       console.log('[DeleteAll] 2/6 Deleting payments...');
-      const { error: paymentError } = await supabase.from('payments').delete().gte('payment_id', 0);
+      const { error: paymentError } = await supabase.from('payments').delete().gte('id', 0);
       if (paymentError) console.error('[DeleteAll] 2/6 Payments delete error:', paymentError);
 
       // 3. Delete all schedules
