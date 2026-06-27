@@ -99,7 +99,7 @@ export default function NewCustomers() {
               department_id: deptId,
               subscription_amount: amount,
               due_date: dueDate.toISOString().split('T')[0],
-              subscription_status: 'active',
+              subscription_status: 'pending_payment',
               financial_notes: `حساب منشأ تلقائياً ومعتمد من طلب الاشتراك الجديد رقم #${customer.id}`
             });
           }
@@ -124,7 +124,8 @@ export default function NewCustomers() {
                 'student',
                 customer.phone,
                 'active',
-                customer.plan_type === 'basic' ? 'plan-silver' : 'plan-gold'
+                customer.plan_type === 'basic' ? 'plan-silver' : 'plan-gold',
+                'pending_payment'
               );
             } else {
               // Update existing LMS user status & subscription plan
@@ -132,7 +133,8 @@ export default function NewCustomers() {
                 .from('lms_users')
                 .update({ 
                   status: 'active', 
-                  subscription_plan_id: customer.plan_type === 'basic' ? 'plan-silver' : 'plan-gold' 
+                  subscription_plan_id: customer.plan_type === 'basic' ? 'plan-silver' : 'plan-gold',
+                  subscription_status: 'pending_payment'
                 })
                 .eq('email', lmsEmail);
               if (updateLmsError) throw updateLmsError;

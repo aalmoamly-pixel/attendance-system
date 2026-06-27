@@ -11,7 +11,7 @@ import {
   Eye,
   ArrowLeft
 } from 'lucide-react';
-import { db } from '../lib/supabase';
+import { supabase, db } from '../lib/supabase';
 import { getAuthState } from '../lib/auth';
 import type { Payment, PaymentStatus, PaymentMethod } from '../types/database';
 
@@ -385,6 +385,22 @@ function PaymentDetail({ payment, onBack, onUpdate }: { payment: Payment; onBack
         admin_notes: adminNote || payment.admin_notes
       });
 
+      // Update student subscription status to active in both systems
+      if (student) {
+        await db.updateStudent(student.student_id, {
+          subscription_status: 'active',
+          due_date: endDate.toISOString().split('T')[0]
+        });
+
+        if (supabase) {
+          const lmsEmail = student.academic_id.includes('@') ? student.academic_id : `${student.academic_id}@lms.com`;
+          await supabase
+            .from('lms_users')
+            .update({ subscription_status: 'active' })
+            .eq('email', lmsEmail);
+        }
+      }
+
       await db.sendNotification({
         student_id: payment.student_id,
         sender_id: getAuthState().user?.student_id || 0,
@@ -415,6 +431,21 @@ function PaymentDetail({ payment, onBack, onUpdate }: { payment: Payment; onBack
         status: 'rejected',
         admin_notes: rejectReason
       });
+
+      // Reset student subscription status to pending_payment in both systems
+      if (student) {
+        await db.updateStudent(student.student_id, {
+          subscription_status: 'pending_payment'
+        });
+
+        if (supabase) {
+          const lmsEmail = student.academic_id.includes('@') ? student.academic_id : `${student.academic_id}@lms.com`;
+          await supabase
+            .from('lms_users')
+            .update({ subscription_status: 'pending_payment' })
+            .eq('email', lmsEmail);
+        }
+      }
 
       await db.sendNotification({
         student_id: payment.student_id,

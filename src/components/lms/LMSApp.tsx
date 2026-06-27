@@ -5,6 +5,7 @@ import LMSAdminDashboard from './LMSAdminDashboard';
 import LMSInstructorDashboard from './LMSInstructorDashboard';
 import LMSStudentDashboard from './LMSStudentDashboard';
 import { type LMSUser } from '../../lib/lms_supabase';
+import { supabase } from '../../lib/supabase';
 
 export default function LMSApp() {
   const [user, setUser] = useState<LMSUser | null>(null);
@@ -21,6 +22,48 @@ export default function LMSApp() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const client = supabase;
+    if (user && client) {
+      // Fetch latest user status from Supabase to keep it in sync
+      const fetchLatestUser = async () => {
+        try {
+          const { data, error } = await client
+            .from('lms_users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          if (data && !error) {
+            setUser(data);
+            localStorage.setItem('lms_auth_user', JSON.stringify(data));
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      
+      fetchLatestUser();
+
+      // Subscribe to changes on lms_users for this user
+      const channel = client
+        .channel(`lms_user_sync:${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'lms_users', filter: `id=eq.${user.id}` },
+          (payload: any) => {
+            console.log('[LMS User Sync] Realtime Profile Update:', payload.new);
+            setUser(payload.new);
+            localStorage.setItem('lms_auth_user', JSON.stringify(payload.new));
+          }
+        )
+        .subscribe();
+
+      return () => {
+        client.removeChannel(channel);
+      };
+    }
+  }, [user?.id]);
 
   const handleLoginSuccess = (loggedInUser: LMSUser) => {
     setUser(loggedInUser);
@@ -58,10 +101,11 @@ export default function LMSApp() {
       role={user.role}
       userName={user.full_name}
       onLogout={handleLogout}
+      subscriptionStatus={user?.subscription_status}
     >
       {user.role === 'student' ? (
         // Pass down activeTab to allow tab switching from sidebar
-        <LMSStudentDashboard student={user} activeTab={activeTab} />
+        <LMSStudentDashboard student={user} activeTab={activeTab} setActiveTab={setActiveTab} />
       ) : (
         renderDashboard()
       )}

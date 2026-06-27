@@ -17,7 +17,8 @@ import {
   ClipboardList, 
   Building2, 
   ChevronLeft,
-  GraduationCap
+  GraduationCap,
+  CreditCard
 } from 'lucide-react';
 
 
@@ -28,9 +29,10 @@ interface LMSLayoutProps {
   role: 'admin' | 'instructor' | 'student';
   userName: string;
   onLogout: () => void;
+  subscriptionStatus?: string;
 }
 
-export default function LMSLayout({ children, activeTab, setActiveTab, role, userName, onLogout }: LMSLayoutProps) {
+export default function LMSLayout({ children, activeTab, setActiveTab, role, userName, onLogout, subscriptionStatus }: LMSLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Platform identity CMS integration
@@ -83,6 +85,12 @@ export default function LMSLayout({ children, activeTab, setActiveTab, role, use
           { id: 'announcements', label: 'الإعلانات الأكاديمية', icon: Bell },
         ];
       case 'student':
+        if (subscriptionStatus !== 'active') {
+          return [
+            { id: 'dashboard', label: 'لوحة تحكم الطالب', icon: LayoutDashboard },
+            { id: 'payment', label: 'الدفع والاشتراك', icon: CreditCard },
+          ];
+        }
         return [
           { id: 'dashboard', label: 'لوحة تحكم الطالب', icon: LayoutDashboard },
           { id: 'enrollment', label: 'تسجيل المقررات', icon: BookOpen },

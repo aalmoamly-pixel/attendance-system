@@ -2,21 +2,135 @@ import { useState, useEffect, useRef } from 'react';
 import {
   BookOpen, FileText, CheckSquare, Award, ClipboardList,
   Video, MessageSquare, Bell, Eye, Clock,
-  Send, CheckCircle, ChevronLeft, Plus
+  Send, CheckCircle, ChevronLeft, Plus, CreditCard
 } from 'lucide-react';
 import { lmsDb, type LMSUser, type LMSSection, type LMSMaterial, type LMSAssignment, type LMSQuestion, type LMSExam, type LMSAnnouncement, type LMSMeeting, type LMSAttendance, type LMSMessage, type LMSCertificate, type LMSSubmission, type LMSExamAttempt, type LMSSpecialRequest } from '../../lib/lms_supabase';
+import { db } from '../../lib/supabase';
 
 interface LMSStudentDashboardProps {
   student: LMSUser;
   activeTab?: string;
+  setActiveTab?: (tab: string) => void;
 }
 
-export default function LMSStudentDashboard({ student, activeTab: propActiveTab }: LMSStudentDashboardProps) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+export default function LMSStudentDashboard({ student, activeTab: propActiveTab, setActiveTab }: LMSStudentDashboardProps) {
+  const [activeTab, setLocalActiveTab] = useState('dashboard');
+  const changeTab = setActiveTab || setLocalActiveTab;
+
+  // Payments states
+  const [coreStudent, setCoreStudent] = useState<any>(null);
+  const [paymentSettings, setPaymentSettings] = useState<any>(null);
+  const [existingPayments, setExistingPayments] = useState<any[]>([]);
+  const [selectedMethod, setSelectedMethod] = useState('');
+  const [transactionId, setTransactionId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [receiptImage, setReceiptImage] = useState('');
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState('');
+
+  // Load payment settings and link student
+  useEffect(() => {
+    const loadPaymentDetails = async () => {
+      try {
+        const studentsList = await db.getStudents();
+        const found = studentsList.find(s => s.academic_id === student.email || `${s.academic_id}@lms.com` === student.email);
+        if (found) {
+          setCoreStudent(found);
+          const paymentsList = await db.getPayments();
+          const studentPayments = paymentsList.filter(p => p.student_id === found.student_id);
+          setExistingPayments(studentPayments);
+          
+          const pending = studentPayments.find(p => p.status === 'pending');
+          if (pending) {
+            setPaymentMessage('تم استلام الإيصال وهو الآن بانتظار مراجعة الإدارة.');
+          } else {
+            setPaymentMessage('');
+          }
+        }
+
+        const settings = await db.getPaymentSettings();
+        setPaymentSettings(settings);
+        if (settings.enabled_payment_methods && settings.enabled_payment_methods.length > 0) {
+          setSelectedMethod(settings.enabled_payment_methods[0]);
+        }
+      } catch (err) {
+        console.error('[Payment] Load details error:', err);
+      }
+    };
+
+    if (activeTab === 'payment' || activeTab === 'dashboard') {
+      loadPaymentDetails();
+    }
+  }, [activeTab, student.email]);
+
+  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmitPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!coreStudent) {
+      alert('خطأ: لم يتم العثور على حساب الطالب في النظام الموحد.');
+      return;
+    }
+    if (!receiptImage) {
+      alert('يرجى رفع صورة الإيصال أولاً.');
+      return;
+    }
+    setSubmittingPayment(true);
+    try {
+      const invoiceNum = `INV-LMS-${Math.floor(100000 + Math.random() * 900000)}`;
+      // Pricing: Basic = 299, Premium = 599. Let's map lms plan to price:
+      const amount = student.subscription_plan_id === 'plan-gold' ? 299 : student.subscription_plan_id === 'plan-diamond' ? 499 : 150;
+      
+      await db.createPayment({
+        student_id: coreStudent.student_id,
+        amount,
+        payment_method: selectedMethod as any,
+        status: 'pending',
+        receipt_image: receiptImage,
+        invoice_number: invoiceNum,
+        transaction_id: transactionId || null,
+        notes: notes || null,
+        admin_notes: null,
+        approved_at: null,
+        approved_by: null,
+        subscription_start: null,
+        subscription_end: null
+      });
+
+      // Keep status as pending_payment in core student system
+      await db.updateStudent(coreStudent.student_id, {
+        subscription_status: 'pending_payment'
+      });
+
+      setPaymentMessage('تم استلام الإيصال وهو الآن بانتظار مراجعة الإدارة.');
+      showToast('تم رفع إيصال الدفع بنجاح');
+      
+      const paymentsList = await db.getPayments();
+      setExistingPayments(paymentsList.filter(p => p.student_id === coreStudent.student_id));
+      
+      setReceiptImage('');
+      setTransactionId('');
+      setNotes('');
+    } catch (err: any) {
+      console.error(err);
+      alert('فشل رفع الإيصال: ' + err.message);
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
 
   useEffect(() => {
     if (propActiveTab) {
-      setActiveTab(propActiveTab);
+      setLocalActiveTab(propActiveTab);
     }
   }, [propActiveTab]);
   const [sections, setSections] = useState<LMSSection[]>([]);
@@ -469,18 +583,23 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab 
     );
   }
 
-  const tabs = [
-    { id: 'dashboard', label: 'لوحة التحكم', icon: BookOpen },
-    { id: 'enrollment', label: 'تسجيل المقررات', icon: Plus },
-    { id: 'materials', label: 'المحاضرات', icon: FileText },
-    { id: 'assignments', label: 'الواجبات والمهام', icon: CheckSquare },
-    { id: 'exams', label: 'الاختبارات', icon: Award },
-    { id: 'attendance', label: 'سجل الحضور', icon: ClipboardList },
-    { id: 'schedule', label: 'الجدول الدراسي', icon: Clock },
-    { id: 'meetings', label: 'المحاضرات المباشرة', icon: Video },
-    { id: 'messages', label: 'مراسلة الأساتذة', icon: MessageSquare },
-    { id: 'certificates', label: 'الشهادات والدرجات', icon: Award }
-  ];
+  const tabs = student.subscription_status === 'active'
+    ? [
+        { id: 'dashboard', label: 'لوحة التحكم', icon: BookOpen },
+        { id: 'enrollment', label: 'تسجيل المقررات', icon: Plus },
+        { id: 'materials', label: 'المحاضرات', icon: FileText },
+        { id: 'assignments', label: 'الواجبات والمهام', icon: CheckSquare },
+        { id: 'exams', label: 'الاختبارات', icon: Award },
+        { id: 'attendance', label: 'سجل الحضور', icon: ClipboardList },
+        { id: 'schedule', label: 'الجدول الدراسي', icon: Clock },
+        { id: 'meetings', label: 'المحاضرات المباشرة', icon: Video },
+        { id: 'messages', label: 'مراسلة الأساتذة', icon: MessageSquare },
+        { id: 'certificates', label: 'الشهادات والدرجات', icon: Award }
+      ]
+    : [
+        { id: 'dashboard', label: 'لوحة التحكم', icon: BookOpen },
+        { id: 'payment', label: 'الدفع والاشتراك', icon: CreditCard }
+      ];
 
   if (loading) {
     return (
@@ -502,7 +621,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab 
       {/* Tab Selector Buttons */}
       <div className="flex flex-wrap gap-2 flex-row-reverse justify-start">
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+          <button key={tab.id} onClick={() => changeTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === tab.id 
                 ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' 
@@ -532,6 +651,42 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab 
       {/* OVERVIEW Tab */}
       {activeTab === 'dashboard' && (
         <div className="space-y-6">
+          {/* Active Subscription Verification Warning Card */}
+          {student.subscription_status !== 'active' && (
+            <div className="bg-rose-500/10 border-2 border-rose-500/30 p-6 rounded-3xl text-right flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg shadow-rose-950/20">
+              <div className="space-y-1">
+                <h3 className="text-white font-black text-lg flex items-center gap-2 flex-row-reverse justify-start">
+                  <span>🔒 اشتراكك غير مفعل</span>
+                </h3>
+                <p className="text-xs text-rose-300">
+                  يرجى إتمام عملية الدفع ورفع صورة الإيصال ليتم تفعيل حسابك والوصول لكافة المواد العلمية والاختبارات.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2.5 shrink-0 flex-row-reverse">
+                <button
+                  onClick={() => changeTab('payment')}
+                  className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl text-xs shadow-lg shadow-rose-500/20 cursor-pointer transition-all"
+                >
+                  الدفع الآن
+                </button>
+                <button
+                  onClick={() => changeTab('payment')}
+                  className="px-5 py-2.5 bg-[#131622] border border-rose-500/30 text-rose-400 hover:text-white font-bold rounded-xl text-xs cursor-pointer transition-all"
+                >
+                  رفع الإيصال
+                </button>
+                <a
+                  href={paymentSettings?.whatsapp_link || 'https://wa.me/966501234567'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-[#090b10] font-black rounded-xl text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
+                >
+                  التواصل عبر واتساب
+                </a>
+              </div>
+            </div>
+          )}
+
           {/* Welcome Banner */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-brand-secondary to-brand-primary p-8 text-white shadow-xl border border-brand-primary/25">
             <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
@@ -1053,6 +1208,212 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab 
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* PAYMENT Tab */}
+      {activeTab === 'payment' && (
+        <div className="space-y-6 text-right">
+          <div className="glass-card p-6 md:p-8 space-y-6">
+            <div className="border-b border-[#21263d] pb-4 flex flex-col md:flex-row md:items-center justify-between gap-2 flex-row-reverse text-right">
+              <h3 className="text-white font-black text-xl flex items-center gap-2 flex-row-reverse">
+                <CreditCard className="w-6 h-6 text-brand-primary" />
+                <span>إتمام عملية الدفع وتفعيل الباقة</span>
+              </h3>
+              <p className="text-xs text-slate-400">يرجى تحويل قيمة الباقة وإرفاق صورة التحويل بالأسفل ليتم تفعيل حسابك.</p>
+            </div>
+
+            {/* Plan summary & cost */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-2">
+                <p className="text-xs text-slate-400">الباقة المختارة</p>
+                <p className="text-lg font-black text-white">
+                  {student.subscription_plan_id === 'plan-gold' 
+                    ? 'الباقة الذهبية (شاملة + دعم)' 
+                    : student.subscription_plan_id === 'plan-diamond' 
+                      ? 'الباقة الماسية (دعم خاص)' 
+                      : 'الباقة الفضية (شاملة)'}
+                </p>
+              </div>
+              <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-2">
+                <p className="text-xs text-slate-400">قيمة الاشتراك</p>
+                <p className="text-2xl font-black text-[#20c997] font-mono">
+                  {student.subscription_plan_id === 'plan-gold' 
+                    ? 299 
+                    : student.subscription_plan_id === 'plan-diamond' 
+                      ? 499 
+                      : 150} ر.س
+                </p>
+              </div>
+              <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-2 flex flex-col justify-center">
+                <a
+                  href={paymentSettings?.whatsapp_link || 'https://wa.me/966501234567'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-[#090b10] font-black rounded-xl text-center text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                >
+                  💬 تواصل واتساب مع الإدارة
+                </a>
+              </div>
+            </div>
+
+            {/* Payment Methods Accounts */}
+            <div className="bg-[#090b10] border border-[#21263d] p-6 rounded-2xl space-y-4">
+              <h4 className="font-bold text-white text-base">حسابات وطرق التحويل المعتمدة:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {paymentSettings?.bank_name && (
+                  <div className="bg-[#131622] p-4 rounded-xl border border-[#21263d] space-y-2 text-sm text-white">
+                    <p className="font-bold text-brand-primary text-xs">🏦 التحويل البنكي المباشر</p>
+                    <p><span className="text-slate-400">اسم البنك:</span> {paymentSettings.bank_name}</p>
+                    <p><span className="text-slate-400">اسم الحساب:</span> {paymentSettings.account_holder}</p>
+                    <p className="font-mono"><span className="text-slate-400">الحساب:</span> {paymentSettings.account_number}</p>
+                    <p className="font-mono text-xs"><span className="text-slate-400">IBAN:</span> {paymentSettings.iban}</p>
+                  </div>
+                )}
+
+                {paymentSettings?.binance_usdt_address && (
+                  <div className="bg-[#131622] p-4 rounded-xl border border-[#21263d] space-y-2 text-sm text-white">
+                    <p className="font-bold text-amber-500 text-xs">🪙 Binance USDT (TRC20)</p>
+                    <p className="font-mono text-xs break-all"><span className="text-slate-400">العنوان:</span> {paymentSettings.binance_usdt_address}</p>
+                    <p className="text-slate-400 text-xs">يرجى التأكد من اختيار شبكة Tron (TRC-20).</p>
+                  </div>
+                )}
+
+                {paymentSettings?.ria_details && (
+                  <div className="bg-[#131622] p-4 rounded-xl border border-[#21263d] space-y-2 text-sm text-white">
+                    <p className="font-bold text-purple-400 text-xs">💸 تحويل عبر Ria Money Transfer</p>
+                    <p className="text-xs leading-relaxed"><span className="text-slate-400">تفاصيل المستلم:</span> {paymentSettings.ria_details}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Payment Message / Notice */}
+            {paymentMessage && (
+              <div className="bg-brand-warning/10 border border-brand-warning/30 text-brand-warning p-4 rounded-2xl flex items-center gap-3 text-sm">
+                <Clock className="w-5 h-5 shrink-0" />
+                <span className="font-semibold">{paymentMessage}</span>
+              </div>
+            )}
+
+            {/* Submission Form */}
+            <form onSubmit={handleSubmitPayment} className="space-y-4">
+              <h4 className="font-bold text-white text-base">رفع بيانات وإيصال التحويل:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>طريقة التحويل المستخدمة *</label>
+                  <select
+                    value={selectedMethod}
+                    onChange={(e) => setSelectedMethod(e.target.value)}
+                    className={inputClass}
+                    required
+                  >
+                    {paymentSettings?.enabled_payment_methods?.map((m: string) => (
+                      <option key={m} value={m}>
+                        {m === 'bank_transfer' ? 'تحويل بنكي مباشر' : m === 'binance_usdt' ? 'Binance USDT' : m === 'ria' ? 'Ria Money Transfer' : m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>رقم العملية أو الحوالة (اختياري)</label>
+                  <input
+                    type="text"
+                    value={transactionId}
+                    onChange={(e) => setTransactionId(e.target.value)}
+                    placeholder="مثال: TXN998822..."
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>ملاحظات إضافية</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="أكتب أي ملاحظة للإدارة بخصوص التحويل البنكي هنا..."
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>إرفاق صورة إيصال التحويل *</label>
+                <div className="flex items-center gap-4 flex-row-reverse">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleReceiptUpload}
+                    className="hidden"
+                    id="receipt-file-input"
+                    required={!paymentMessage}
+                  />
+                  <label
+                    htmlFor="receipt-file-input"
+                    className="px-5 py-3 bg-[#131622] hover:bg-[#1f263e] border border-[#21263d] text-white text-xs font-bold rounded-xl cursor-pointer transition-all shrink-0"
+                  >
+                    📁 اختيار ملف الصورة
+                  </label>
+                  <div className="flex-1 text-slate-500 text-xs text-right truncate">
+                    {receiptImage ? 'تم اختيار الصورة وتجهيزها للرفع' : 'لم يتم اختيار أي إيصال بعد'}
+                  </div>
+                </div>
+                {receiptImage && (
+                  <div className="mt-4 max-w-xs border border-[#21263d] rounded-xl overflow-hidden">
+                    <img src={receiptImage} alt="Receipt preview" className="w-full max-h-48 object-cover" />
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingPayment || !receiptImage}
+                className="w-full py-4 bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-sm rounded-xl cursor-pointer disabled:opacity-40 transition-all"
+              >
+                {submittingPayment ? 'جاري رفع الطلب والإيصال سحابياً...' : 'إرسال إيصال الدفع للمراجعة'}
+              </button>
+            </form>
+
+            {/* Payments History Table */}
+            {existingPayments.length > 0 && (
+              <div className="bg-[#090b10] border border-[#21263d] p-6 rounded-2xl space-y-4 pt-6 mt-6">
+                <h4 className="font-bold text-white text-base">سجل الدفعات السابقة:</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-sm">
+                    <thead>
+                      <tr className="border-b border-[#21263d] text-slate-400">
+                        <th className="pb-3 text-right">رقم الفاتورة</th>
+                        <th className="pb-3 text-right">طريقة الدفع</th>
+                        <th className="pb-3 text-right">المبلغ</th>
+                        <th className="pb-3 text-right">الحالة</th>
+                        <th className="pb-3 text-right">تاريخ الطلب</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#21263d]/60 text-white">
+                      {existingPayments.map((p) => (
+                        <tr key={p.id} className="hover:bg-[#131622]/40 transition">
+                          <td className="py-3 font-mono text-xs">{p.invoice_number}</td>
+                          <td className="py-3">
+                            {p.payment_method === 'bank_transfer' ? 'تحويل بنكي' : p.payment_method === 'binance_usdt' ? 'Binance USDT' : p.payment_method === 'ria' ? 'Ria Transfer' : p.payment_method}
+                          </td>
+                          <td className="py-3 font-mono text-[#20c997] font-bold">{p.amount} ر.س</td>
+                          <td className="py-3">
+                            {p.status === 'approved' && <span className="text-emerald-400 font-bold">معتمد ✅</span>}
+                            {p.status === 'pending' && <span className="text-amber-400 font-bold">قيد المراجعة ⏳</span>}
+                            {p.status === 'rejected' && <span className="text-rose-400 font-bold">مرفوض ❌</span>}
+                          </td>
+                          <td className="py-3 text-xs text-slate-500 font-mono">
+                            {new Date(p.created_at).toLocaleDateString('ar-SA')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

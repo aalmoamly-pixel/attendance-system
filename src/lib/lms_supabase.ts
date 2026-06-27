@@ -9,6 +9,7 @@ export interface LMSUser {
   avatar_url?: string;
   status?: 'active' | 'pending' | 'rejected';
   subscription_plan_id?: string;
+  subscription_status?: string;
   created_at: string;
 }
 
@@ -398,12 +399,21 @@ export async function seedLMSSupabaseData() {
 
 export const lmsDb = {
   // 1. Auth & Users
-  async registerUser(email: string, password_hash: string, full_name: string, role: LMSUser['role'], phone = '', status?: LMSUser['status'], subscriptionPlanId?: string): Promise<LMSUser> {
+  async registerUser(email: string, password_hash: string, full_name: string, role: LMSUser['role'], phone = '', status?: LMSUser['status'], subscriptionPlanId?: string, subscriptionStatus?: string): Promise<LMSUser> {
     await checkLmsMode();
     if (!useLmsLocal && supabase) {
       const { data, error } = await supabase
         .from('lms_users')
-        .insert({ email, password_hash, full_name, role, phone, status: status || (role === 'student' ? 'pending' : 'active'), subscription_plan_id: subscriptionPlanId })
+        .insert({ 
+          email, 
+          password_hash, 
+          full_name, 
+          role, 
+          phone, 
+          status: status || (role === 'student' ? 'pending' : 'active'), 
+          subscription_plan_id: subscriptionPlanId,
+          subscription_status: subscriptionStatus || (role === 'student' ? 'pending_payment' : 'active')
+        })
         .select('*')
         .single();
       if (error) throw error;
@@ -421,6 +431,7 @@ export const lmsDb = {
         role,
         status: status || (role === 'student' ? 'pending' : 'active'),
         subscription_plan_id: subscriptionPlanId,
+        subscription_status: subscriptionStatus || (role === 'student' ? 'pending_payment' : 'active'),
         created_at: new Date().toISOString()
       };
       users.push(newUser);
@@ -1382,52 +1393,106 @@ export const lmsDb = {
       };
     }
   },
-
   // 14. Special requests for custom boosting lessons
   async getSpecialRequests(): Promise<LMSSpecialRequest[]> {
     await checkLmsMode();
-    return getLocal<LMSSpecialRequest>(LOCAL_KEYS.SPECIAL_REQUESTS).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    if (!useLmsLocal && supabase) {
+      const { data, error } = await supabase
+        .from('lms_special_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } else {
+      return getLocal<LMSSpecialRequest>(LOCAL_KEYS.SPECIAL_REQUESTS).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
   },
 
   async createSpecialRequest(studentId: string, details: string): Promise<LMSSpecialRequest> {
     await checkLmsMode();
-    const requests = getLocal<LMSSpecialRequest>(LOCAL_KEYS.SPECIAL_REQUESTS);
-    const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
-    const user = users.find(u => u.id === studentId);
+    if (!useLmsLocal && supabase) {
+      // Get student info from lms_users
+      const { data: user, error: userError } = await supabase
+        .from('lms_users')
+        .select('*')
+        .eq('id', studentId)
+        .single();
+      if (userError) throw userError;
 
-    const newRequest: LMSSpecialRequest = {
-      id: `req-${Math.random().toString(36).substring(2, 9)}`,
-      student_id: studentId,
-      student_name: user?.full_name || 'طالب مجهول',
-      student_email: user?.email || '',
-      student_phone: user?.phone || '',
-      details,
-      status: 'pending',
-      created_at: new Date().toISOString()
-    };
-    requests.push(newRequest);
-    setLocal(LOCAL_KEYS.SPECIAL_REQUESTS, requests);
-    return newRequest;
+      const { data, error } = await supabase
+        .from('lms_special_requests')
+        .insert({
+          student_id: studentId,
+          student_name: user.full_name,
+          student_email: user.email,
+          student_phone: user.phone || '',
+          details,
+          status: 'pending'
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+      return data;
+    } else {
+      const requests = getLocal<LMSSpecialRequest>(LOCAL_KEYS.SPECIAL_REQUESTS);
+      const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
+      const user = users.find(u => u.id === studentId);
+
+      const newRequest: LMSSpecialRequest = {
+        id: `req-${Math.random().toString(36).substring(2, 9)}`,
+        student_id: studentId,
+        student_name: user?.full_name || 'طالب مجهول',
+        student_email: user?.email || '',
+        student_phone: user?.phone || '',
+        details,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+      requests.push(newRequest);
+      setLocal(LOCAL_KEYS.SPECIAL_REQUESTS, requests);
+      return newRequest;
+    }
   },
 
   async updateSpecialRequest(requestId: string, status: 'approved' | 'rejected', price?: number): Promise<void> {
     await checkLmsMode();
-    const requests = getLocal<LMSSpecialRequest>(LOCAL_KEYS.SPECIAL_REQUESTS);
-    const reqIndex = requests.findIndex(r => r.id === requestId);
-    if (reqIndex !== -1) {
-      requests[reqIndex].status = status;
-      if (price !== undefined) {
-        requests[reqIndex].price = price;
-      }
-      setLocal(LOCAL_KEYS.SPECIAL_REQUESTS, requests);
+    if (!useLmsLocal && supabase) {
+      const updates: any = { status };
+      if (price !== undefined) updates.price = price;
       
-      // Auto-approve user status as well if the request is approved
-      const studentId = requests[reqIndex].student_id;
-      const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
-      const userIndex = users.findIndex(u => u.id === studentId);
-      if (userIndex !== -1 && status === 'approved') {
-        users[userIndex].status = 'active';
-        setLocal(LOCAL_KEYS.USERS, users);
+      const { data: updatedRequest, error } = await supabase
+        .from('lms_special_requests')
+        .update(updates)
+        .eq('id', requestId)
+        .select('*')
+        .single();
+      if (error) throw error;
+
+      if (status === 'approved') {
+        const { error: userError } = await supabase
+          .from('lms_users')
+          .update({ status: 'active' })
+          .eq('id', updatedRequest.student_id);
+        if (userError) throw userError;
+      }
+    } else {
+      const requests = getLocal<LMSSpecialRequest>(LOCAL_KEYS.SPECIAL_REQUESTS);
+      const reqIndex = requests.findIndex(r => r.id === requestId);
+      if (reqIndex !== -1) {
+        requests[reqIndex].status = status;
+        if (price !== undefined) {
+          requests[reqIndex].price = price;
+        }
+        setLocal(LOCAL_KEYS.SPECIAL_REQUESTS, requests);
+        
+        // Auto-approve user status as well if the request is approved
+        const studentId = requests[reqIndex].student_id;
+        const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
+        const userIndex = users.findIndex(u => u.id === studentId);
+        if (userIndex !== -1 && status === 'approved') {
+          users[userIndex].status = 'active';
+          setLocal(LOCAL_KEYS.USERS, users);
+        }
       }
     }
   },
@@ -1435,11 +1500,19 @@ export const lmsDb = {
   // 15. User approvals & management
   async updateUserStatus(userId: string, status: 'active' | 'pending' | 'rejected'): Promise<void> {
     await checkLmsMode();
-    const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
-    const index = users.findIndex(u => u.id === userId);
-    if (index !== -1) {
-      users[index].status = status;
-      setLocal(LOCAL_KEYS.USERS, users);
+    if (!useLmsLocal && supabase) {
+      const { error } = await supabase
+        .from('lms_users')
+        .update({ status })
+        .eq('id', userId);
+      if (error) throw error;
+    } else {
+      const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
+      const index = users.findIndex(u => u.id === userId);
+      if (index !== -1) {
+        users[index].status = status;
+        setLocal(LOCAL_KEYS.USERS, users);
+      }
     }
   },
 
