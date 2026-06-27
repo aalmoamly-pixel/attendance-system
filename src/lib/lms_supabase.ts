@@ -215,7 +215,7 @@ const LOCAL_KEYS = {
 
 // State flags for database detection
 // Force LocalStorage mode — all LMS data is stored locally
-const useLmsLocal = true;
+const useLmsLocal = false;
 let isChecked = false;
 
 const getLocal = <T>(key: string): T[] => {
