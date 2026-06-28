@@ -5,6 +5,7 @@ import {
   Check, Star, Users, ArrowLeft, ShieldCheck
 } from 'lucide-react';
 import { lmsDb, type LMSUser, type LMSCourse, type LMSSubscriptionPlan } from '../../lib/lms_supabase';
+import { db } from '../../lib/supabase';
 
 interface LMSLandingProps {
   onLoginSuccess: (user: LMSUser) => void;
@@ -126,20 +127,19 @@ export default function LMSLanding({ onLoginSuccess }: LMSLandingProps) {
         throw new Error('يرجى كتابة تفاصيل موضوع أو درس التقوية المطلوب.');
       }
 
-      // Register user as student (pending by default)
-      const newUser = await lmsDb.registerUser(regEmail, regPassword, regFullName, 'student', regPhone, 'pending', selectedPlanId || undefined);
-      
-      // Auto enroll or submit custom request
-      if (selectedRegCourseId === 'special') {
-        await lmsDb.createSpecialRequest(newUser.id, specialDetails);
-      } else if (selectedRegCourseId) {
-        const sectionsList = await lmsDb.getSections();
-        let section = sectionsList.find(s => s.course_id === selectedRegCourseId);
-        if (!section) {
-          section = await lmsDb.createSection(selectedRegCourseId, null, '01', 'Fall 2026', 30);
-        }
-        await lmsDb.enrollStudent(newUser.id, section.id);
-      }
+      // Save registration request in new_customers table
+      await db.createNewCustomer({
+        full_name: regFullName,
+        university_name: 'LMS Student',
+        username: regEmail,
+        password: regPassword,
+        phone: regPhone,
+        receipt_file: '',
+        plan_type: selectedPlanId ? 'premium' : 'basic',
+        selected_plan_id: selectedPlanId || null,
+        selected_course_id: selectedRegCourseId || null,
+        special_details: selectedRegCourseId === 'special' ? specialDetails : null
+      } as any);
 
       setRegSuccess(true);
       // Auto switch to login with prefilled email

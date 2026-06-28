@@ -60,6 +60,41 @@ const LOCAL_KEYS = {
   NEW_CUSTOMERS: 'attendance_new_customers'
 };
 
+const cacheLocal = (key: string, data: any) => {
+  try {
+    if (data) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch (e) {
+    console.error(`Error caching ${key} locally:`, e);
+  }
+};
+
+const syncToLocal = (key: string, item: any, idField: string) => {
+  try {
+    const existing = JSON.parse(localStorage.getItem(key) || '[]');
+    const index = existing.findIndex((x: any) => x[idField] === item[idField]);
+    if (index !== -1) {
+      existing[index] = { ...existing[index], ...item };
+    } else {
+      existing.push(item);
+    }
+    localStorage.setItem(key, JSON.stringify(existing));
+  } catch (e) {
+    console.error(`Error syncing ${key} to local storage:`, e);
+  }
+};
+
+const removeFromLocal = (key: string, id: any, idField: string) => {
+  try {
+    const existing = JSON.parse(localStorage.getItem(key) || '[]');
+    const filtered = existing.filter((x: any) => x[idField] !== id);
+    localStorage.setItem(key, JSON.stringify(filtered));
+  } catch (e) {
+    console.error(`Error removing ${id} from local ${key}:`, e);
+  }
+};
+
 export const initializeLocalData = async () => {
   if (isSupabaseConfigured && supabase) {
     // --- Supabase mode: Initialize data in Supabase
@@ -539,12 +574,14 @@ export const db = {
         console.error('[Departments] Fetch error:', error);
         throw error;
       }
+      cacheLocal(LOCAL_KEYS.DEPARTMENTS, data);
       return data || [];
     }
     return JSON.parse(localStorage.getItem(LOCAL_KEYS.DEPARTMENTS) || '[]');
   },
 
   async createDepartment(dept: Omit<Department, 'department_id'>): Promise<Department> {
+    let result;
     if (supabase) {
       const { data, error } = await supabase
         .from('departments')
@@ -555,15 +592,14 @@ export const db = {
         console.error('[Departments] Create error:', error);
         throw error;
       }
-      return data;
+      result = data;
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.DEPARTMENTS) || '[]');
       const nextId = existing.length > 0 ? Math.max(...existing.map((d: any) => d.department_id)) + 1 : 1;
-      const newDept = { ...dept, department_id: nextId };
-      existing.push(newDept);
-      localStorage.setItem(LOCAL_KEYS.DEPARTMENTS, JSON.stringify(existing));
-      return newDept;
+      result = { ...dept, department_id: nextId };
     }
+    syncToLocal(LOCAL_KEYS.DEPARTMENTS, result, 'department_id');
+    return result;
   },
 
   async importDepartments(depts: Omit<Department, 'department_id'>[]): Promise<Map<string, number>> {
@@ -600,6 +636,7 @@ export const db = {
         console.error('[Students] Fetch error:', error);
         throw error;
       }
+      cacheLocal(LOCAL_KEYS.STUDENTS, data);
       return data || [];
     }
     return JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
@@ -643,6 +680,7 @@ export const db = {
 
     console.log('[createStudent] Final studentData:', studentData);
 
+    let result;
     if (supabase) {
       const { data, error } = await supabase
         .from('students')
@@ -653,21 +691,18 @@ export const db = {
         console.error('[Students] Create error:', error);
         throw error;
       }
-      return data;
+      result = data;
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
       const nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.student_id)) + 1 : 1;
-      const newStudent = { 
+      result = { 
         ...studentData, 
         student_id: nextId,
         password_hash: studentData.password_hash || '' 
       } as Student;
-      existing.push(newStudent);
-      localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existing));
-      console.log('[createStudent] Saved to localStorage:', newStudent);
-      console.log('[createStudent] All students now:', existing);
-      return newStudent;
     }
+    syncToLocal(LOCAL_KEYS.STUDENTS, result, 'student_id');
+    return result;
   },
 
   async updateStudent(id: number, student: Partial<Omit<Student, 'student_id'>> & { password?: string }): Promise<Student> {
@@ -685,6 +720,7 @@ export const db = {
 
     console.log('[updateStudent] Final studentData:', studentData);
 
+    let result;
     if (supabase) {
       const { data, error } = await supabase
         .from('students')
@@ -696,26 +732,23 @@ export const db = {
         console.error('[Students] Update error:', error);
         throw error;
       }
-      return data;
+      result = data;
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
       const index = existing.findIndex((s: any) => s.student_id === id);
       if (index !== -1) {
-        existing[index] = { ...existing[index], ...studentData };
-        localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existing));
-        console.log('[updateStudent] Saved to localStorage:', existing[index]);
-        return existing[index];
+        result = { ...existing[index], ...studentData };
+      } else {
+        throw new Error('Student not found');
       }
-      throw new Error('Student not found');
     }
+    syncToLocal(LOCAL_KEYS.STUDENTS, result, 'student_id');
+    return result;
   },
 
   async deleteStudent(id: number): Promise<void> {
     if (supabase) {
       console.log('[DeleteStudent] Deleting student', id);
-      // First delete all related records (in CORRECT order to avoid FK constraints)
-      // 1. Delete attendance logs (attendance_log has schedule_id which links to student_id)
-      // First get all schedule ids for this student
       const { data: studentSchedules } = await supabase.from('student_schedule').select('schedule_id').eq('student_id', id);
       if (studentSchedules && studentSchedules.length > 0) {
         const scheduleIds = studentSchedules.map(s => s.schedule_id);
@@ -723,48 +756,41 @@ export const db = {
         if (attError) console.error('[DeleteStudent] 1/6 Attendance logs delete error:', attError);
       }
       
-      // 2. Delete payments first (most critical FK constraint)
       const { error: paymentError } = await supabase.from('payments').delete().eq('student_id', id);
       if (paymentError) console.error('[DeleteStudent] 2/6 Payments delete error:', paymentError);
 
-      // 3. Delete schedules
       const { error: scheduleError } = await supabase.from('student_schedule').delete().eq('student_id', id);
       if (scheduleError) console.error('[DeleteStudent] 3/6 Schedules delete error:', scheduleError);
 
-      // 4. Delete personal notes
       const { error: noteError } = await supabase.from('personal_notes').delete().eq('student_id', id);
       if (noteError) console.error('[DeleteStudent] 4/6 Personal notes delete error:', noteError);
 
-      // 5. Delete notifications
       const { error: notifError } = await supabase.from('notifications').delete().or(`sender_id.eq.${id},student_id.eq.${id}`);
       if (notifError) console.error('[DeleteStudent] 5/6 Notifications delete error:', notifError);
       
-      // 6. Finally delete the student
       const { error } = await supabase.from('students').delete().eq('student_id', id);
       if (error) {
         console.error('[DeleteStudent] 6/6 Students delete error:', error);
         throw error;
       }
       console.log('[DeleteStudent] Student deleted successfully!');
-    } else {
-      const existingStudents = JSON.parse(localStorage.getItem(LOCAL_KEYS.STUDENTS) || '[]');
-      const existingSchedules = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
-      const existingNotifications = JSON.parse(localStorage.getItem(LOCAL_KEYS.NOTIFICATIONS) || '[]');
-      const existingNotes = JSON.parse(localStorage.getItem(LOCAL_KEYS.PERSONAL_NOTES) || '[]');
-      const existingPayments = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENTS) || '[]');
-      const existingAttendance = JSON.parse(localStorage.getItem(LOCAL_KEYS.ATTENDANCE_LOGS) || '[]');
-      
-      // Find all schedule ids for this student first
-      const studentScheduleIds = existingSchedules.filter((s: any) => s.student_id === id).map((s: any) => s.schedule_id);
-      
-      // Remove all related data
-      localStorage.setItem(LOCAL_KEYS.STUDENTS, JSON.stringify(existingStudents.filter((s: any) => s.student_id !== id)));
-      localStorage.setItem(LOCAL_KEYS.SCHEDULES, JSON.stringify(existingSchedules.filter((s: any) => s.student_id !== id)));
-      localStorage.setItem(LOCAL_KEYS.NOTIFICATIONS, JSON.stringify(existingNotifications.filter((n: any) => n.student_id !== id && n.sender_id !== id)));
-      localStorage.setItem(LOCAL_KEYS.PERSONAL_NOTES, JSON.stringify(existingNotes.filter((n: any) => n.student_id !== id)));
-      localStorage.setItem(LOCAL_KEYS.PAYMENTS, JSON.stringify(existingPayments.filter((p: any) => p.student_id !== id)));
-      localStorage.setItem(LOCAL_KEYS.ATTENDANCE_LOGS, JSON.stringify(existingAttendance.filter((a: any) => !studentScheduleIds.includes(a.schedule_id))));
     }
+    
+    // Always sync local storage
+    const existingSchedules = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
+    const studentScheduleIds = existingSchedules.filter((s: any) => s.student_id === id).map((s: any) => s.schedule_id);
+    
+    removeFromLocal(LOCAL_KEYS.STUDENTS, id, 'student_id');
+    removeFromLocal(LOCAL_KEYS.SCHEDULES, id, 'student_id');
+    
+    const existingNotifications = JSON.parse(localStorage.getItem(LOCAL_KEYS.NOTIFICATIONS) || '[]');
+    localStorage.setItem(LOCAL_KEYS.NOTIFICATIONS, JSON.stringify(existingNotifications.filter((n: any) => n.student_id !== id && n.sender_id !== id)));
+    
+    removeFromLocal(LOCAL_KEYS.PERSONAL_NOTES, id, 'student_id');
+    removeFromLocal(LOCAL_KEYS.PAYMENTS, id, 'student_id');
+    
+    const existingAttendance = JSON.parse(localStorage.getItem(LOCAL_KEYS.ATTENDANCE_LOGS) || '[]');
+    localStorage.setItem(LOCAL_KEYS.ATTENDANCE_LOGS, JSON.stringify(existingAttendance.filter((a: any) => !studentScheduleIds.includes(a.schedule_id))));
   },
 
   async deleteAllStudents(): Promise<void> {
@@ -939,12 +965,14 @@ export const db = {
         console.error('[Subjects] Fetch error:', error);
         throw error;
       }
+      cacheLocal(LOCAL_KEYS.SUBJECTS, data);
       return data || [];
     }
     return JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]');
   },
 
   async createSubject(subject: Omit<Subject, 'subject_id'>): Promise<Subject> {
+    let result;
     if (supabase) {
       const { data, error } = await supabase
         .from('subjects')
@@ -955,18 +983,18 @@ export const db = {
         console.error('[Subjects] Create error:', error);
         throw error;
       }
-      return data;
+      result = data;
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]');
       const nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.subject_id)) + 1 : 1;
-      const newSubject = { ...subject, subject_id: nextId };
-      existing.push(newSubject);
-      localStorage.setItem(LOCAL_KEYS.SUBJECTS, JSON.stringify(existing));
-      return newSubject;
+      result = { ...subject, subject_id: nextId };
     }
+    syncToLocal(LOCAL_KEYS.SUBJECTS, result, 'subject_id');
+    return result;
   },
 
   async saveSubject(subject: Omit<Subject, 'created_at'> & { subject_id?: number }): Promise<Subject> {
+    let result;
     if (supabase) {
       if (subject.subject_id) {
         const { data, error } = await supabase
@@ -979,7 +1007,7 @@ export const db = {
           console.error('[Subjects] Update error:', error);
           throw error;
         }
-        return data;
+        result = data;
       } else {
         const { data, error } = await supabase
           .from('subjects')
@@ -990,7 +1018,7 @@ export const db = {
           console.error('[Subjects] Insert error:', error);
           throw error;
         }
-        return data;
+        result = data;
       }
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]');
@@ -999,13 +1027,14 @@ export const db = {
         if (index !== -1) {
           existing[index] = { ...existing[index], ...subject };
         }
+        result = existing.find((s: any) => s.subject_id === subject.subject_id) || subject as Subject;
       } else {
         const nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.subject_id)) + 1 : 1;
-        existing.push({ ...subject, subject_id: nextId });
+        result = { ...subject, subject_id: nextId } as Subject;
       }
-      localStorage.setItem(LOCAL_KEYS.SUBJECTS, JSON.stringify(existing));
-      return existing.find((s: any) => s.subject_id === (subject.subject_id || existing.length)) || subject as Subject;
     }
+    syncToLocal(LOCAL_KEYS.SUBJECTS, result, 'subject_id');
+    return result;
   },
 
   async deleteSubject(id: number): Promise<void> {
@@ -1015,10 +1044,8 @@ export const db = {
         console.error('[Subjects] Delete error:', error);
         throw error;
       }
-    } else {
-      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SUBJECTS) || '[]');
-      localStorage.setItem(LOCAL_KEYS.SUBJECTS, JSON.stringify(existing.filter((s: any) => s.subject_id !== id)));
     }
+    removeFromLocal(LOCAL_KEYS.SUBJECTS, id, 'subject_id');
   },
 
   async importSubjects(subjects: Omit<Subject, 'subject_id' | 'created_at'>[]): Promise<Map<string, number>> {
@@ -1131,12 +1158,14 @@ export const db = {
         console.error('[Schedules] Fetch error:', error);
         throw error;
       }
+      cacheLocal(LOCAL_KEYS.SCHEDULES, data);
       return data || [];
     }
     return JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
   },
 
   async createSchedule(schedule: Omit<StudentSchedule, 'schedule_id'>): Promise<StudentSchedule> {
+    let result;
     if (supabase) {
       const { data, error } = await supabase
         .from('student_schedule')
@@ -1147,15 +1176,14 @@ export const db = {
         console.error('[Schedule] Create error:', error);
         throw error;
       }
-      return data;
+      result = data;
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
       const nextId = existing.length > 0 ? Math.max(...existing.map((s: any) => s.schedule_id)) + 1 : 1;
-      const newSchedule = { ...schedule, schedule_id: nextId };
-      existing.push(newSchedule);
-      localStorage.setItem(LOCAL_KEYS.SCHEDULES, JSON.stringify(existing));
-      return newSchedule;
+      result = { ...schedule, schedule_id: nextId };
     }
+    syncToLocal(LOCAL_KEYS.SCHEDULES, result, 'schedule_id');
+    return result;
   },
 
   async deleteSchedule(scheduleId: number): Promise<void> {
@@ -1168,13 +1196,8 @@ export const db = {
         console.error('[Schedule] Delete error:', error);
         throw error;
       }
-    } else {
-      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.SCHEDULES) || '[]');
-      localStorage.setItem(
-        LOCAL_KEYS.SCHEDULES,
-        JSON.stringify(existing.filter((s: any) => s.schedule_id !== scheduleId))
-      );
     }
+    removeFromLocal(LOCAL_KEYS.SCHEDULES, scheduleId, 'schedule_id');
   },
 
   async importSchedule(schedules: Omit<StudentSchedule, 'schedule_id' | 'created_at'>[]): Promise<void> {
@@ -1260,6 +1283,7 @@ export const db = {
         console.error('[Attendance] Fetch error:', error);
         throw error;
       }
+      cacheLocal(LOCAL_KEYS.ATTENDANCE_LOGS, data);
       return data || [];
     }
     return JSON.parse(localStorage.getItem(LOCAL_KEYS.ATTENDANCE_LOGS) || '[]');
@@ -1288,7 +1312,10 @@ export const db = {
         console.error('[Attendance] Mark error:', error);
         throw error;
       }
-    } else {
+    }
+    
+    // Always update LocalStorage
+    try {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.ATTENDANCE_LOGS) || '[]');
       const existingIndex = existing.findIndex((l: any) => 
         l.schedule_id === log.schedule_id && l.attendance_date === log.attendance_date
@@ -1302,6 +1329,8 @@ export const db = {
       }
       
       localStorage.setItem(LOCAL_KEYS.ATTENDANCE_LOGS, JSON.stringify(existing));
+    } catch (e) {
+      console.error('Attendance sync error:', e);
     }
   },
 
@@ -1639,6 +1668,7 @@ export const db = {
         console.error('[Payments] Fetch error:', error);
         throw error;
       }
+      cacheLocal(LOCAL_KEYS.PAYMENTS, data);
       return data || [];
     }
     
@@ -1659,41 +1689,43 @@ export const db = {
       created_at: now.toISOString()
     };
     
+    let result;
     if (supabase) {
       const { data, error } = await supabase.from('payments').insert(newPayment).select('*').single();
       if (error) {
         console.error('[Payments] Create error:', error);
         throw error;
       }
-      return data;
+      result = data;
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENTS) || '[]');
       const nextId = existing.length > 0 ? Math.max(...existing.map((p: any) => p.id)) + 1 : 1;
-      const paymentWithId = { ...newPayment, id: nextId };
-      existing.push(paymentWithId);
-      localStorage.setItem(LOCAL_KEYS.PAYMENTS, JSON.stringify(existing));
-      return paymentWithId;
+      result = { ...newPayment, id: nextId };
     }
+    syncToLocal(LOCAL_KEYS.PAYMENTS, result, 'id');
+    return result;
   },
 
   async updatePayment(id: number, payment: Partial<Omit<Payment, 'id'>>): Promise<Payment> {
+    let result;
     if (supabase) {
       const { data, error } = await supabase.from('payments').update(payment).eq('id', id).select('*').single();
       if (error) {
         console.error('[Payments] Update error:', error);
         throw error;
       }
-      return data;
+      result = data;
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.PAYMENTS) || '[]');
       const index = existing.findIndex((p: any) => p.id === id);
       if (index !== -1) {
-        existing[index] = { ...existing[index], ...payment };
-        localStorage.setItem(LOCAL_KEYS.PAYMENTS, JSON.stringify(existing));
-        return existing[index];
+        result = { ...existing[index], ...payment };
+      } else {
+        throw new Error('Payment not found');
       }
-      throw new Error('Payment not found');
     }
+    syncToLocal(LOCAL_KEYS.PAYMENTS, result, 'id');
+    return result;
   },
 
   async getPaymentSettings(): Promise<PaymentSettings> {
@@ -1703,7 +1735,10 @@ export const db = {
         console.error('[PaymentSettings] Fetch error:', error);
         throw error;
       }
-      if (data) return data;
+      if (data) {
+        localStorage.setItem(LOCAL_KEYS.PAYMENT_SETTINGS, JSON.stringify(data));
+        return data;
+      }
       const defaultSettings: PaymentSettings = {
         subscription_amount: 299,
         subscription_duration_days: 30,
@@ -1717,6 +1752,7 @@ export const db = {
         payment_instructions: 'يرجى إرسال إثبات الدفع عبر النظام بعد الدفع'
       };
       await supabase.from('payment_settings').insert(defaultSettings);
+      localStorage.setItem(LOCAL_KEYS.PAYMENT_SETTINGS, JSON.stringify(defaultSettings));
       return defaultSettings;
     }
     
@@ -1736,19 +1772,20 @@ export const db = {
   },
 
   async updatePaymentSettings(settings: Partial<PaymentSettings>): Promise<PaymentSettings> {
+    let result;
     if (supabase) {
       const { data, error } = await supabase.from('payment_settings').update(settings).select('*').single();
       if (error) {
         console.error('[PaymentSettings] Update error:', error);
         throw error;
       }
-      return data;
+      result = data;
     } else {
       const existing = await this.getPaymentSettings();
-      const newSettings = { ...existing, ...settings };
-      localStorage.setItem(LOCAL_KEYS.PAYMENT_SETTINGS, JSON.stringify(newSettings));
-      return newSettings;
+      result = { ...existing, ...settings };
     }
+    localStorage.setItem(LOCAL_KEYS.PAYMENT_SETTINGS, JSON.stringify(result));
+    return result;
   },
 
   async getStudentSubscription(student_id: number): Promise<{ active: boolean; end_date: string | null; days_remaining: number }> {
@@ -2076,6 +2113,7 @@ export const db = {
         console.error('[NewCustomers] Fetch error:', error);
         throw error;
       }
+      cacheLocal(LOCAL_KEYS.NEW_CUSTOMERS, data);
       return data || [];
     }
     return JSON.parse(localStorage.getItem(LOCAL_KEYS.NEW_CUSTOMERS) || '[]');
@@ -2090,21 +2128,21 @@ export const db = {
       updated_at: now
     };
     
+    let result;
     if (supabase) {
       const { data, error } = await supabase.from('new_customers').insert(newCust).select('*').single();
       if (error) {
         console.error('[NewCustomers] Create error:', error);
         throw error;
       }
-      return data;
+      result = data;
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.NEW_CUSTOMERS) || '[]');
       const nextId = existing.length > 0 ? Math.max(...existing.map((c: any) => c.id)) + 1 : 1;
-      const custWithId = { ...newCust, id: nextId };
-      existing.push(custWithId);
-      localStorage.setItem(LOCAL_KEYS.NEW_CUSTOMERS, JSON.stringify(existing));
-      return custWithId;
+      result = { ...newCust, id: nextId };
     }
+    syncToLocal(LOCAL_KEYS.NEW_CUSTOMERS, result, 'id');
+    return result;
   },
 
   async updateNewCustomer(id: number, customer: Partial<Omit<NewCustomer, 'id'>>): Promise<NewCustomer> {
@@ -2114,23 +2152,25 @@ export const db = {
       updated_at: now
     };
     
+    let result;
     if (supabase) {
       const { data, error } = await supabase.from('new_customers').update(updateData).eq('id', id).select('*').single();
       if (error) {
         console.error('[NewCustomers] Update error:', error);
         throw error;
       }
-      return data;
+      result = data;
     } else {
       const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.NEW_CUSTOMERS) || '[]');
       const index = existing.findIndex((c: any) => c.id === id);
       if (index !== -1) {
-        existing[index] = { ...existing[index], ...updateData };
-        localStorage.setItem(LOCAL_KEYS.NEW_CUSTOMERS, JSON.stringify(existing));
-        return existing[index];
+        result = { ...existing[index], ...updateData };
+      } else {
+        throw new Error('Customer request not found');
       }
-      throw new Error('Customer request not found');
     }
+    syncToLocal(LOCAL_KEYS.NEW_CUSTOMERS, result, 'id');
+    return result;
   },
 
   async deleteNewCustomer(id: number): Promise<void> {
@@ -2140,11 +2180,8 @@ export const db = {
         console.error('[NewCustomers] Delete error:', error);
         throw error;
       }
-    } else {
-      const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.NEW_CUSTOMERS) || '[]');
-      const filtered = existing.filter((c: any) => c.id !== id);
-      localStorage.setItem(LOCAL_KEYS.NEW_CUSTOMERS, JSON.stringify(filtered));
     }
+    removeFromLocal(LOCAL_KEYS.NEW_CUSTOMERS, id, 'id');
   },
 
   async ensureReceiptBucket(): Promise<void> {

@@ -36,16 +36,20 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
         const found = studentsList.find(s => s.academic_id === student.email || `${s.academic_id}@lms.com` === student.email);
         if (found) {
           setCoreStudent(found);
-          const paymentsList = await db.getPayments();
-          const studentPayments = paymentsList.filter(p => p.student_id === found.student_id);
-          setExistingPayments(studentPayments);
-          
-          const pending = studentPayments.find(p => p.status === 'pending');
-          if (pending) {
-            setPaymentMessage('تم استلام الإيصال وهو الآن بانتظار مراجعة الإدارة.');
-          } else {
-            setPaymentMessage('');
-          }
+        }
+        
+        // Fetch all payments and filter by lms_user_id or core student_id
+        const paymentsList = await db.getPayments();
+        const studentPayments = paymentsList.filter(p => 
+          (p as any).lms_user_id === student.id || (found && p.student_id === found.student_id)
+        );
+        setExistingPayments(studentPayments);
+        
+        const pending = studentPayments.find(p => p.status === 'pending');
+        if (pending) {
+          setPaymentMessage('تم استلام الإيصال وهو الآن بانتظار مراجعة الإدارة.');
+        } else {
+          setPaymentMessage('');
         }
 
         const settings = await db.getPaymentSettings();
@@ -61,7 +65,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
     if (activeTab === 'payment' || activeTab === 'dashboard') {
       loadPaymentDetails();
     }
-  }, [activeTab, student.email]);
+  }, [activeTab, student.email, student.id]);
 
   const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,12 +78,15 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
     }
   };
 
+  // Calculate active plan/custom price
+  const approvedRequest = specialRequests.find(r => r.student_id === student.id && r.status === 'approved');
+  const customPrice = approvedRequest ? approvedRequest.price : null;
+  const selectedPlan = subscriptionPlans.find(p => p.id === student.subscription_plan_id);
+  const planPrice = selectedPlan ? selectedPlan.price : 150;
+  const finalPrice = customPrice !== null && customPrice !== undefined ? customPrice : planPrice;
+
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!coreStudent) {
-      alert('خطأ: لم يتم العثور على حساب الطالب في النظام الموحد.');
-      return;
-    }
     if (!receiptImage) {
       alert('يرجى رفع صورة الإيصال أولاً.');
       return;
@@ -87,12 +94,12 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
     setSubmittingPayment(true);
     try {
       const invoiceNum = `INV-LMS-${Math.floor(100000 + Math.random() * 900000)}`;
-      // Pricing: Basic = 299, Premium = 599. Let's map lms plan to price:
-      const amount = student.subscription_plan_id === 'plan-gold' ? 299 : student.subscription_plan_id === 'plan-diamond' ? 499 : 150;
       
       await db.createPayment({
-        student_id: coreStudent.student_id,
-        amount,
+        student_id: coreStudent ? coreStudent.student_id : null,
+        lms_user_id: student.id,
+        plan_id: student.subscription_plan_id || 'custom',
+        amount: finalPrice,
         payment_method: selectedMethod as any,
         status: 'pending',
         receipt_image: receiptImage,
@@ -104,18 +111,21 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
         approved_by: null,
         subscription_start: null,
         subscription_end: null
-      });
+      } as any);
 
-      // Keep status as pending_payment in core student system
-      await db.updateStudent(coreStudent.student_id, {
-        subscription_status: 'pending_payment'
-      });
+      if (coreStudent) {
+        await db.updateStudent(coreStudent.student_id, {
+          subscription_status: 'pending_payment'
+        });
+      }
 
       setPaymentMessage('تم استلام الإيصال وهو الآن بانتظار مراجعة الإدارة.');
       showToast('تم رفع إيصال الدفع بنجاح');
       
       const paymentsList = await db.getPayments();
-      setExistingPayments(paymentsList.filter(p => p.student_id === coreStudent.student_id));
+      setExistingPayments(paymentsList.filter(p => 
+        (p as any).lms_user_id === student.id || (coreStudent && p.student_id === coreStudent.student_id)
+      ));
       
       setReceiptImage('');
       setTransactionId('');
@@ -601,6 +611,10 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
         { id: 'payment', label: 'الدفع والاشتراك', icon: CreditCard }
       ];
 
+  const currentTab = student.subscription_status === 'active' 
+    ? activeTab 
+    : (activeTab === 'dashboard' || activeTab === 'payment' ? activeTab : 'dashboard');
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -623,7 +637,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => changeTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
-              activeTab === tab.id 
+              currentTab === tab.id 
                 ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' 
                 : 'bg-[#131622] border border-[#21263d] text-slate-400 hover:text-white hover:border-slate-600'
             }`}
@@ -634,7 +648,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       </div>
 
       {/* Course Selector (rendered for course-specific tabs) */}
-      {['materials', 'assignments', 'exams', 'attendance', 'meetings'].includes(activeTab) && sections.length > 0 && (
+      {['materials', 'assignments', 'exams', 'attendance', 'meetings'].includes(currentTab) && sections.length > 0 && (
         <div className="bg-[#131622] border border-[#21263d] p-5 rounded-2xl">
           <label className={labelClass}>اختر المقرر الدراسي الحالي</label>
           <select value={selectedSection?.id || ''} onChange={e => {
@@ -649,7 +663,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       )}
 
       {/* OVERVIEW Tab */}
-      {activeTab === 'dashboard' && (
+      {currentTab === 'dashboard' && (
         <div className="space-y-6">
           {/* Active Subscription Verification Warning Card */}
           {student.subscription_status !== 'active' && (
@@ -659,7 +673,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
                   <span>🔒 اشتراكك غير مفعل</span>
                 </h3>
                 <p className="text-xs text-rose-300">
-                  يرجى إتمام عملية الدفع ورفع صورة الإيصال ليتم تفعيل حسابك والوصول لكافة المواد العلمية والاختبارات.
+                  رسوم الاشتراك المستحقة: <span className="font-mono text-emerald-400 font-bold">{finalPrice} ر.س</span>. يرجى إتمام عملية الدفع ورفع صورة الإيصال ليتم تفعيل حسابك والوصول لكافة المواد العلمية والاختبارات.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2.5 shrink-0 flex-row-reverse">
@@ -853,7 +867,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       )}
 
       {/* ENROLLMENT Tab */}
-      {activeTab === 'enrollment' && (
+      {currentTab === 'enrollment' && (
         <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-4">
           <h3 className="text-white font-black text-lg">بوابة تسجيل المقررات والشعب الدراسية</h3>
           <p className="text-xs text-slate-400">سجل في الشعبة المطلوبة للالتحاق بالمحاضرات واستقبال الواجبات والاختبارات.</p>
@@ -884,7 +898,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       )}
 
       {/* MATERIALS Tab */}
-      {activeTab === 'materials' && (
+      {currentTab === 'materials' && (
         <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-4">
           <h3 className="text-white font-black text-lg">المحاضرات والمواد العلمية</h3>
           <div className="space-y-3">
@@ -906,7 +920,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       )}
 
       {/* ASSIGNMENTS Tab */}
-      {activeTab === 'assignments' && (
+      {currentTab === 'assignments' && (
         <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-4">
           <h3 className="text-white font-black text-lg">الواجبات والمهام الدراسية</h3>
           <div className="space-y-3">
@@ -959,7 +973,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       )}
 
       {/* EXAMS Tab */}
-      {activeTab === 'exams' && (
+      {currentTab === 'exams' && (
         <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-4">
           <h3 className="text-white font-black text-lg">الاختبارات الإلكترونية</h3>
           <div className="space-y-3">
@@ -998,7 +1012,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       )}
 
       {/* ATTENDANCE Tab */}
-      {activeTab === 'attendance' && (
+      {currentTab === 'attendance' && (
         <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-4">
           <div className="flex items-center justify-between border-b border-[#21263d] pb-4 flex-row-reverse">
             <h3 className="text-white font-black text-lg">سجل الحضور والغياب التفصيلي</h3>
@@ -1044,7 +1058,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
         </div>
       )}
       {/* MEETINGS Tab */}
-      {activeTab === 'meetings' && (
+      {currentTab === 'meetings' && (
         <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-4">
           <h3 className="text-white font-black text-lg">المحاضرات التفاعلية والاجتماعات المباشرة</h3>
           <div className="space-y-3">
@@ -1066,7 +1080,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       )}
 
       {/* MESSAGES/CHAT Tab */}
-      {activeTab === 'messages' && (
+      {currentTab === 'messages' && (
         <div className="glass-card overflow-hidden flex flex-col md:flex-row h-[550px] border border-dark-border/40">
           {/* Messages Main Box */}
           <div className="flex-1 flex flex-col bg-dark-bg/25">
@@ -1140,7 +1154,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       )}
 
       {/* CERTIFICATES Tab */}
-      {activeTab === 'certificates' && (
+      {currentTab === 'certificates' && (
         <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-4">
           <h3 className="text-white font-black text-lg">الشهادات والتقديرات الأكاديمية</h3>
           <p className="text-xs text-slate-400">عند استكمال متطلبات المقرر الدراسي وحصولك على الدرجات، سيقوم الأستاذ بإصدار شهادتك هنا.</p>
@@ -1170,7 +1184,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       )}
 
       {/* SCHEDULE Tab */}
-      {activeTab === 'schedule' && (
+      {currentTab === 'schedule' && (
         <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-6">
           <div className="border-b border-[#21263d] pb-4 flex flex-col md:flex-row md:items-center justify-between gap-2 flex-row-reverse text-right">
             <h3 className="text-white font-black text-lg">الجدول الدراسي الأسبوعي</h3>
@@ -1213,7 +1227,7 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
       )}
 
       {/* PAYMENT Tab */}
-      {activeTab === 'payment' && (
+      {currentTab === 'payment' && (
         <div className="space-y-6 text-right">
           <div className="glass-card p-6 md:p-8 space-y-6">
             <div className="border-b border-[#21263d] pb-4 flex flex-col md:flex-row md:items-center justify-between gap-2 flex-row-reverse text-right">
@@ -1233,17 +1247,15 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
                     ? 'الباقة الذهبية (شاملة + دعم)' 
                     : student.subscription_plan_id === 'plan-diamond' 
                       ? 'الباقة الماسية (دعم خاص)' 
-                      : 'الباقة الفضية (شاملة)'}
+                      : approvedRequest 
+                        ? 'طلب تسجيل مخصص / درس خاص'
+                        : 'الباقة الفضية (شاملة)'}
                 </p>
               </div>
               <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-2">
                 <p className="text-xs text-slate-400">قيمة الاشتراك</p>
                 <p className="text-2xl font-black text-[#20c997] font-mono">
-                  {student.subscription_plan_id === 'plan-gold' 
-                    ? 299 
-                    : student.subscription_plan_id === 'plan-diamond' 
-                      ? 499 
-                      : 150} ر.س
+                  {finalPrice} ر.س
                 </p>
               </div>
               <div className="bg-[#090b10] border border-[#21263d] p-5 rounded-2xl space-y-2 flex flex-col justify-center">

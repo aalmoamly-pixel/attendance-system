@@ -63,100 +63,118 @@ export default function NewCustomers() {
         setLoading(true);
         
         if (newStatus === 'approved') {
-          // Auto-onboard Student
-          // 1. Get or Create Department
-          const departments = await db.getDepartments();
-          let dept = departments.find(d => d.department_name.toLowerCase() === customer.university_name.toLowerCase());
-          let deptId;
-          
-          if (dept) {
-            deptId = dept.department_id;
-          } else {
-            const newDept = await db.createDepartment({
-              department_name: customer.university_name,
-              degree_type: 'بكالوريوس'
-            });
-            deptId = newDept.department_id;
-          }
-
-          // 2. Create student user in Attendance System (if not exists)
-          const amount = customer.plan_type === 'basic' ? 299 : 599;
-          const today = new Date();
-          const dueDate = new Date();
-          dueDate.setDate(today.getDate() + 30);
-          
-          const studentsList = await db.getStudents();
-          const existingStudent = studentsList.find(s => s.academic_id === customer.username);
-          
-          if (!existingStudent) {
-            await db.createStudent({
-              full_name: customer.full_name,
-              phone: customer.phone,
-              academic_id: customer.username,
-              national_id: `NC-${customer.id}-${Math.floor(1000 + Math.random() * 9000)}`, // unique ID
-              password: customer.password,
-              role: 'student',
-              department_id: deptId,
-              subscription_amount: amount,
-              due_date: dueDate.toISOString().split('T')[0],
-              subscription_status: 'pending_payment',
-              financial_notes: `حساب منشأ تلقائياً ومعتمد من طلب الاشتراك الجديد رقم #${customer.id}`
-            });
-          }
-
-          // 3. Create student user inside public.lms_users table (if not exists)
-          const lmsEmail = customer.username.includes('@') ? customer.username : `${customer.username}@lms.com`;
-          
           if (supabase) {
-            const { data: existingLmsUser, error: checkLmsError } = await supabase
-              .from('lms_users')
-              .select('*')
-              .eq('email', lmsEmail)
-              .maybeSingle();
-              
-            if (checkLmsError) throw checkLmsError;
+            // Safe, single-transaction database approval
+            const { data, error } = await supabase.rpc('approve_new_customer', { p_customer_id: customer.id });
+            if (error) throw error;
+            if (data && !data.success) {
+              throw new Error(data.message);
+            }
+          } else {
+            // Local storage fallback
+            // 1. Get or Create Department
+            const departments = await db.getDepartments();
+            let dept = departments.find(d => d.department_name.toLowerCase() === customer.university_name.toLowerCase());
+            let deptId;
             
+            if (dept) {
+              deptId = dept.department_id;
+            } else {
+              const newDept = await db.createDepartment({
+                department_name: customer.university_name,
+                degree_type: 'بكالوريوس'
+              });
+              deptId = newDept.department_id;
+            }
+
+            // 2. Create student user in Attendance System (if not exists)
+            const amount = customer.plan_type === 'basic' ? 299 : 599;
+            const today = new Date();
+            const dueDate = new Date();
+            dueDate.setDate(today.getDate() + 30);
+            
+            const studentsList = await db.getStudents();
+            const existingStudent = studentsList.find(s => s.academic_id === customer.username);
+            let studentIdVal;
+            
+            if (!existingStudent) {
+              const created = await db.createStudent({
+                full_name: customer.full_name,
+                phone: customer.phone,
+                academic_id: customer.username,
+                national_id: `NC-${customer.id}-${Math.floor(1000 + Math.random() * 9000)}`,
+                password: customer.password,
+                role: 'student',
+                department_id: deptId,
+                subscription_amount: amount,
+                due_date: dueDate.toISOString().split('T')[0],
+                subscription_status: 'pending_payment',
+                financial_notes: `حساب منشأ تلقائياً ومعتمد من طلب الاشتراك الجديد رقم #${customer.id}`
+              });
+              studentIdVal = created.student_id;
+            } else {
+              studentIdVal = existingStudent.student_id;
+            }
+
+            // 3. Create student user inside public.lms_users table (if not exists)
+            const lmsEmail = customer.username.includes('@') ? customer.username : `${customer.username}@lms.com`;
+            const usersList = await lmsDb.getUsers();
+            const existingLmsUser = usersList.find(u => u.email.toLowerCase() === lmsEmail.toLowerCase());
+            
+            let lmsUserId;
             if (!existingLmsUser) {
-              await lmsDb.registerUser(
+              const createdLms = await lmsDb.registerUser(
                 lmsEmail,
                 customer.password,
                 customer.full_name,
                 'student',
                 customer.phone,
                 'active',
-                customer.plan_type === 'basic' ? 'plan-silver' : 'plan-gold',
+                (customer as any).selected_plan_id || (customer.plan_type === 'basic' ? 'plan-silver' : 'plan-gold'),
                 'pending_payment'
               );
+              lmsUserId = createdLms.id;
             } else {
-              // Update existing LMS user status & subscription plan
-              const { error: updateLmsError } = await supabase
-                .from('lms_users')
-                .update({ 
-                  status: 'active', 
-                  subscription_plan_id: customer.plan_type === 'basic' ? 'plan-silver' : 'plan-gold',
-                  subscription_status: 'pending_payment'
-                })
-                .eq('email', lmsEmail);
-              if (updateLmsError) throw updateLmsError;
+              lmsUserId = existingLmsUser.id;
             }
+
+            // 4. Enroll or create special request locally
+            const selectedCourseId = (customer as any).selected_course_id;
+            if (selectedCourseId && selectedCourseId !== 'special') {
+              const sectionsList = await lmsDb.getSections();
+              let section = sectionsList.find(s => s.course_id === selectedCourseId);
+              if (!section) {
+                section = await lmsDb.createSection(selectedCourseId, null, '01', 'Fall 2026', 30);
+              }
+              await lmsDb.enrollStudent(lmsUserId, section.id);
+            } else if (selectedCourseId === 'special') {
+              await lmsDb.createSpecialRequest(lmsUserId, (customer as any).special_details || '');
+            }
+
+            // 5. Update subscription request status in new_customers
+            await db.updateNewCustomer(customer.id, { status: 'approved' });
           }
 
-          // 4. Send Notification to Student
-          await db.sendNotification({
-            student_id: 0,
-            sender_id: 1, // Admin id
-            sender_role: 'admin',
-            message: `أهلاً بك ${customer.full_name}، تم اعتماد اشتراكك وتفعيل حسابك بنجاح! اسم المستخدم الخاص بك هو: ${customer.username}`,
-            is_read: false
-          });
+          // Send Notification to Student (Optional, if we want to run it on client)
+          try {
+            await db.sendNotification({
+              student_id: 0,
+              sender_id: 1, // Admin id
+              sender_role: 'admin',
+              message: `أهلاً بك ${customer.full_name}، تم اعتماد اشتراكك وتفعيل حسابك بنجاح! اسم المستخدم الخاص بك هو: ${customer.username}`,
+              is_read: false
+            });
+          } catch (e) {
+            console.error('Error sending approval notification:', e);
+          }
+        } else {
+          // Just update status for rejected/pending/new
+          await db.updateNewCustomer(customer.id, { status: newStatus });
         }
 
-        // 5. Update subscription request status in new_customers
-        await db.updateNewCustomer(customer.id, { status: newStatus });
-
-        // 6. Show success message
+        // Show success message
         if (newStatus === 'approved') {
-          alert(`تم تفعيل وقبول حساب الطالب بنجاح! تم إنشاء حساب الطالب بالاسم الحركي: ${customer.username} وكلمة المرور المدخلة.`);
+          alert(`تم تفعيل وقبول حساب الطالب بنجاح! تم إنشاء حساب الطالب بالبريد: ${customer.username} ويمكنه الدخول للمنصة وسداد الرسوم الآن.`);
         } else {
           alert(`تم تغيير حالة الطلب بنجاح إلى: ${getStatusLabel(newStatus)}.`);
         }

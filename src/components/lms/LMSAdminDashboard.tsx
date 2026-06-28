@@ -5,6 +5,7 @@ import {
   Edit, Trash2, ShieldCheck
 } from 'lucide-react';
 import { lmsDb, type LMSUser, type LMSDepartment, type LMSCourse, type LMSSection, type LMSSpecialRequest, type LMSSubscriptionPlan } from '../../lib/lms_supabase';
+import { db } from '../../lib/supabase';
 
 export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: propActiveTab }: { adminUser: LMSUser, activeTab?: string }) {
   const [activeTab, setActiveTab] = useState<'overview' | 'departments' | 'courses' | 'sections' | 'users' | 'approvals' | 'site_settings' | 'plans'>('overview');
@@ -26,6 +27,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
   const [customPrices, setCustomPrices] = useState<Record<string, string>>({});
   const [siteConfig, setSiteConfig] = useState<any>(null);
   const [subscriptionPlans, setSubscriptionPlans] = useState<LMSSubscriptionPlan[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
@@ -70,14 +72,15 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [depts, crs, sects, usrs, reqs, sConf, sPlans] = await Promise.all([
+      const [depts, crs, sects, usrs, reqs, sConf, sPlans, paymentsList] = await Promise.all([
         lmsDb.getDepartments(),
         lmsDb.getCourses(),
         lmsDb.getSections(),
         lmsDb.getUsers(),
         lmsDb.getSpecialRequests(),
         lmsDb.getSiteConfig(),
-        lmsDb.getSubscriptionPlans()
+        lmsDb.getSubscriptionPlans(),
+        db.getPayments()
       ]);
       setDepartments(depts);
       setCourses(crs);
@@ -86,6 +89,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
       setSpecialRequests(reqs);
       setSiteConfig(sConf);
       setSubscriptionPlans(sPlans);
+      setPayments(paymentsList.filter((p: any) => p.lms_user_id !== null));
     } catch (err) {
       console.error('[LMSAdmin] Load error:', err);
     } finally {
@@ -341,6 +345,81 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
     }
   };
 
+  const handleApprovePayment = async (payment: any) => {
+    if (!confirm('هل أنت متأكد من قبول إيصال الدفع وتفعيل اشتراك الطالب؟')) return;
+    try {
+      setLoading(true);
+      const today = new Date();
+      const endDate = new Date();
+      endDate.setDate(today.getDate() + 30);
+      
+      await db.updatePayment(payment.id, {
+        status: 'approved',
+        approved_at: today.toISOString(),
+        approved_by: 1,
+        subscription_start: today.toISOString().split('T')[0],
+        subscription_end: endDate.toISOString().split('T')[0]
+      });
+
+      await lmsDb.updateUserSubscription(
+        payment.lms_user_id,
+        'active',
+        payment.plan_id
+      );
+
+      try {
+        await db.sendNotification({
+          student_id: 0,
+          sender_id: 1,
+          sender_role: 'admin',
+          message: `تم اعتماد إيصال الدفع وتفعيل اشتراكك بنجاح! شكراً لك.`,
+          is_read: false
+        });
+      } catch (e) {
+        console.error(e);
+      }
+
+      showToast('تم قبول الدفعة وتفعيل اشتراك الطالب بنجاح');
+      await loadAll();
+    } catch (err: any) {
+      console.error(err);
+      alert('فشل قبول الدفعة: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectPayment = async (payment: any) => {
+    const reason = prompt('يرجى إدخال سبب رفض الإيصال:');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      alert('يجب كتابة سبب الرفض ليظهر للطالب.');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await db.updatePayment(payment.id, {
+        status: 'rejected',
+        admin_notes: reason
+      });
+
+      await lmsDb.updateUserSubscription(
+        payment.lms_user_id,
+        'pending_payment',
+        payment.plan_id
+      );
+
+      showToast('تم رفض الإيصال وتسجيل السبب');
+      await loadAll();
+    } catch (err: any) {
+      console.error(err);
+      alert('فشل رفض الدفعة: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApproveSpecialRequest = async (reqId: string) => {
     const priceStr = customPrices[reqId];
     if (!priceStr || isNaN(parseFloat(priceStr))) {
@@ -418,6 +497,12 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
             label: 'طلبات التسجيل والموافقات', 
             icon: CheckCircle, 
             badge: users.filter((u: LMSUser) => u.role === 'student' && u.status === 'pending').length + specialRequests.filter((r: LMSSpecialRequest) => r.status === 'pending').length 
+          },
+          { 
+            id: 'payments', 
+            label: 'طلبات الدفع', 
+            icon: ClipboardList, 
+            badge: payments.filter((p: any) => p.status === 'pending').length 
           },
           { id: 'plans', label: 'باقات الاشتراك', icon: ShieldCheck },
           { id: 'site_settings', label: 'إدارة الموقع', icon: LayoutDashboard },
@@ -830,6 +915,94 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payments Review Tab */}
+      {activeTab === 'payments' && (
+        <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-4">
+          <h3 className="text-white font-black text-lg text-right">طلبات دفع الاشتراكات والرسوم ({payments.filter(p => p.status === 'pending').length})</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead>
+                <tr className="border-b border-[#21263d] text-slate-400">
+                  <th className="p-3 font-bold text-right">الطالب</th>
+                  <th className="p-3 font-bold text-right">رقم الجوال</th>
+                  <th className="p-3 font-bold text-right">الباقة / التفاصيل</th>
+                  <th className="p-3 font-bold text-right">المبلغ</th>
+                  <th className="p-3 font-bold text-right">الإيصال</th>
+                  <th className="p-3 font-bold text-right">تاريخ الإرسال</th>
+                  <th className="p-3 font-bold text-right">الحالة</th>
+                  <th className="p-3 font-bold text-center">الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p: any) => {
+                  const studentUser = users.find(u => u.id === p.lms_user_id);
+                  const studentName = studentUser ? studentUser.full_name : 'طالب غير معروف';
+                  const studentPhone = studentUser ? (studentUser.phone || '—') : '—';
+                  
+                  return (
+                    <tr key={p.id} className="border-b border-[#21263d]/40 hover:bg-[#121626]/30 transition">
+                      <td className="p-3 text-white font-bold text-sm">{studentName}</td>
+                      <td className="p-3 font-mono text-slate-400 text-sm">{studentPhone}</td>
+                      <td className="p-3 text-slate-300 text-sm">
+                        {p.plan_id === 'plan-gold' 
+                          ? 'الباقة الذهبية' 
+                          : p.plan_id === 'plan-diamond' 
+                            ? 'الباقة الماسية' 
+                            : p.plan_id === 'plan-silver' 
+                              ? 'الباقة الفضية'
+                              : 'طلب خاص / مخصص'}
+                      </td>
+                      <td className="p-3 text-emerald-400 font-bold text-sm font-mono">{p.amount} ر.س</td>
+                      <td className="p-3">
+                        {p.receipt_image ? (
+                          <a href={p.receipt_image} target="_blank" rel="noreferrer" className="text-brand-primary hover:underline font-bold flex items-center gap-1 justify-end">
+                            👁️ عرض الإيصال
+                          </a>
+                        ) : 'لا يوجد'}
+                      </td>
+                      <td className="p-3 text-slate-500 text-xs font-mono">{new Date(p.created_at).toLocaleDateString('ar-SA')}</td>
+                      <td className="p-3">
+                        <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase border ${
+                          p.status === 'approved' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                          p.status === 'pending' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 animate-pulse' :
+                          'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                        }`}>
+                          {p.status === 'approved' ? 'مقبول' : p.status === 'pending' ? 'معلق' : 'مرفوض'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        {p.status === 'pending' && (
+                          <div className="flex justify-center gap-1.5">
+                            <button
+                              onClick={() => handleApprovePayment(p)}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer"
+                            >
+                              قبول وتفعيل
+                            </button>
+                            <button
+                              onClick={() => handleRejectPayment(p)}
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition cursor-pointer"
+                            >
+                              رفض الدفع
+                            </button>
+                          </div>
+                        )}
+                        {p.status !== 'pending' && p.admin_notes && (
+                          <span className="text-slate-500 italic text-xs">{p.admin_notes}</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {payments.length === 0 && (
+                  <tr><td colSpan={8} className="text-center text-slate-500 p-8 text-sm">لا توجد طلبات دفع مسجلة.</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -231,6 +231,31 @@ const setLocal = <T>(key: string, data: T[]): void => {
   localStorage.setItem(key, JSON.stringify(data));
 };
 
+const syncToLocal = <T extends { id?: string | number }>(key: string, item: T, idField: keyof T = 'id'): void => {
+  try {
+    const existing = getLocal<T>(key);
+    const index = existing.findIndex(x => x[idField] === item[idField]);
+    if (index !== -1) {
+      existing[index] = { ...existing[index], ...item };
+    } else {
+      existing.push(item);
+    }
+    setLocal(key, existing);
+  } catch (e) {
+    console.error(`Error syncing ${key} to local storage:`, e);
+  }
+};
+
+const removeFromLocal = <T extends { id?: string | number }>(key: string, id: any, idField: keyof T = 'id'): void => {
+  try {
+    const existing = getLocal<T>(key);
+    const filtered = existing.filter(x => x[idField] !== id);
+    setLocal(key, filtered);
+  } catch (e) {
+    console.error(`Error removing ${id} from local ${key}:`, e);
+  }
+};
+
 // Initialize database/local storage and seed data
 const checkLmsMode = async () => {
   if (isChecked) return;
@@ -401,6 +426,7 @@ export const lmsDb = {
   // 1. Auth & Users
   async registerUser(email: string, password_hash: string, full_name: string, role: LMSUser['role'], phone = '', status?: LMSUser['status'], subscriptionPlanId?: string, subscriptionStatus?: string): Promise<LMSUser> {
     await checkLmsMode();
+    let result;
     if (!useLmsLocal && supabase) {
       const { data, error } = await supabase
         .from('lms_users')
@@ -417,7 +443,7 @@ export const lmsDb = {
         .select('*')
         .single();
       if (error) throw error;
-      return data;
+      result = data;
     } else {
       const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
       if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
@@ -434,16 +460,16 @@ export const lmsDb = {
         subscription_status: subscriptionStatus || (role === 'student' ? 'pending_payment' : 'active'),
         created_at: new Date().toISOString()
       };
-      users.push(newUser);
       
       // Also save password locally in a separate mock auth store for simplicity
       const localAuth = JSON.parse(localStorage.getItem('lms_local_auth_passwords') || '{}');
       localAuth[email.toLowerCase()] = password_hash;
       localStorage.setItem('lms_local_auth_passwords', JSON.stringify(localAuth));
 
-      setLocal(LOCAL_KEYS.USERS, users);
-      return newUser;
+      result = newUser;
     }
+    syncToLocal(LOCAL_KEYS.USERS, result);
+    return result;
   },
 
   async loginUser(email: string, password_hash: string): Promise<LMSUser> {
@@ -486,6 +512,7 @@ export const lmsDb = {
       }
       const { data, error } = await query;
       if (error) throw error;
+      setLocal(LOCAL_KEYS.USERS, data || []);
       return data || [];
     } else {
       const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
@@ -538,6 +565,7 @@ export const lmsDb = {
     if (!useLmsLocal && supabase) {
       const { data, error } = await supabase.from('lms_courses').select('*').order('title');
       if (error) throw error;
+      setLocal(LOCAL_KEYS.COURSES, data || []);
       return data || [];
     } else {
       return getLocal<LMSCourse>(LOCAL_KEYS.COURSES).sort((a,b) => a.title.localeCompare(b.title));
@@ -546,6 +574,7 @@ export const lmsDb = {
 
   async createCourse(code: string, title: string, description = '', departmentId?: string, price?: number): Promise<LMSCourse> {
     await checkLmsMode();
+    let result;
     if (!useLmsLocal && supabase) {
       const { data, error } = await supabase
         .from('lms_courses')
@@ -553,7 +582,7 @@ export const lmsDb = {
         .select('*')
         .single();
       if (error) throw error;
-      return data;
+      result = data;
     } else {
       const courses = getLocal<LMSCourse>(LOCAL_KEYS.COURSES);
       const newCourse: LMSCourse = {
@@ -565,10 +594,10 @@ export const lmsDb = {
         price,
         created_at: new Date().toISOString()
       };
-      courses.push(newCourse);
-      setLocal(LOCAL_KEYS.COURSES, courses);
-      return newCourse;
+      result = newCourse;
     }
+    syncToLocal(LOCAL_KEYS.COURSES, result);
+    return result;
   },
 
   // 4. Sections
@@ -580,6 +609,7 @@ export const lmsDb = {
         .select('*, course:lms_courses(*), instructor:lms_users(*)')
         .order('section_number');
       if (error) throw error;
+      setLocal(LOCAL_KEYS.SECTIONS, data || []);
       return data || [];
     } else {
       const sections = getLocal<LMSSection>(LOCAL_KEYS.SECTIONS);
@@ -596,6 +626,7 @@ export const lmsDb = {
 
   async createSection(courseId: string, instructorId: string | null, sectionNumber: string, semester: string, capacity = 30, scheduleDays?: string[], scheduleTime?: string): Promise<LMSSection> {
     await checkLmsMode();
+    let result;
     if (!useLmsLocal && supabase) {
       const { data, error } = await supabase
         .from('lms_sections')
@@ -603,7 +634,7 @@ export const lmsDb = {
         .select('*, course:lms_courses(*), instructor:lms_users(*)')
         .single();
       if (error) throw error;
-      return data;
+      result = data;
     } else {
       const sections = getLocal<LMSSection>(LOCAL_KEYS.SECTIONS);
       const courses = getLocal<LMSCourse>(LOCAL_KEYS.COURSES);
@@ -620,15 +651,15 @@ export const lmsDb = {
         schedule_time: scheduleTime,
         created_at: new Date().toISOString()
       };
-      sections.push(newSection);
-      setLocal(LOCAL_KEYS.SECTIONS, sections);
-
-      return {
+      
+      result = {
         ...newSection,
         course: courses.find(c => c.id === courseId),
         instructor: instructorId ? users.find(u => u.id === instructorId) : undefined
       };
     }
+    syncToLocal(LOCAL_KEYS.SECTIONS, result);
+    return result;
   },
 
   async getInstructorSections(instructorId: string): Promise<LMSSection[]> {
@@ -1513,6 +1544,31 @@ export const lmsDb = {
         users[index].status = status;
         setLocal(LOCAL_KEYS.USERS, users);
       }
+    }
+  },
+
+  async updateUserSubscription(userId: string, subscriptionStatus: string, planId?: string): Promise<void> {
+    await checkLmsMode();
+    if (!useLmsLocal && supabase) {
+      const { error } = await supabase
+        .from('lms_users')
+        .update({ 
+          subscription_status: subscriptionStatus,
+          subscription_plan_id: planId 
+        })
+        .eq('id', userId);
+      if (error) throw error;
+    }
+    
+    // Always sync local storage
+    const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
+    const index = users.findIndex(u => u.id === userId);
+    if (index !== -1) {
+      users[index].subscription_status = subscriptionStatus;
+      if (planId !== undefined) {
+        users[index].subscription_plan_id = planId || undefined;
+      }
+      setLocal(LOCAL_KEYS.USERS, users);
     }
   },
 

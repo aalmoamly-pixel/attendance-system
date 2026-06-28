@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Supabase Diagnosis</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1, h2 { color: #569cd6; }
+    pre { background: #2d2d2d; padding: 15px; border-radius: 5px; border: 1px solid #3c3c3c; overflow-x: auto; }
+    #status { font-weight: bold; color: #ce9178; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Supabase Diagnosis</h1>
+  <div id="status">Running tests...</div>
+  
+  <h2>1. Testing REST API (lms_users select)</h2>
+  <pre id="rest-result">Waiting...</pre>
+
+  <h2>2. Testing Auth API (signInWithPassword)</h2>
+  <pre id="auth-result">Waiting...</pre>
+
+  <h2>3. Testing Auth API (signUp)</h2>
+  <pre id="signup-result">Waiting...</pre>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    async function runTests() {
+      const url = 'https://kvceksrtlqdnrhkzshqp.supabase.co';
+      const key = 'sb_publishable_JQ-QhRuG9OJzuBn8XcdRzA_B13m_YCS';
+      
+      try {
+        if (!window.supabase) {
+          throw new Error('Supabase library failed to load from CDN');
+        }
+        const supabase = window.supabase.createClient(url, key);
+        
+        // 1. Test REST API
+        document.getElementById('rest-result').textContent = 'Querying lms_users...';
+        const { data: dbData, error: dbError, status: dbStatus, statusText: dbStatusText } = await supabase
+          .from('lms_users')
+          .select('*')
+          .limit(1);
+        
+        document.getElementById('rest-result').textContent = JSON.stringify({
+          status: dbStatus,
+          statusText: dbStatusText,
+          error: dbError,
+          data: dbData
+        }, null, 2);
+
+        // 2. Test Auth Sign In
+        document.getElementById('auth-result').textContent = 'Attempting sign in...';
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: 'test@example.com',
+          password: 'wrongpassword'
+        });
+
+        document.getElementById('auth-result').textContent = JSON.stringify({
+          error: authError ? {
+            message: authError.message,
+            status: authError.status,
+            name: authError.name
+          } : null,
+          data: authData
+        }, null, 2);
+
+        // 3. Test Auth Sign Up
+        document.getElementById('signup-result').textContent = 'Attempting sign up...';
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: 'test_' + Math.random().toString(36).substring(7) + '@example.com',
+          password: 'somepassword123'
+        });
+
+        document.getElementById('signup-result').textContent = JSON.stringify({
+          error: signUpError ? {
+            message: signUpError.message,
+            status: signUpError.status,
+            name: signUpError.name
+          } : null,
+          data: signUpData
+        }, null, 2);
+
+        document.getElementById('status').textContent = 'Tests completed.';
+      } catch (e) {
+        document.getElementById('status').textContent = 'Error running tests: ' + e.message;
+      }
+    }
+    
+    // Run after page and CDN are loaded
+    window.onload = runTests;
+  </script>
+</body>
+</html>
