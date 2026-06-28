@@ -575,8 +575,8 @@ ALTER TABLE public.new_customers ADD COLUMN IF NOT EXISTS special_details TEXT;
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS lms_user_id UUID REFERENCES public.lms_users(id) ON DELETE CASCADE;
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS plan_id VARCHAR(255);
 
--- Create transaction-safe customer approval function
-CREATE OR REPLACE FUNCTION public.approve_new_customer(
+-- Create transaction-safe LMS customer approval function
+CREATE OR REPLACE FUNCTION public.approve_lms_customer(
     p_customer_id INTEGER,
     p_user_id UUID DEFAULT gen_random_uuid()
 ) RETURNS JSONB AS $$
@@ -585,9 +585,8 @@ DECLARE
     v_user_exists BOOLEAN;
     v_section_id UUID;
     v_user_id UUID;
-    v_dept_id INTEGER;
 BEGIN
-    -- 1. Get the customer request
+    -- 1. جلب طلب الاشتراك
     SELECT * INTO v_customer FROM public.new_customers WHERE id = p_customer_id;
     IF NOT FOUND THEN
         RETURN jsonb_build_object('success', false, 'message', 'طلب التسجيل غير موجود');
@@ -597,11 +596,11 @@ BEGIN
         RETURN jsonb_build_object('success', true, 'message', 'الطلب مقبول بالفعل');
     END IF;
 
-    -- 2. Check if the user already exists in lms_users
+    -- 2. التحقق مما إذا كان المستخدم موجوداً مسبقاً بالبريد الإلكتروني
     SELECT EXISTS(SELECT 1 FROM public.lms_users WHERE LOWER(email) = LOWER(v_customer.username)) INTO v_user_exists;
     
     IF NOT v_user_exists THEN
-        -- 3. Create the user in lms_users
+        -- 3. إنشاء المستخدم في جدول lms_users كطالب غير نشط الدفع
         v_user_id := p_user_id;
         INSERT INTO public.lms_users (
             id,
@@ -632,8 +631,103 @@ BEGIN
         SELECT id INTO v_user_id FROM public.lms_users WHERE LOWER(email) = LOWER(v_customer.username);
     END IF;
 
-    -- 4. Create student user in Attendance System (students table) if not exists
-    -- Get or create department for Attendance System using university_name
+    -- 4. إلحاق الطالب بالشعبة الدراسية أو تسجيل طلب التقوية الخاص
+    IF v_customer.selected_course_id IS NOT NULL AND v_customer.selected_course_id <> '' AND v_customer.selected_course_id <> 'special' THEN
+        -- البحث عن شعبة للمقرر المختار أو إنشاء شعبة جديدة
+        SELECT id INTO v_section_id 
+        FROM public.lms_sections 
+        WHERE course_id = CAST(v_customer.selected_course_id AS UUID) 
+        LIMIT 1;
+        
+        IF v_section_id IS NULL THEN
+            v_section_id := gen_random_uuid();
+            INSERT INTO public.lms_sections (
+                id,
+                course_id,
+                section_number,
+                semester,
+                capacity,
+                created_at
+            ) VALUES (
+                v_section_id,
+                CAST(v_customer.selected_course_id AS UUID),
+                '01',
+                'Fall 2026',
+                30,
+                NOW()
+            );
+        END IF;
+
+        -- تسجيل الطالب في الشعبة
+        INSERT INTO public.lms_enrollments (
+            student_id,
+            section_id,
+            enrolled_at
+        ) VALUES (
+            v_user_id,
+            v_section_id,
+            NOW()
+        ) ON CONFLICT (student_id, section_id) DO NOTHING;
+    ELSIF v_customer.selected_course_id = 'special' THEN
+        -- إنشاء طلب خاص بموضوع أو درس تقوية معين
+        INSERT INTO public.lms_special_requests (
+            student_id,
+            student_name,
+            student_email,
+            student_phone,
+            details,
+            status,
+            created_at
+        ) VALUES (
+            v_user_id,
+            v_customer.full_name,
+            v_customer.username,
+            v_customer.phone,
+            v_customer.special_details,
+            'pending',
+            NOW()
+        );
+    END IF;
+
+    -- 5. تحديث حالة طلب الاشتراك في جدول new_customers إلى مقبول (approved)
+    UPDATE public.new_customers 
+    SET status = 'approved', updated_at = NOW() 
+    WHERE id = p_customer_id;
+
+    RETURN jsonb_build_object(
+        'success', true, 
+        'message', 'تم تفعيل حساب الطالب الأكاديمي بنجاح',
+        'user_id', v_user_id
+    );
+EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object(
+        'success', false, 
+        'message', 'فشلت العملية: ' || SQLERRM
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- Create transaction-safe Attendance customer approval function
+CREATE OR REPLACE FUNCTION public.approve_attendance_customer(
+    p_customer_id INTEGER
+) RETURNS JSONB AS $$
+DECLARE
+    v_customer RECORD;
+    v_dept_id INTEGER;
+    v_student_id INTEGER;
+BEGIN
+    -- 1. جلب طلب التسجيل في الحضور
+    SELECT * INTO v_customer FROM public.new_customers WHERE id = p_customer_id;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'message', 'طلب التسجيل غير موجود');
+    END IF;
+    
+    IF v_customer.status = 'approved' THEN
+        RETURN jsonb_build_object('success', true, 'message', 'الطلب مقبول بالفعل');
+    END IF;
+
+    -- 2. جلب أو إنشاء القسم لربطه بالطالب
     SELECT department_id INTO v_dept_id FROM public.departments WHERE LOWER(department_name) = LOWER(v_customer.university_name) LIMIT 1;
     IF v_dept_id IS NULL THEN
         INSERT INTO public.departments (department_name, degree_type) 
@@ -641,7 +735,7 @@ BEGIN
         RETURNING department_id INTO v_dept_id;
     END IF;
 
-    -- Create student in students table if not exists
+    -- 3. إنشاء الطالب في جدول الحضور (students) إذا لم يكن موجوداً مسبقاً
     IF NOT EXISTS(SELECT 1 FROM public.students WHERE academic_id = v_customer.username) THEN
         INSERT INTO public.students (
             full_name,
@@ -668,80 +762,23 @@ BEGIN
             CASE WHEN v_customer.plan_type = 'premium' THEN 599.00 ELSE 299.00 END,
             (CURRENT_DATE + INTERVAL '30 days')::date,
             'pending_payment',
-            'حساب منشأ تلقائياً ومعتمد من طلب الاشتراك الجديد رقم #' || p_customer_id
-        );
+            'حساب منشأ تلقائياً ومعتمد من طلب حضور جديد رقم #' || p_customer_id
+        ) RETURNING student_id INTO v_student_id;
+    ELSE
+        SELECT student_id INTO v_student_id FROM public.students WHERE academic_id = v_customer.username;
     END IF;
 
-    -- 5. Create any related records (e.g. enroll in course if selected)
-    IF v_customer.selected_course_id IS NOT NULL AND v_customer.selected_course_id <> '' AND v_customer.selected_course_id <> 'special' THEN
-        -- Find or create a section for this course
-        SELECT id INTO v_section_id 
-        FROM public.lms_sections 
-        WHERE course_id = CAST(v_customer.selected_course_id AS UUID) 
-        LIMIT 1;
-        
-        IF v_section_id IS NULL THEN
-            v_section_id := gen_random_uuid();
-            INSERT INTO public.lms_sections (
-                id,
-                course_id,
-                section_number,
-                semester,
-                capacity,
-                created_at
-            ) VALUES (
-                v_section_id,
-                CAST(v_customer.selected_course_id AS UUID),
-                '01',
-                'Fall 2026',
-                30,
-                NOW()
-            );
-        END IF;
-
-        -- Enroll student (ignore if already enrolled)
-        INSERT INTO public.lms_enrollments (
-            student_id,
-            section_id,
-            enrolled_at
-        ) VALUES (
-            v_user_id,
-            v_section_id,
-            NOW()
-        ) ON CONFLICT (student_id, section_id) DO NOTHING;
-    ELSIF v_customer.selected_course_id = 'special' THEN
-        -- Create special request
-        INSERT INTO public.lms_special_requests (
-            student_id,
-            student_name,
-            student_email,
-            student_phone,
-            details,
-            status,
-            created_at
-        ) VALUES (
-            v_user_id,
-            v_customer.full_name,
-            v_customer.username,
-            v_customer.phone,
-            v_customer.special_details,
-            'pending',
-            NOW()
-        );
-    END IF;
-
-    -- 6. Update the request status in new_customers
+    -- 4. تحديث حالة طلب الاشتراك في جدول new_customers إلى مقبول (approved)
     UPDATE public.new_customers 
     SET status = 'approved', updated_at = NOW() 
     WHERE id = p_customer_id;
 
     RETURN jsonb_build_object(
         'success', true, 
-        'message', 'تم قبول الطالب وتفعيل حسابه بنجاح',
-        'user_id', v_user_id
+        'message', 'تم تسجيل وتفعيل الطالب في نظام الحضور بنجاح',
+        'student_id', v_student_id
     );
 EXCEPTION WHEN OTHERS THEN
-    -- Automatically rolls back
     RETURN jsonb_build_object(
         'success', false, 
         'message', 'فشلت العملية: ' || SQLERRM

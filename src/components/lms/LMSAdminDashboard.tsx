@@ -28,6 +28,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
   const [siteConfig, setSiteConfig] = useState<any>(null);
   const [subscriptionPlans, setSubscriptionPlans] = useState<LMSSubscriptionPlan[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [pendingLmsStudents, setPendingLmsStudents] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
@@ -72,7 +73,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [depts, crs, sects, usrs, reqs, sConf, sPlans, paymentsList] = await Promise.all([
+      const [depts, crs, sects, usrs, reqs, sConf, sPlans, paymentsList, newCustomersList] = await Promise.all([
         lmsDb.getDepartments(),
         lmsDb.getCourses(),
         lmsDb.getSections(),
@@ -80,7 +81,8 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
         lmsDb.getSpecialRequests(),
         lmsDb.getSiteConfig(),
         lmsDb.getSubscriptionPlans(),
-        db.getPayments()
+        db.getPayments(),
+        db.getNewCustomers()
       ]);
       setDepartments(depts);
       setCourses(crs);
@@ -90,6 +92,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
       setSiteConfig(sConf);
       setSubscriptionPlans(sPlans);
       setPayments(paymentsList.filter((p: any) => p.lms_user_id !== null));
+      setPendingLmsStudents(newCustomersList.filter((c: any) => c.status === 'new' && (c.selected_course_id || c.university_name === 'LMS Student')));
     } catch (err) {
       console.error('[LMSAdmin] Load error:', err);
     } finally {
@@ -342,6 +345,65 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
       showToast('تم رفض الحساب وإخطار الطالب');
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleApproveLmsStudent = async (customer: any) => {
+    if (!confirm(`هل أنت متأكد من تفعيل حساب الطالب الأكاديمي ${customer.full_name}؟`)) return;
+    try {
+      setLoading(true);
+      if (supabase) {
+        const { data, error } = await supabase.rpc('approve_lms_customer', { p_customer_id: customer.id });
+        if (error) throw error;
+        if (data && !data.success) throw new Error(data.message);
+      } else {
+        // Local fallback
+        const lmsEmail = customer.username.includes('@') ? customer.username : `${customer.username}@lms.com`;
+        const createdLms = await lmsDb.registerUser(
+          lmsEmail,
+          customer.password,
+          customer.full_name,
+          'student',
+          customer.phone,
+          'active',
+          customer.selected_plan_id || 'plan-silver',
+          'pending_payment'
+        );
+        
+        if (customer.selected_course_id && customer.selected_course_id !== 'special') {
+          const sectionsList = await lmsDb.getSections();
+          let section = sectionsList.find(s => s.course_id === customer.selected_course_id);
+          if (!section) {
+            section = await lmsDb.createSection(customer.selected_course_id, null, '01', 'Fall 2026', 30);
+          }
+          await lmsDb.enrollStudent(createdLms.id, section.id);
+        } else if (customer.selected_course_id === 'special') {
+          await lmsDb.createSpecialRequest(createdLms.id, customer.special_details || '');
+        }
+        
+        await db.updateNewCustomer(customer.id, { status: 'approved' });
+      }
+      
+      showToast('تم تفعيل حساب الطالب الأكاديمي بنجاح');
+      await loadAll();
+    } catch (err: any) {
+      alert('فشل التفعيل: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectLmsStudent = async (customerId: number) => {
+    if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
+    try {
+      setLoading(true);
+      await db.updateNewCustomer(customerId, { status: 'rejected' });
+      showToast('تم رفض الطلب بنجاح');
+      await loadAll();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -818,7 +880,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
         <div className="space-y-6">
           {/* Table 1: Standard Course Registrations */}
           <div className="bg-[#131622] border border-[#21263d] p-6 rounded-3xl space-y-4">
-            <h3 className="text-white font-black text-lg">طلبات تسجيل الطلاب الجدد للمقررات ({users.filter((u: LMSUser) => u.role === 'student' && u.status === 'pending').length})</h3>
+            <h3 className="text-white font-black text-lg">طلبات تسجيل الطلاب الجدد للمقررات ({pendingLmsStudents.length})</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">
                 <thead>
@@ -831,21 +893,21 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
                   </tr>
                 </thead>
                 <tbody>
-                  {users.filter((u: LMSUser) => u.role === 'student' && u.status === 'pending').map(student => (
-                    <tr key={student.id} className="border-b border-[#21263d]/40 hover:bg-[#121626]/30 transition">
-                      <td className="p-3 text-white font-bold text-sm">{student.full_name}</td>
-                      <td className="p-3 font-mono text-slate-400 text-sm">{student.email}</td>
-                      <td className="p-3 font-mono text-slate-400 text-sm">{student.phone || '—'}</td>
-                      <td className="p-3 text-slate-500 text-xs font-mono">{new Date(student.created_at).toLocaleDateString('ar-SA')}</td>
+                  {pendingLmsStudents.map(customer => (
+                    <tr key={customer.id} className="border-b border-[#21263d]/40 hover:bg-[#121626]/30 transition">
+                      <td className="p-3 text-white font-bold text-sm">{customer.full_name}</td>
+                      <td className="p-3 font-mono text-slate-400 text-sm">{customer.username}</td>
+                      <td className="p-3 font-mono text-slate-400 text-sm">{customer.phone || '—'}</td>
+                      <td className="p-3 text-slate-500 text-xs font-mono">{new Date(customer.created_at).toLocaleDateString('ar-SA')}</td>
                       <td className="p-3 text-center flex items-center justify-center gap-2">
                         <button
-                          onClick={() => handleApproveUser(student.id)}
+                          onClick={() => handleApproveLmsStudent(customer)}
                           className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer"
                         >
                           موافقة وتفعيل
                         </button>
                         <button
-                          onClick={() => handleRejectUser(student.id)}
+                          onClick={() => handleRejectLmsStudent(customer.id)}
                           className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition cursor-pointer"
                         >
                           رفض الطلب
@@ -853,7 +915,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
                       </td>
                     </tr>
                   ))}
-                  {users.filter((u: LMSUser) => u.role === 'student' && u.status === 'pending').length === 0 && (
+                  {pendingLmsStudents.length === 0 && (
                     <tr><td colSpan={5} className="text-center text-slate-500 p-8 text-sm">لا توجد طلبات تسجيل طلاب معلقة حالياً.</td></tr>
                   )}
                 </tbody>

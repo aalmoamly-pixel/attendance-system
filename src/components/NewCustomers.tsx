@@ -29,7 +29,8 @@ export default function NewCustomers() {
     try {
       setLoading(true);
       const data = await db.getNewCustomers();
-      setCustomers(data);
+      // Filter out LMS students: only show Attendance registrations
+      setCustomers(data.filter(c => !(c as any).selected_course_id && c.university_name !== 'LMS Student'));
     } catch (err) {
       console.error('[NewCustomers] Error fetching:', err);
     } finally {
@@ -64,8 +65,8 @@ export default function NewCustomers() {
         
         if (newStatus === 'approved') {
           if (supabase) {
-            // Safe, single-transaction database approval
-            const { data, error } = await supabase.rpc('approve_new_customer', { p_customer_id: customer.id });
+            // Safe, single-transaction database approval for Attendance
+            const { data, error } = await supabase.rpc('approve_attendance_customer', { p_customer_id: customer.id });
             if (error) throw error;
             if (data && !data.success) {
               throw new Error(data.message);
@@ -95,6 +96,7 @@ export default function NewCustomers() {
             
             const studentsList = await db.getStudents();
             const existingStudent = studentsList.find(s => s.academic_id === customer.username);
+            
             if (!existingStudent) {
               await db.createStudent({
                 full_name: customer.full_name,
@@ -107,46 +109,11 @@ export default function NewCustomers() {
                 subscription_amount: amount,
                 due_date: dueDate.toISOString().split('T')[0],
                 subscription_status: 'pending_payment',
-                financial_notes: `حساب منشأ تلقائياً ومعتمد من طلب الاشتراك الجديد رقم #${customer.id}`
+                financial_notes: `حساب منشأ تلقائياً ومعتمد من طلب حضور جديد رقم #${customer.id}`
               });
             }
 
-            // 3. Create student user inside public.lms_users table (if not exists)
-            const lmsEmail = customer.username.includes('@') ? customer.username : `${customer.username}@lms.com`;
-            const usersList = await lmsDb.getUsers();
-            const existingLmsUser = usersList.find(u => u.email.toLowerCase() === lmsEmail.toLowerCase());
-            
-            let lmsUserId;
-            if (!existingLmsUser) {
-              const createdLms = await lmsDb.registerUser(
-                lmsEmail,
-                customer.password,
-                customer.full_name,
-                'student',
-                customer.phone,
-                'active',
-                (customer as any).selected_plan_id || (customer.plan_type === 'basic' ? 'plan-silver' : 'plan-gold'),
-                'pending_payment'
-              );
-              lmsUserId = createdLms.id;
-            } else {
-              lmsUserId = existingLmsUser.id;
-            }
-
-            // 4. Enroll or create special request locally
-            const selectedCourseId = (customer as any).selected_course_id;
-            if (selectedCourseId && selectedCourseId !== 'special') {
-              const sectionsList = await lmsDb.getSections();
-              let section = sectionsList.find(s => s.course_id === selectedCourseId);
-              if (!section) {
-                section = await lmsDb.createSection(selectedCourseId, null, '01', 'Fall 2026', 30);
-              }
-              await lmsDb.enrollStudent(lmsUserId, section.id);
-            } else if (selectedCourseId === 'special') {
-              await lmsDb.createSpecialRequest(lmsUserId, (customer as any).special_details || '');
-            }
-
-            // 5. Update subscription request status in new_customers
+            // Update subscription request status in new_customers
             await db.updateNewCustomer(customer.id, { status: 'approved' });
           }
 
