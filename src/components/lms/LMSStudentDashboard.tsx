@@ -27,7 +27,6 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
   const [receiptImage, setReceiptImage] = useState('');
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState('');
-  const [specialRequests, setSpecialRequests] = useState<LMSSpecialRequest[]>([]);
   const [subscriptionPlans, setSubscriptionPlans] = useState<any[]>([]);
 
   // Load payment settings and link student
