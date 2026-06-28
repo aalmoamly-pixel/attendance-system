@@ -85,12 +85,6 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
     }
   };
 
-  // Calculate active plan/custom price
-  const approvedRequest = specialRequests.find(r => r.student_id === student.id && r.status === 'approved');
-  const customPrice = approvedRequest ? approvedRequest.price : null;
-  const selectedPlan = subscriptionPlans.find(p => p.id === student.subscription_plan_id);
-  const planPrice = selectedPlan ? selectedPlan.price : 150;
-  const finalPrice = customPrice !== null && customPrice !== undefined ? customPrice : planPrice;
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,6 +183,13 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
 
   // Certificate Modal
   const [activeCertificate, setActiveCertificate] = useState<LMSCertificate | null>(null);
+
+  // Calculate active plan/custom price
+  const approvedRequest = specialRequests.find(r => r.student_id === student.id && r.status === 'approved');
+  const customPrice = approvedRequest ? approvedRequest.price : null;
+  const selectedPlan = subscriptionPlans.find(p => p.id === student.subscription_plan_id);
+  const planPrice = selectedPlan ? selectedPlan.price : 150;
+  const finalPrice = customPrice !== null && customPrice !== undefined ? customPrice : planPrice;
 
   useEffect(() => {
     loadStudentData();
