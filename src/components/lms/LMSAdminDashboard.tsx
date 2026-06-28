@@ -5,7 +5,7 @@ import {
   Edit, Trash2, ShieldCheck
 } from 'lucide-react';
 import { lmsDb, type LMSUser, type LMSDepartment, type LMSCourse, type LMSSection, type LMSSpecialRequest, type LMSSubscriptionPlan } from '../../lib/lms_supabase';
-import { db } from '../../lib/supabase';
+import { db, supabase } from '../../lib/supabase';
 
 export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: propActiveTab }: { adminUser: LMSUser, activeTab?: string }) {
   const [activeTab, setActiveTab] = useState<'overview' | 'departments' | 'courses' | 'sections' | 'users' | 'approvals' | 'site_settings' | 'plans' | 'payments'>('overview');
@@ -328,25 +328,6 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
   };
 
   // Approvals & Site Config logic
-  const handleApproveUser = async (userId: string) => {
-    try {
-      await lmsDb.updateUserStatus(userId, 'active');
-      await loadAll();
-      showToast('تم تفعيل وقبول حساب الطالب بنجاح');
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
-
-  const handleRejectUser = async (userId: string) => {
-    try {
-      await lmsDb.updateUserStatus(userId, 'rejected');
-      await loadAll();
-      showToast('تم رفض الحساب وإخطار الطالب');
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
 
   const handleApproveLmsStudent = async (customer: any) => {
     if (!confirm(`هل أنت متأكد من تفعيل حساب الطالب الأكاديمي ${customer.full_name}؟`)) return;

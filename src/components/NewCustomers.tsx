@@ -14,7 +14,6 @@ import {
   Building2
 } from 'lucide-react';
 import { supabase, db } from '../lib/supabase';
-import { lmsDb } from '../lib/lms_supabase';
 import type { NewCustomer } from '../types/database';
 
 export default function NewCustomers() {
