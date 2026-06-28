@@ -246,15 +246,15 @@ const syncToLocal = <T extends { id?: string | number }>(key: string, item: T, i
   }
 };
 
-const removeFromLocal = <T extends { id?: string | number }>(key: string, id: any, idField: keyof T = 'id'): void => {
-  try {
-    const existing = getLocal<T>(key);
-    const filtered = existing.filter(x => x[idField] !== id);
-    setLocal(key, filtered);
-  } catch (e) {
-    console.error(`Error removing ${id} from local ${key}:`, e);
-  }
-};
+// const removeFromLocal = <T extends { id?: string | number }>(key: string, id: any, idField: keyof T = 'id'): void => {
+//   try {
+//     const existing = getLocal<T>(key);
+//     const filtered = existing.filter(x => x[idField] !== id);
+//     setLocal(key, filtered);
+//   } catch (e) {
+//     console.error(`Error removing ${id} from local ${key}:`, e);
+//   }
+// };
 
 // Initialize database/local storage and seed data
 const checkLmsMode = async () => {
@@ -584,7 +584,6 @@ export const lmsDb = {
       if (error) throw error;
       result = data;
     } else {
-      const courses = getLocal<LMSCourse>(LOCAL_KEYS.COURSES);
       const newCourse: LMSCourse = {
         id: `course-${Math.random().toString(36).substring(2, 9)}`,
         code,
@@ -636,7 +635,6 @@ export const lmsDb = {
       if (error) throw error;
       result = data;
     } else {
-      const sections = getLocal<LMSSection>(LOCAL_KEYS.SECTIONS);
       const courses = getLocal<LMSCourse>(LOCAL_KEYS.COURSES);
       const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
 

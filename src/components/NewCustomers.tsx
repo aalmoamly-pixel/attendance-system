@@ -95,10 +95,8 @@ export default function NewCustomers() {
             
             const studentsList = await db.getStudents();
             const existingStudent = studentsList.find(s => s.academic_id === customer.username);
-            let studentIdVal;
-            
             if (!existingStudent) {
-              const created = await db.createStudent({
+              await db.createStudent({
                 full_name: customer.full_name,
                 phone: customer.phone,
                 academic_id: customer.username,
@@ -111,9 +109,6 @@ export default function NewCustomers() {
                 subscription_status: 'pending_payment',
                 financial_notes: `حساب منشأ تلقائياً ومعتمد من طلب الاشتراك الجديد رقم #${customer.id}`
               });
-              studentIdVal = created.student_id;
-            } else {
-              studentIdVal = existingStudent.student_id;
             }
 
             // 3. Create student user inside public.lms_users table (if not exists)

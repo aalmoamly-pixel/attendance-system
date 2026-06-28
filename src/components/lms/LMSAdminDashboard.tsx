@@ -8,7 +8,7 @@ import { lmsDb, type LMSUser, type LMSDepartment, type LMSCourse, type LMSSectio
 import { db } from '../../lib/supabase';
 
 export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: propActiveTab }: { adminUser: LMSUser, activeTab?: string }) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'departments' | 'courses' | 'sections' | 'users' | 'approvals' | 'site_settings' | 'plans'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'departments' | 'courses' | 'sections' | 'users' | 'approvals' | 'site_settings' | 'plans' | 'payments'>('overview');
 
   useEffect(() => {
     if (propActiveTab) {

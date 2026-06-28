@@ -27,6 +27,8 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
   const [receiptImage, setReceiptImage] = useState('');
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState('');
+  const [specialRequests, setSpecialRequests] = useState<LMSSpecialRequest[]>([]);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<any[]>([]);
 
   // Load payment settings and link student
   useEffect(() => {
@@ -57,6 +59,12 @@ export default function LMSStudentDashboard({ student, activeTab: propActiveTab,
         if (settings.enabled_payment_methods && settings.enabled_payment_methods.length > 0) {
           setSelectedMethod(settings.enabled_payment_methods[0]);
         }
+
+        const reqs = await lmsDb.getSpecialRequests();
+        setSpecialRequests(reqs);
+
+        const plans = await lmsDb.getSubscriptionPlans();
+        setSubscriptionPlans(plans);
       } catch (err) {
         console.error('[Payment] Load details error:', err);
       }
