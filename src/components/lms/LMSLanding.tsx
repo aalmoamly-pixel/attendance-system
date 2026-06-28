@@ -102,7 +102,26 @@ export default function LMSLanding({ onLoginSuccess }: LMSLandingProps) {
     setLoginError('');
     setLoginLoading(true);
     try {
-      const user = await lmsDb.loginUser(loginEmail, loginPassword);
+      let user;
+      try {
+        user = await lmsDb.loginUser(loginEmail, loginPassword);
+      } catch (loginErr) {
+        // Check if they are a pending new customer
+        const newCustomers = await db.getNewCustomers();
+        const pendingCustomer = newCustomers.find(
+          c => c.username.toLowerCase() === loginEmail.toLowerCase()
+        );
+        
+        if (pendingCustomer) {
+          if (pendingCustomer.status === 'new' || pendingCustomer.status === 'pending') {
+            throw new Error('حسابك قيد المراجعة والموافقة من قبل الإدارة حالياً. يرجى الانتظار لحين التفعيل وسداد الرسوم.');
+          } else if (pendingCustomer.status === 'rejected') {
+            throw new Error('تم رفض طلب التسجيل الخاص بك. يرجى التواصل مع إدارة المنصة.');
+          }
+        }
+        throw loginErr;
+      }
+
       if (user.status === 'pending') {
         throw new Error('حسابك قيد المراجعة والموافقة من قبل الإدارة حالياً. يرجى الانتظار لحين التفعيل وسداد الرسوم.');
       }
@@ -115,9 +134,7 @@ export default function LMSLanding({ onLoginSuccess }: LMSLandingProps) {
     } finally {
       setLoginLoading(false);
     }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
+  };  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
     setRegSuccess(false);
