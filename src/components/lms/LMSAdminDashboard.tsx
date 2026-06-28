@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Building2, BookOpen, Users, ClipboardList, Plus, 
   CheckCircle, LayoutDashboard, GraduationCap, UserPlus,
-  Edit, Trash2, ShieldCheck
+  Edit, Trash2, ShieldCheck, X
 } from 'lucide-react';
 import { lmsDb, type LMSUser, type LMSDepartment, type LMSCourse, type LMSSection, type LMSSpecialRequest, type LMSSubscriptionPlan } from '../../lib/lms_supabase';
 import { db, supabase } from '../../lib/supabase';
@@ -29,6 +29,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
   const [subscriptionPlans, setSubscriptionPlans] = useState<LMSSubscriptionPlan[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [pendingLmsStudents, setPendingLmsStudents] = useState<any[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
@@ -1002,9 +1003,12 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
                       <td className="p-3 text-emerald-400 font-bold text-sm font-mono">{p.amount} ر.س</td>
                       <td className="p-3">
                         {p.receipt_image ? (
-                          <a href={p.receipt_image} target="_blank" rel="noreferrer" className="text-brand-primary hover:underline font-bold flex items-center gap-1 justify-end">
+                          <button
+                            onClick={() => setPreviewImage(p.receipt_image)}
+                            className="text-brand-primary hover:underline font-bold flex items-center gap-1 justify-end cursor-pointer bg-transparent border-0 outline-none w-full text-right"
+                          >
                             👁️ عرض الإيصال
-                          </a>
+                          </button>
                         ) : 'لا يوجد'}
                       </td>
                       <td className="p-3 text-slate-500 text-xs font-mono">{new Date(p.created_at).toLocaleDateString('ar-SA')}</td>
@@ -2672,6 +2676,41 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
             >
               {editPlanId ? 'حفظ التعديلات' : 'إنشاء الباقة'}
             </button>
+          </div>
+        </div>
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 animate-fade-in">
+          <div className="relative bg-[#131622] border border-[#21263d] rounded-3xl p-6 max-w-3xl w-full max-h-[90vh] flex flex-col items-center justify-between gap-4">
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-xl bg-[#090b10] border border-[#21263d] cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h4 className="text-white font-black text-lg text-center w-full mt-2">معاينة إيصال الدفع</h4>
+            <div className="flex-1 w-full overflow-auto flex items-center justify-center bg-[#090b10] rounded-2xl p-2 min-h-[300px]">
+              <img
+                src={previewImage}
+                alt="إيصال الدفع"
+                className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-lg"
+              />
+            </div>
+            <div className="flex gap-2 w-full justify-center flex-row-reverse">
+              <a
+                href={previewImage}
+                download="receipt.png"
+                className="px-6 py-2.5 bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-bold rounded-xl shadow-lg transition-all text-center cursor-pointer"
+              >
+                تحميل الصورة
+              </a>
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="px-6 py-2.5 bg-[#090b10] border border-[#21263d] text-slate-400 hover:text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                إغلاق
+              </button>
+            </div>
           </div>
         </div>
       )}
