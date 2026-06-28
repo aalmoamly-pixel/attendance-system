@@ -114,7 +114,7 @@ export default function LMSLanding({ onLoginSuccess }: LMSLandingProps) {
         
         if (pendingCustomer) {
           if (pendingCustomer.status === 'new' || pendingCustomer.status === 'pending') {
-            throw new Error('حسابك قيد المراجعة والموافقة من قبل الإدارة حالياً. يرجى الانتظار لحين التفعيل وسداد الرسوم.');
+            throw new Error('حسابك قيد المراجعة والموافقة من قبل الإدارة حالياً. يرجى الانتظار لحين التفعيل.');
           } else if (pendingCustomer.status === 'rejected') {
             throw new Error('تم رفض طلب التسجيل الخاص بك. يرجى التواصل مع إدارة المنصة.');
           }
@@ -123,7 +123,7 @@ export default function LMSLanding({ onLoginSuccess }: LMSLandingProps) {
       }
 
       if (user.status === 'pending') {
-        throw new Error('حسابك قيد المراجعة والموافقة من قبل الإدارة حالياً. يرجى الانتظار لحين التفعيل وسداد الرسوم.');
+        throw new Error('حسابك قيد المراجعة والموافقة من قبل الإدارة حالياً. يرجى الانتظار لحين التفعيل.');
       }
       if (user.status === 'rejected') {
         throw new Error('تم رفض طلب التسجيل الخاص بك. يرجى التواصل مع إدارة المنصة.');
@@ -653,8 +653,16 @@ export default function LMSLanding({ onLoginSuccess }: LMSLandingProps) {
 
             {/* ERROR / SUCCESS ALERTS */}
             {authTab === 'login' && loginError && (
-              <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 p-3.5 rounded-xl flex items-center gap-3 text-sm text-right flex-row-reverse">
-                <AlertCircle className="w-5 h-5 shrink-0" />
+              <div className={`border p-3.5 rounded-xl flex items-center gap-3 text-sm text-right flex-row-reverse ${
+                loginError.includes('قيد المراجعة')
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                  : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+              }`}>
+                {loginError.includes('قيد المراجعة') ? (
+                  <CheckCircle className="w-5 h-5 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                )}
                 <span>{loginError}</span>
               </div>
             )}

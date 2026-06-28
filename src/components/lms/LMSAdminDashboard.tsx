@@ -331,9 +331,10 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
   // Approvals & Site Config logic
 
   const handleApproveLmsStudent = async (customer: any) => {
-    if (!confirm(`هل أنت متأكد من تفعيل حساب الطالب الأكاديمي ${customer.full_name}؟`)) return;
     try {
-      setLoading(true);
+      // Snappy UI: Instantly remove student from pending list
+      setPendingLmsStudents(prev => prev.filter(c => c.id !== customer.id));
+      
       if (supabase) {
         const { data, error } = await supabase.rpc('approve_lms_customer', { p_customer_id: customer.id });
         if (error) throw error;
@@ -367,25 +368,42 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
       }
       
       showToast('تم تفعيل حساب الطالب الأكاديمي بنجاح');
-      await loadAll();
+      
+      // Silent background reload
+      Promise.resolve().then(async () => {
+        const [usrs, reqs, newCustomersList] = await Promise.all([
+          lmsDb.getUsers(),
+          lmsDb.getSpecialRequests(),
+          db.getNewCustomers()
+        ]);
+        setUsers(usrs);
+        setSpecialRequests(reqs);
+        setPendingLmsStudents(newCustomersList.filter((c: any) => c.status === 'new' && (c.selected_course_id || c.university_name === 'LMS Student')));
+      }).catch(err => console.error('Background reload error:', err));
     } catch (err: any) {
+      await loadAll(); // Revert on failure
       alert('فشل التفعيل: ' + err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleRejectLmsStudent = async (customerId: number) => {
-    if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
     try {
-      setLoading(true);
+      setPendingLmsStudents(prev => prev.filter(c => c.id !== customerId));
       await db.updateNewCustomer(customerId, { status: 'rejected' });
       showToast('تم رفض الطلب بنجاح');
-      await loadAll();
+      
+      // Silent background reload
+      Promise.resolve().then(async () => {
+        const [reqs, newCustomersList] = await Promise.all([
+          lmsDb.getSpecialRequests(),
+          db.getNewCustomers()
+        ]);
+        setSpecialRequests(reqs);
+        setPendingLmsStudents(newCustomersList.filter((c: any) => c.status === 'new' && (c.selected_course_id || c.university_name === 'LMS Student')));
+      }).catch(err => console.error('Background reload error:', err));
     } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setLoading(false);
+      await loadAll(); // Revert on failure
+      alert('فشل الرفض: ' + err.message);
     }
   };
 
