@@ -72,7 +72,46 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
   }, []);
 
   const loadAll = async () => {
-    setLoading(true);
+    // 1. Instantly load from LocalStorage to make the page load in 0 seconds!
+    try {
+      const getLocal = <T>(key: string): T[] => {
+        try {
+          return JSON.parse(localStorage.getItem(key) || '[]');
+        } catch {
+          return [];
+        }
+      };
+      
+      const deptsLocal = getLocal<LMSDepartment>('lms_departments');
+      const crsLocal = getLocal<LMSCourse>('lms_courses');
+      const sectsLocal = getLocal<LMSSection>('lms_sections');
+      const usrsLocal = getLocal<LMSUser>('lms_users');
+      const reqsLocal = getLocal<LMSSpecialRequest>('lms_special_requests');
+      const sPlansLocal = getLocal<LMSSubscriptionPlan>('lms_subscription_plans');
+      const paymentsLocal = getLocal<any>('attendance_payments');
+      const newCustomersLocal = getLocal<any>('attendance_new_customers');
+      const sConfLocal = localStorage.getItem('lms_site_config') ? JSON.parse(localStorage.getItem('lms_site_config')!) : null;
+
+      if (deptsLocal.length > 0 || crsLocal.length > 0 || usrsLocal.length > 0) {
+        setDepartments(deptsLocal);
+        setCourses(crsLocal);
+        setSections(sectsLocal);
+        setUsers(usrsLocal);
+        setSpecialRequests(reqsLocal);
+        setSubscriptionPlans(sPlansLocal);
+        setPayments(paymentsLocal.filter((p: any) => p.lms_user_id !== null));
+        setPendingLmsStudents(newCustomersLocal.filter((c: any) => c.status === 'new' && (c.selected_course_id || c.university_name === 'LMS Student')));
+        if (sConfLocal) setSiteConfig(sConfLocal);
+        setLoading(false); // Stop loading spinner immediately!
+      } else {
+        setLoading(true);
+      }
+    } catch (e) {
+      console.error('Error loading local cache:', e);
+      setLoading(true);
+    }
+
+    // 2. Fetch fresh data from Supabase in the background
     try {
       const [depts, crs, sects, usrs, reqs, sConf, sPlans, paymentsList, newCustomersList] = await Promise.all([
         lmsDb.getDepartments(),
@@ -95,7 +134,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
       setPayments(paymentsList.filter((p: any) => p.lms_user_id !== null));
       setPendingLmsStudents(newCustomersList.filter((c: any) => c.status === 'new' && (c.selected_course_id || c.university_name === 'LMS Student')));
     } catch (err) {
-      console.error('[LMSAdmin] Load error:', err);
+      console.error('[LMSAdmin] Background load error:', err);
     } finally {
       setLoading(false);
     }
