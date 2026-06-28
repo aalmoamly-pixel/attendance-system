@@ -2678,6 +2678,7 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
             </button>
           </div>
         </div>
+      )}
       {/* Image Preview Modal */}
       {previewImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 animate-fade-in">
