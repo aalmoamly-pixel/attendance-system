@@ -1743,6 +1743,13 @@ export const lmsDb = {
   // 17. CRUD for Departments
   async updateDepartment(id: string, name: string, description?: string): Promise<void> {
     await checkLmsMode();
+    if (!useLmsLocal && supabase && isValidUuid(id)) {
+      const { error } = await supabase
+        .from('lms_departments')
+        .update({ name, description })
+        .eq('id', id);
+      if (error) throw error;
+    }
     const depts = getLocal<LMSDepartment>(LOCAL_KEYS.DEPARTMENTS);
     const index = depts.findIndex(d => d.id === id);
     if (index !== -1) {
@@ -1753,9 +1760,18 @@ export const lmsDb = {
   },
   async deleteDepartment(id: string): Promise<void> {
     await checkLmsMode();
+    if (!useLmsLocal && supabase && isValidUuid(id)) {
+      const { error, count } = await supabase
+        .from('lms_departments')
+        .delete({ count: 'exact' })
+        .eq('id', id);
+      if (error) throw error;
+      if (count === 0) {
+        throw new Error('لم يتم حذف القسم من السيرفر. قد يكون ذلك بسبب قيود الحماية (RLS) أو عدم وجود السجل.');
+      }
+    }
     const depts = getLocal<LMSDepartment>(LOCAL_KEYS.DEPARTMENTS);
     const courses = getLocal<LMSCourse>(LOCAL_KEYS.COURSES);
-    // Unlink courses from deleted department
     courses.forEach((c, idx) => {
       if (c.department_id === id) {
         courses[idx].department_id = undefined;
@@ -1768,6 +1784,14 @@ export const lmsDb = {
   // 18. CRUD for Courses
   async updateCourse(id: string, code: string, title: string, description?: string, departmentId?: string, price?: number): Promise<void> {
     await checkLmsMode();
+    const deptUuid = (departmentId && isValidUuid(departmentId)) ? departmentId : null;
+    if (!useLmsLocal && supabase && isValidUuid(id)) {
+      const { error } = await supabase
+        .from('lms_courses')
+        .update({ code, title, description, department_id: deptUuid, price })
+        .eq('id', id);
+      if (error) throw error;
+    }
     const courses = getLocal<LMSCourse>(LOCAL_KEYS.COURSES);
     const index = courses.findIndex(c => c.id === id);
     if (index !== -1) {
@@ -1781,9 +1805,18 @@ export const lmsDb = {
   },
   async deleteCourse(id: string): Promise<void> {
     await checkLmsMode();
+    if (!useLmsLocal && supabase && isValidUuid(id)) {
+      const { error, count } = await supabase
+        .from('lms_courses')
+        .delete({ count: 'exact' })
+        .eq('id', id);
+      if (error) throw error;
+      if (count === 0) {
+        throw new Error('لم يتم حذف المقرر من السيرفر. قد يكون ذلك بسبب قيود الحماية (RLS) أو عدم وجود السجل.');
+      }
+    }
     const courses = getLocal<LMSCourse>(LOCAL_KEYS.COURSES);
     const sections = getLocal<LMSSection>(LOCAL_KEYS.SECTIONS);
-    // Delete related sections
     setLocal(LOCAL_KEYS.SECTIONS, sections.filter(s => s.course_id !== id));
     setLocal(LOCAL_KEYS.COURSES, courses.filter(c => c.id !== id));
   },
@@ -1791,6 +1824,23 @@ export const lmsDb = {
   // 19. CRUD for Sections
   async updateSection(id: string, courseId: string, instructorId: string | null, sectionNumber: string, semester: string, capacity: number, scheduleDays?: string[], scheduleTime?: string): Promise<void> {
     await checkLmsMode();
+    const instUuid = (instructorId && isValidUuid(instructorId)) ? instructorId : null;
+    const courseUuid = isValidUuid(courseId) ? courseId : null;
+    if (!useLmsLocal && supabase && isValidUuid(id)) {
+      const { error } = await supabase
+        .from('lms_sections')
+        .update({ 
+          course_id: courseUuid, 
+          instructor_id: instUuid, 
+          section_number: sectionNumber, 
+          semester, 
+          capacity, 
+          schedule_days: scheduleDays, 
+          schedule_time: scheduleTime 
+        })
+        .eq('id', id);
+      if (error) throw error;
+    }
     const sections = getLocal<LMSSection>(LOCAL_KEYS.SECTIONS);
     const index = sections.findIndex(s => s.id === id);
     if (index !== -1) {
@@ -1806,6 +1856,16 @@ export const lmsDb = {
   },
   async deleteSection(id: string): Promise<void> {
     await checkLmsMode();
+    if (!useLmsLocal && supabase && isValidUuid(id)) {
+      const { error, count } = await supabase
+        .from('lms_sections')
+        .delete({ count: 'exact' })
+        .eq('id', id);
+      if (error) throw error;
+      if (count === 0) {
+        throw new Error('لم يتم حذف الشعبة من السيرفر. قد يكون ذلك بسبب قيود الحماية (RLS) أو عدم وجود السجل.');
+      }
+    }
     const sections = getLocal<LMSSection>(LOCAL_KEYS.SECTIONS);
     setLocal(LOCAL_KEYS.SECTIONS, sections.filter(s => s.id !== id));
   },
@@ -1813,6 +1873,24 @@ export const lmsDb = {
   // 20. CRUD for Users
   async updateUser(id: string, email: string, fullName: string, role: 'admin' | 'instructor' | 'student', phone?: string, status?: LMSUser['status'], passwordHash?: string, subscriptionPlanId?: string): Promise<void> {
     await checkLmsMode();
+    if (!useLmsLocal && supabase && isValidUuid(id)) {
+      const updateData: any = {
+        email,
+        full_name: fullName,
+        role,
+        phone,
+        status,
+        subscription_plan_id: subscriptionPlanId || null
+      };
+      if (passwordHash) {
+        updateData.password_hash = passwordHash;
+      }
+      const { error } = await supabase
+        .from('lms_users')
+        .update(updateData)
+        .eq('id', id);
+      if (error) throw error;
+    }
     const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
     const index = users.findIndex(u => u.id === id);
     if (index !== -1) {
@@ -1832,6 +1910,16 @@ export const lmsDb = {
   },
   async deleteUser(id: string): Promise<void> {
     await checkLmsMode();
+    if (!useLmsLocal && supabase && isValidUuid(id)) {
+      const { error, count } = await supabase
+        .from('lms_users')
+        .delete({ count: 'exact' })
+        .eq('id', id);
+      if (error) throw error;
+      if (count === 0) {
+        throw new Error('لم يتم حذف المستخدم من السيرفر. قد يكون ذلك بسبب قيود الحماية (RLS) أو عدم وجود السجل.');
+      }
+    }
     const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
     setLocal(LOCAL_KEYS.USERS, users.filter(u => u.id !== id));
   },
