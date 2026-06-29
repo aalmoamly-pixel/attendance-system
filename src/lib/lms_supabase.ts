@@ -1581,6 +1581,7 @@ export const lmsDb = {
           .from('lms_site_config')
           .select('config')
           .maybeSingle();
+        if (error) throw error;
         if (data && data.config) {
           localStorage.setItem(LOCAL_KEYS.SITE_CONFIG, JSON.stringify(data.config));
         }
