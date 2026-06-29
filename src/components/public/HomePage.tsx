@@ -208,7 +208,7 @@ export default function HomePage() {
                 className={`w-full sm:w-auto text-base px-8 py-4 flex items-center justify-center gap-2 hover:scale-[1.05] transition-all cursor-pointer rounded-xl font-bold ${
                   isLms 
                     ? 'bg-gradient-to-r from-brand-primary to-purple-600 text-white shadow-xl shadow-brand-primary/35 ring-2 ring-brand-primary/45' 
-                    : 'bg-slate-950/85 border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    : 'bg-slate-900 border border-brand-primary/50 text-brand-primary hover:bg-brand-primary/10'
                 }`}
               >
                 {isLms ? <BookOpen className="w-5 h-5" /> : <ClipboardList className="w-5 h-5" />}
@@ -284,12 +284,12 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Attendance Portal Card (Less prominent) - Now SECOND */}
+        {/* Attendance Portal Card (Active brand colors) - Now SECOND */}
         {siteConfig.portals?.attendance && (
-          <div className="glass-card p-8 border border-dark-border/40 opacity-75 hover:opacity-100 hover:border-slate-700 transition-all duration-300 flex flex-col justify-between text-right group relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-slate-900/10 blur-3xl pointer-events-none rounded-full" />
+          <div className="glass-card p-8 border border-dark-border/80 hover:border-brand-primary/50 transition-all duration-300 flex flex-col justify-between text-right group relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl pointer-events-none rounded-full" />
             <div className="space-y-6">
-              <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary group-hover:scale-110 transition-transform">
                 <ClipboardList className="w-7 h-7" />
               </div>
               <h3 className="text-2xl font-black text-white">{siteConfig.portals.attendance.name}</h3>
@@ -301,7 +301,7 @@ export default function HomePage() {
               <div className="space-y-3 pt-2 border-t border-dark-border/40">
                 {(siteConfig.attendanceFeatures || []).map((feat: any, i: number) => (
                   <div key={i} className="flex items-center gap-2.5 flex-row-reverse text-right text-xs text-dark-muted">
-                    <Check className="w-4 h-4 text-slate-500 shrink-0" />
+                    <Check className="w-4 h-4 text-brand-primary shrink-0" />
                     <span>{feat.title}</span>
                   </div>
                 ))}
@@ -310,7 +310,7 @@ export default function HomePage() {
             <div className="pt-8">
               <Link 
                 to={siteConfig.portals.attendance.link} 
-                className="w-full py-3.5 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-800 font-bold text-sm text-center block transition-all hover:scale-[1.01]"
+                className="w-full py-3.5 rounded-xl bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/40 text-brand-primary font-bold text-sm text-center block transition-all hover:scale-[1.01]"
               >
                 دخول {siteConfig.portals.attendance.name}
               </Link>
@@ -384,7 +384,7 @@ export default function HomePage() {
             </Link>
             <Link 
               to="/login"
-              className="px-8 py-3.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-900 font-bold text-sm text-center transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="px-8 py-3.5 rounded-xl bg-slate-900 border border-brand-primary/50 text-brand-primary hover:bg-brand-primary/10 font-bold text-sm text-center transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Lock className="w-4.5 h-4.5" />
               {siteConfig.unifiedLoginBtnAttendance || 'تسجيل الدخول الموحد (نظام التحضير)'}
