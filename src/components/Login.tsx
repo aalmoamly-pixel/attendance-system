@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Eye, EyeOff, Lock, User, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, AlertCircle, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { login } from '../lib/auth';
 
 interface LoginProps {
@@ -30,7 +31,14 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-dark-bg via-dark-bg to-dark-card p-4">
-      <div className="glass-card w-full max-w-md p-8 animate-fade-in">
+      <div className="glass-card w-full max-w-md p-8 animate-fade-in relative">
+        {/* Close Button */}
+        <Link
+          to="/"
+          className="absolute top-4 right-4 p-2 rounded-xl bg-dark-bg border border-dark-border text-dark-muted hover:text-white transition-all cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </Link>
         <div className="text-center mb-8">
           <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center">
             <Lock className="w-10 h-10 text-white" />
