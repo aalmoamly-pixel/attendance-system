@@ -15,7 +15,8 @@ import {
   Upload,
   AlertCircle,
   RefreshCw,
-  MessageSquare
+  MessageSquare,
+  Lock
 } from 'lucide-react';
 import PublicLayout from './PublicLayout';
 import { lmsDb, type LMSSubscriptionPlan } from '../../lib/lms_supabase';
