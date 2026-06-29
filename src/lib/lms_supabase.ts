@@ -1573,6 +1573,22 @@ export const lmsDb = {
   // 16. Site settings dynamic management (site info, stats, features)
   async getSiteConfig(): Promise<any> {
     await checkLmsMode();
+    
+    // 1. Try to fetch from database if online
+    if (!useLmsLocal && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('lms_site_config')
+          .select('config')
+          .maybeSingle();
+        if (data && data.config) {
+          localStorage.setItem(LOCAL_KEYS.SITE_CONFIG, JSON.stringify(data.config));
+        }
+      } catch (e) {
+        console.error('Error fetching site config from Supabase:', e);
+      }
+    }
+
     const configStr = localStorage.getItem(LOCAL_KEYS.SITE_CONFIG);
     let config: any = null;
     if (configStr) {
@@ -1694,6 +1710,33 @@ export const lmsDb = {
   async updateSiteConfig(config: any): Promise<void> {
     await checkLmsMode();
     localStorage.setItem(LOCAL_KEYS.SITE_CONFIG, JSON.stringify(config));
+
+    // Update in Supabase if online
+    if (!useLmsLocal && supabase) {
+      try {
+        const { data: existing, error: checkError } = await supabase
+          .from('lms_site_config')
+          .select('id')
+          .maybeSingle();
+        
+        if (checkError) throw checkError;
+
+        if (existing) {
+          const { error: updateError } = await supabase
+            .from('lms_site_config')
+            .update({ config, updated_at: new Date().toISOString() })
+            .eq('id', existing.id);
+          if (updateError) throw updateError;
+        } else {
+          const { error: insertError } = await supabase
+            .from('lms_site_config')
+            .insert([{ config }]);
+          if (insertError) throw insertError;
+        }
+      } catch (e) {
+        console.error('Error saving site config to Supabase:', e);
+      }
+    }
   },
 
   // 17. CRUD for Departments
