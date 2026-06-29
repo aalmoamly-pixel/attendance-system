@@ -52,6 +52,26 @@ export default function HomePage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
+    // 1. Instantly read from LocalStorage for 0-second load!
+    try {
+      const cachedConfig = localStorage.getItem('lms_site_config');
+      const cachedPlans = localStorage.getItem('lms_subscription_plans');
+      
+      if (cachedConfig) {
+        setSiteConfig(JSON.parse(cachedConfig));
+      }
+      if (cachedPlans) {
+        setSubscriptionPlans(JSON.parse(cachedPlans));
+      }
+      
+      if (cachedConfig) {
+        setLoading(false);
+      }
+    } catch (e) {
+      console.error('Error loading local cache in HomePage:', e);
+    }
+
+    // 2. Fetch fresh data from Supabase in the background
     async function loadData() {
       try {
         const [config, plans] = await Promise.all([
