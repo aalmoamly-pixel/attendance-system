@@ -74,13 +74,13 @@ export default function LMSAdminDashboard({ adminUser: _adminUser, activeTab: pr
   const loadAll = async () => {
     // 1. Instantly load from LocalStorage to make the page load in 0 seconds!
     try {
-      const getLocal = <T>(key: string): T[] => {
+      function getLocal<T>(key: string): T[] {
         try {
           return JSON.parse(localStorage.getItem(key) || '[]');
         } catch {
           return [];
         }
-      };
+      }
       
       const deptsLocal = getLocal<LMSDepartment>('lms_departments');
       const crsLocal = getLocal<LMSCourse>('lms_courses');
