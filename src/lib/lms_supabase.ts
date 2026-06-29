@@ -219,6 +219,11 @@ const LOCAL_KEYS = {
 const useLmsLocal = false;
 let isChecked = false;
 
+const isValidUuid = (id: any): boolean => {
+  if (typeof id !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 const getLocal = <T>(key: string): T[] => {
   try {
     return JSON.parse(localStorage.getItem(key) || '[]');
