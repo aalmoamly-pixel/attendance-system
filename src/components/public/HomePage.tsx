@@ -245,41 +245,7 @@ export default function HomePage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-[1450px] mx-auto items-stretch">
-        {/* Attendance Portal Card (Less prominent) */}
-        {siteConfig.portals?.attendance && (
-          <div className="glass-card p-8 border border-dark-border/40 opacity-75 hover:opacity-100 hover:border-slate-700 transition-all duration-300 flex flex-col justify-between text-right group relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-slate-900/10 blur-3xl pointer-events-none rounded-full" />
-            <div className="space-y-6">
-              <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform">
-                <ClipboardList className="w-7 h-7" />
-              </div>
-              <h3 className="text-2xl font-black text-white">{siteConfig.portals.attendance.name}</h3>
-              <p className="text-sm text-dark-muted leading-relaxed">
-                {siteConfig.portals.attendance.desc}
-              </p>
-              
-              {/* Features List */}
-              <div className="space-y-3 pt-2 border-t border-dark-border/40">
-                {(siteConfig.attendanceFeatures || []).map((feat: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2.5 flex-row-reverse text-right text-xs text-dark-muted">
-                    <Check className="w-4 h-4 text-slate-500 shrink-0" />
-                    <span>{feat.title}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="pt-8">
-              <Link 
-                to={siteConfig.portals.attendance.link} 
-                className="w-full py-3.5 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-800 font-bold text-sm text-center block transition-all hover:scale-[1.01]"
-              >
-                دخول {siteConfig.portals.attendance.name}
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* LMS Portal Card (Highly prominent & glowing) */}
+        {/* LMS Portal Card (Highly prominent & glowing) - Now FIRST */}
         {siteConfig.portals?.lms && (
           <div className="glass-card p-8 border-2 border-brand-primary bg-[#0f1322]/95 shadow-2xl shadow-brand-primary/10 lg:scale-[1.03] transition-all duration-300 flex flex-col justify-between text-right group relative overflow-hidden">
             {/* Highly Recommended Badge */}
@@ -312,6 +278,40 @@ export default function HomePage() {
                 className="w-full py-4 rounded-xl bg-gradient-to-r from-brand-primary to-purple-600 text-white hover:opacity-95 font-black text-base text-center block transition-all hover:scale-[1.02] shadow-xl shadow-brand-primary/30"
               >
                 دخول {siteConfig.portals.lms.name} (المنصة التعليمية المميزة)
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Attendance Portal Card (Less prominent) - Now SECOND */}
+        {siteConfig.portals?.attendance && (
+          <div className="glass-card p-8 border border-dark-border/40 opacity-75 hover:opacity-100 hover:border-slate-700 transition-all duration-300 flex flex-col justify-between text-right group relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-slate-900/10 blur-3xl pointer-events-none rounded-full" />
+            <div className="space-y-6">
+              <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform">
+                <ClipboardList className="w-7 h-7" />
+              </div>
+              <h3 className="text-2xl font-black text-white">{siteConfig.portals.attendance.name}</h3>
+              <p className="text-sm text-dark-muted leading-relaxed">
+                {siteConfig.portals.attendance.desc}
+              </p>
+              
+              {/* Features List */}
+              <div className="space-y-3 pt-2 border-t border-dark-border/40">
+                {(siteConfig.attendanceFeatures || []).map((feat: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2.5 flex-row-reverse text-right text-xs text-dark-muted">
+                    <Check className="w-4 h-4 text-slate-500 shrink-0" />
+                    <span>{feat.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="pt-8">
+              <Link 
+                to={siteConfig.portals.attendance.link} 
+                className="w-full py-3.5 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-800 font-bold text-sm text-center block transition-all hover:scale-[1.01]"
+              >
+                دخول {siteConfig.portals.attendance.name}
               </Link>
             </div>
           </div>
@@ -375,16 +375,18 @@ export default function HomePage() {
 
           <div className="pt-4 flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
-              to="/login"
-              className="px-8 py-3.5 rounded-xl bg-brand-primary text-white hover:bg-brand-primary/95 font-bold text-sm text-center shadow-lg shadow-brand-primary/25 hover:scale-[1.01] transition-all"
+              to="/lms"
+              className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-brand-primary to-purple-600 text-white font-black text-sm text-center shadow-xl shadow-brand-primary/30 ring-2 ring-brand-primary/40 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
             >
-              {siteConfig.unifiedLoginBtnAttendance || 'تسجيل الدخول الموحد (نظام التحضير)'}
+              <BookOpen className="w-4.5 h-4.5 animate-pulse" />
+              {siteConfig.unifiedLoginBtnLms || 'تسجيل الدخول الموحد (منصة LMS)'}
             </Link>
             <Link 
-              to="/lms"
-              className="px-8 py-3.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white font-bold text-sm text-center hover:bg-slate-800 transition-all"
+              to="/login"
+              className="px-8 py-3.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-900 font-bold text-sm text-center transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              {siteConfig.unifiedLoginBtnLms || 'تسجيل الدخول الموحد (منصة LMS)'}
+              <Lock className="w-4.5 h-4.5" />
+              {siteConfig.unifiedLoginBtnAttendance || 'تسجيل الدخول الموحد (نظام التحضير)'}
             </Link>
           </div>
         </div>

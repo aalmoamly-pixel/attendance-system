@@ -96,17 +96,20 @@ export default function PublicNavbar() {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-4 flex-row">
+            <Link 
+              to="/lms" 
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-primary to-purple-600 text-white font-black text-xs shadow-lg shadow-brand-primary/25 hover:scale-[1.03] transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4 animate-pulse" />
+              بوابة LMS الأكاديمية (المنصة المميزة)
+            </Link>
             <button
               onClick={() => navigate('/login')}
-              className="btn-primary flex items-center gap-2"
+              className="px-5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
             >
-              <Lock className="w-5 h-5" />
+              <Lock className="w-4 h-4" />
               بوابة التحضير
             </button>
-            <Link to="/lms" className="btn-secondary flex items-center gap-2 border border-brand-primary/50 text-brand-primary hover:bg-brand-primary/10">
-              <BookOpen className="w-4 h-4" />
-              بوابة LMS الأكاديمية
-            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -124,24 +127,24 @@ export default function PublicNavbar() {
             <div className="flex flex-col gap-4">
               {navLinks.map((link) => renderLink(link, true))}
               <div className="flex flex-col gap-3 pt-4 border-t border-dark-border">
+                <Link
+                  to="/lms"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-primary to-purple-600 text-white font-black text-xs text-center flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/20"
+                >
+                  <BookOpen className="w-4 h-4 animate-pulse" />
+                  بوابة LMS الأكاديمية (المنصة المميزة)
+                </Link>
                 <button
                   onClick={() => {
                     navigate('/login');
                     setIsMenuOpen(false);
                   }}
-                  className="btn-primary w-full flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center gap-2"
                 >
-                  <Lock className="w-5 h-5" />
+                  <Lock className="w-4 h-4" />
                   بوابة التحضير
                 </button>
-                <Link
-                  to="/lms"
-                  onClick={() => setIsMenuOpen(false)}
-                  className="btn-secondary w-full flex items-center justify-center gap-2 border border-brand-primary/50 text-brand-primary"
-                >
-                  <BookOpen className="w-4 h-4" />
-                  بوابة LMS الأكاديمية
-                </Link>
               </div>
             </div>
           </div>
