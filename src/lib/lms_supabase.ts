@@ -273,7 +273,7 @@ const checkLmsMode = async () => {
 function seedLMSLocalData() {
   const existingCourses = getLocal<LMSCourse>(LOCAL_KEYS.COURSES);
   const hasV2Courses = existingCourses.some(c => c.id === 'course-eng101');
-  
+
   if (getLocal(LOCAL_KEYS.USERS).length === 0 || !hasV2Courses) {
     console.log('[LMS DB] Seeding default data to LocalStorage...');
 
@@ -283,7 +283,7 @@ function seedLMSLocalData() {
       { id: 'usr-student-123', email: 'student@lms.com', full_name: 'أحمد خالد العتيبي', phone: '0500000003', role: 'student', status: 'active', created_at: new Date().toISOString() }
     ];
     setLocal(LOCAL_KEYS.USERS, users);
-    
+
     const depts: LMSDepartment[] = [
       { id: 'dept-cs', name: 'علوم الحاسب والمعلومات', description: 'قسم مختص بعلوم الحاسب وهندسة البرمجيات ونظم المعلومات', created_at: new Date().toISOString() },
       { id: 'dept-gen', name: 'المواد العامة والتقوية', description: 'مساقات لتقوية وتطوير المهارات اللغوية والأكاديمية', created_at: new Date().toISOString() },
@@ -430,13 +430,13 @@ export const lmsDb = {
     if (!useLmsLocal && supabase) {
       const { data, error } = await supabase
         .from('lms_users')
-        .insert({ 
-          email, 
-          password_hash, 
-          full_name, 
-          role, 
-          phone, 
-          status: status || (role === 'student' ? 'pending' : 'active'), 
+        .insert({
+          email,
+          password_hash,
+          full_name,
+          role,
+          phone,
+          status: status || (role === 'student' ? 'pending' : 'active'),
           subscription_plan_id: subscriptionPlanId,
           subscription_status: subscriptionStatus || (role === 'student' ? 'pending_payment' : 'active')
         })
@@ -460,7 +460,7 @@ export const lmsDb = {
         subscription_status: subscriptionStatus || (role === 'student' ? 'pending_payment' : 'active'),
         created_at: new Date().toISOString()
       };
-      
+
       // Also save password locally in a separate mock auth store for simplicity
       const localAuth = JSON.parse(localStorage.getItem('lms_local_auth_passwords') || '{}');
       localAuth[email.toLowerCase()] = password_hash;
@@ -517,9 +517,9 @@ export const lmsDb = {
     } else {
       const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
       if (role) {
-        return users.filter(u => u.role === role).sort((a,b) => a.full_name.localeCompare(b.full_name));
+        return users.filter(u => u.role === role).sort((a, b) => a.full_name.localeCompare(b.full_name));
       }
-      return users.sort((a,b) => a.full_name.localeCompare(b.full_name));
+      return users.sort((a, b) => a.full_name.localeCompare(b.full_name));
     }
   },
 
@@ -531,7 +531,7 @@ export const lmsDb = {
       if (error) throw error;
       return data || [];
     } else {
-      return getLocal<LMSDepartment>(LOCAL_KEYS.DEPARTMENTS).sort((a,b) => a.name.localeCompare(b.name));
+      return getLocal<LMSDepartment>(LOCAL_KEYS.DEPARTMENTS).sort((a, b) => a.name.localeCompare(b.name));
     }
   },
 
@@ -568,7 +568,7 @@ export const lmsDb = {
       setLocal(LOCAL_KEYS.COURSES, data || []);
       return data || [];
     } else {
-      return getLocal<LMSCourse>(LOCAL_KEYS.COURSES).sort((a,b) => a.title.localeCompare(b.title));
+      return getLocal<LMSCourse>(LOCAL_KEYS.COURSES).sort((a, b) => a.title.localeCompare(b.title));
     }
   },
 
@@ -619,7 +619,7 @@ export const lmsDb = {
         ...sec,
         course: courses.find(c => c.id === sec.course_id),
         instructor: users.find(u => u.id === sec.instructor_id)
-      })).sort((a,b) => a.section_number.localeCompare(b.section_number));
+      })).sort((a, b) => a.section_number.localeCompare(b.section_number));
     }
   },
 
@@ -649,7 +649,7 @@ export const lmsDb = {
         schedule_time: scheduleTime,
         created_at: new Date().toISOString()
       };
-      
+
       result = {
         ...newSection,
         course: courses.find(c => c.id === courseId),
@@ -680,7 +680,7 @@ export const lmsDb = {
           ...sec,
           course: courses.find(c => c.id === sec.course_id)
         }))
-        .sort((a,b) => a.section_number.localeCompare(b.section_number));
+        .sort((a, b) => a.section_number.localeCompare(b.section_number));
     }
   },
 
@@ -775,7 +775,7 @@ export const lmsDb = {
       const materials = getLocal<LMSMaterial>(LOCAL_KEYS.MATERIALS);
       return materials
         .filter(m => m.section_id === sectionId)
-        .sort((a,b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
+        .sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
     }
   },
 
@@ -821,7 +821,7 @@ export const lmsDb = {
       const assignments = getLocal<LMSAssignment>(LOCAL_KEYS.ASSIGNMENTS);
       return assignments
         .filter(a => a.section_id === sectionId)
-        .sort((a,b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
     }
   },
 
@@ -872,7 +872,7 @@ export const lmsDb = {
           ...s,
           student: users.find(u => u.id === s.student_id)
         }))
-        .sort((a,b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+        .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
     }
   },
 
@@ -971,7 +971,7 @@ export const lmsDb = {
       const questions = getLocal<LMSQuestion>(LOCAL_KEYS.QUESTIONS);
       return questions
         .filter(q => q.course_id === courseId)
-        .sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
   },
 
@@ -1017,7 +1017,7 @@ export const lmsDb = {
       const exams = getLocal<LMSExam>(LOCAL_KEYS.EXAMS);
       return exams
         .filter(e => e.section_id === sectionId)
-        .sort((a,b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
     }
   },
 
@@ -1162,7 +1162,7 @@ export const lmsDb = {
       const meetings = getLocal<LMSMeeting>(LOCAL_KEYS.MEETINGS);
       return meetings
         .filter(m => m.section_id === sectionId)
-        .sort((a,b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
     }
   },
 
@@ -1272,7 +1272,7 @@ export const lmsDb = {
           ...a,
           creator: users.find(u => u.id === a.created_by)
         }))
-        .sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
   },
 
@@ -1330,7 +1330,7 @@ export const lmsDb = {
           sender: users.find(u => u.id === m.sender_id),
           receiver: users.find(u => u.id === m.receiver_id)
         }))
-        .sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     }
   },
 
@@ -1433,7 +1433,7 @@ export const lmsDb = {
       if (error) throw error;
       return data || [];
     } else {
-      return getLocal<LMSSpecialRequest>(LOCAL_KEYS.SPECIAL_REQUESTS).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      return getLocal<LMSSpecialRequest>(LOCAL_KEYS.SPECIAL_REQUESTS).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
   },
 
@@ -1488,7 +1488,7 @@ export const lmsDb = {
     if (!useLmsLocal && supabase) {
       const updates: any = { status };
       if (price !== undefined) updates.price = price;
-      
+
       const { data: updatedRequest, error } = await supabase
         .from('lms_special_requests')
         .update(updates)
@@ -1513,7 +1513,7 @@ export const lmsDb = {
           requests[reqIndex].price = price;
         }
         setLocal(LOCAL_KEYS.SPECIAL_REQUESTS, requests);
-        
+
         // Auto-approve user status as well if the request is approved
         const studentId = requests[reqIndex].student_id;
         const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
@@ -1550,14 +1550,14 @@ export const lmsDb = {
     if (!useLmsLocal && supabase) {
       const { error } = await supabase
         .from('lms_users')
-        .update({ 
+        .update({
           subscription_status: subscriptionStatus,
-          subscription_plan_id: planId 
+          subscription_plan_id: planId
         })
         .eq('id', userId);
       if (error) throw error;
     }
-    
+
     // Always sync local storage
     const users = getLocal<LMSUser>(LOCAL_KEYS.USERS);
     const index = users.findIndex(u => u.id === userId);
@@ -1573,7 +1573,7 @@ export const lmsDb = {
   // 16. Site settings dynamic management (site info, stats, features)
   async getSiteConfig(): Promise<any> {
     await checkLmsMode();
-    
+
     // 1. Try to fetch from database if online
     if (!useLmsLocal && supabase) {
       try {
@@ -1595,7 +1595,7 @@ export const lmsDb = {
     if (configStr) {
       try {
         config = JSON.parse(configStr);
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const defaultConfig = {
@@ -1719,7 +1719,7 @@ export const lmsDb = {
           .from('lms_site_config')
           .select('id')
           .maybeSingle();
-        
+
         if (checkError) throw checkError;
 
         if (existing) {
