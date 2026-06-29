@@ -197,22 +197,24 @@ export default function HomePage() {
           {siteConfig.welcomeDesc}
         </p>
         
-        {/* Portal Entry Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
-          {siteConfig.heroButtons?.map((btn: any, idx: number) => (
-            <Link
-              key={idx}
-              to={btn.href}
-              className={`w-full sm:w-auto text-base px-8 py-4 flex items-center justify-center gap-2 hover:scale-[1.02] transition-all cursor-pointer rounded-xl font-bold ${
-                btn.isPrimary 
-                  ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25 hover:bg-brand-primary/95' 
-                  : 'bg-slate-900 border border-brand-primary/50 text-brand-primary hover:bg-brand-primary/10'
-              }`}
-            >
-              {btn.href.includes('lms') ? <BookOpen className="w-5 h-5" /> : <ClipboardList className="w-5 h-5" />}
-              <span>{btn.label}</span>
-            </Link>
-          ))}
+          {siteConfig.heroButtons?.map((btn: any, idx: number) => {
+            const isLms = btn.href.includes('lms');
+            return (
+              <Link
+                key={idx}
+                to={btn.href}
+                className={`w-full sm:w-auto text-base px-8 py-4 flex items-center justify-center gap-2 hover:scale-[1.05] transition-all cursor-pointer rounded-xl font-bold ${
+                  isLms 
+                    ? 'bg-gradient-to-r from-brand-primary to-purple-600 text-white shadow-xl shadow-brand-primary/35 ring-2 ring-brand-primary/45' 
+                    : 'bg-slate-950/85 border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                {isLms ? <BookOpen className="w-5 h-5" /> : <ClipboardList className="w-5 h-5" />}
+                <span>{btn.label}</span>
+              </Link>
+            );
+          })}
         </div>
       </div>
       
@@ -243,12 +245,12 @@ export default function HomePage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-[1450px] mx-auto items-stretch">
-        {/* Attendance Portal Card */}
+        {/* Attendance Portal Card (Less prominent) */}
         {siteConfig.portals?.attendance && (
-          <div className="glass-card p-8 hover:border-brand-primary/50 transition-all duration-300 flex flex-col justify-between text-right group relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl pointer-events-none rounded-full" />
+          <div className="glass-card p-8 border border-dark-border/40 opacity-75 hover:opacity-100 hover:border-slate-700 transition-all duration-300 flex flex-col justify-between text-right group relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-slate-900/10 blur-3xl pointer-events-none rounded-full" />
             <div className="space-y-6">
-              <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform">
                 <ClipboardList className="w-7 h-7" />
               </div>
               <h3 className="text-2xl font-black text-white">{siteConfig.portals.attendance.name}</h3>
@@ -260,7 +262,7 @@ export default function HomePage() {
               <div className="space-y-3 pt-2 border-t border-dark-border/40">
                 {(siteConfig.attendanceFeatures || []).map((feat: any, i: number) => (
                   <div key={i} className="flex items-center gap-2.5 flex-row-reverse text-right text-xs text-dark-muted">
-                    <Check className="w-4 h-4 text-brand-primary shrink-0" />
+                    <Check className="w-4 h-4 text-slate-500 shrink-0" />
                     <span>{feat.title}</span>
                   </div>
                 ))}
@@ -269,7 +271,7 @@ export default function HomePage() {
             <div className="pt-8">
               <Link 
                 to={siteConfig.portals.attendance.link} 
-                className="w-full py-3.5 rounded-xl bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/40 text-brand-primary font-bold text-sm text-center block transition-all hover:scale-[1.01]"
+                className="w-full py-3.5 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-800 font-bold text-sm text-center block transition-all hover:scale-[1.01]"
               >
                 دخول {siteConfig.portals.attendance.name}
               </Link>
@@ -277,24 +279,28 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* LMS Portal Card */}
+        {/* LMS Portal Card (Highly prominent & glowing) */}
         {siteConfig.portals?.lms && (
-          <div className="glass-card p-8 hover:border-brand-secondary/50 transition-all duration-300 flex flex-col justify-between text-right group relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-secondary/5 blur-3xl pointer-events-none rounded-full" />
+          <div className="glass-card p-8 border-2 border-brand-primary bg-[#0f1322]/95 shadow-2xl shadow-brand-primary/10 lg:scale-[1.03] transition-all duration-300 flex flex-col justify-between text-right group relative overflow-hidden">
+            {/* Highly Recommended Badge */}
+            <div className="absolute top-4 left-4 bg-gradient-to-r from-brand-primary to-purple-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black tracking-wider animate-pulse">
+              ✨ البوابة الأكاديمية المميزة
+            </div>
+            <div className="absolute top-0 right-0 w-48 h-48 bg-brand-primary/15 blur-3xl pointer-events-none rounded-full" />
             <div className="space-y-6">
-              <div className="w-14 h-14 rounded-2xl bg-brand-secondary/10 border border-brand-secondary/20 flex items-center justify-center text-brand-secondary group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-2xl bg-brand-primary/20 border border-brand-primary/30 flex items-center justify-center text-brand-primary group-hover:scale-110 transition-transform">
                 <BookOpen className="w-7 h-7" />
               </div>
               <h3 className="text-2xl font-black text-white">{siteConfig.portals.lms.name}</h3>
-              <p className="text-sm text-dark-muted leading-relaxed">
+              <p className="text-sm text-slate-300 leading-relaxed">
                 {siteConfig.portals.lms.desc}
               </p>
               
               {/* Features List */}
               <div className="space-y-3 pt-2 border-t border-dark-border/40">
                 {(siteConfig.lmsFeatures || []).map((feat: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2.5 flex-row-reverse text-right text-xs text-dark-muted">
-                    <Check className="w-4 h-4 text-brand-secondary shrink-0" />
+                  <div key={i} className="flex items-center gap-2.5 flex-row-reverse text-right text-xs text-slate-300">
+                    <Check className="w-4 h-4 text-brand-primary shrink-0" />
                     <span>{feat.title}</span>
                   </div>
                 ))}
@@ -303,9 +309,9 @@ export default function HomePage() {
             <div className="pt-8">
               <Link 
                 to={siteConfig.portals.lms.link} 
-                className="w-full py-3.5 rounded-xl bg-brand-primary text-white hover:bg-brand-primary/95 font-bold text-sm text-center block transition-all hover:scale-[1.01] shadow-lg shadow-brand-primary/20"
+                className="w-full py-4 rounded-xl bg-gradient-to-r from-brand-primary to-purple-600 text-white hover:opacity-95 font-black text-base text-center block transition-all hover:scale-[1.02] shadow-xl shadow-brand-primary/30"
               >
-                دخول {siteConfig.portals.lms.name}
+                دخول {siteConfig.portals.lms.name} (المنصة التعليمية المميزة)
               </Link>
             </div>
           </div>
@@ -817,6 +823,18 @@ export default function HomePage() {
           </div>
         </div>
       )}
+      {/* Floating Contact Button */}
+      <div className="fixed bottom-6 left-6 z-50 animate-bounce">
+        <a
+          href={`https://wa.me/${whatsappNumber}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-2 px-5 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-full shadow-2xl shadow-emerald-500/30 hover:scale-105 transition-all duration-300 border border-emerald-400/20"
+        >
+          <MessageSquare className="w-5 h-5 animate-pulse" />
+          <span className="text-xs md:text-sm tracking-wide font-sans">تواصل معنا</span>
+        </a>
+      </div>
     </PublicLayout>
   );
 }

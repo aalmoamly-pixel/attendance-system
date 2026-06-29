@@ -896,6 +896,18 @@ export default function LMSLanding({ onLoginSuccess }: LMSLandingProps) {
           </div>
         </div>
       )}
+      {/* Floating Contact Button */}
+      <div className="fixed bottom-6 left-6 z-50 animate-bounce">
+        <a
+          href={`https://wa.me/${(siteConfig?.whatsapp || siteConfig?.contactPhone || '966501234567').replace(/\D/g, '')}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-2 px-5 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-full shadow-2xl shadow-emerald-500/30 hover:scale-105 transition-all duration-300 border border-emerald-400/20"
+        >
+          <MessageSquare className="w-5 h-5 animate-pulse" />
+          <span className="text-xs md:text-sm tracking-wide font-sans">تواصل معنا</span>
+        </a>
+      </div>
     </div>
   );
 }
